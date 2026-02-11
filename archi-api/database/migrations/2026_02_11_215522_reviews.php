@@ -11,11 +11,13 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('shoppings', function(Blueprint $table){
+        Schema::create('reviews', function(Blueprint $table){
             $table->id();
             $table->foreignId('user_id')->constrained()->onDelete('cascade');
-            $table->date('shop_date');
-            $table->decimal('total');
+            $table->foreignId('models_id')->constrained()->onDelete('cascade');
+            $table->integer('qualification');
+            $table->string('comment');
+            $table->date('date');
             $table->timestamps();
         });
     }
