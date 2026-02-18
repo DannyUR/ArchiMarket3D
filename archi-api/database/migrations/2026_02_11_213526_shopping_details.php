@@ -13,8 +13,8 @@ return new class extends Migration
     {
         Schema::create('shopping_details', function(Blueprint $table){
             $table->id();
-            $table->foreignId('shopping_id')->constrained()->onDelete('cascade');
-            $table->foreignId('models_id')->constrained()->onDelete('cascade');
+            $table->foreignId('shopping_id')->constrained('shopping')->onDelete('cascade');
+            $table->foreignId('model_id')->constrained('models')->onDelete('cascade');
             $table->decimal('unit_price');
             $table->timestamps();
         });
