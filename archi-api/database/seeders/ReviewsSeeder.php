@@ -14,6 +14,16 @@ class ReviewsSeeder extends Seeder
      */
     public function run(): void
     {
-        //
+        DB::table('reviews')->insert([
+            [
+                'user_id'=> 2,
+                'model_id'=> 1,
+                'rating'=> 5,
+                'comment'=> 'Excelente modelo, muy detallado y fácil de integrar en BIM.',
+                'created_at'=> now(),
+                'updated_at'=> now()
+            ]
+        ]);
+
     }
 }

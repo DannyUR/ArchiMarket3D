@@ -14,6 +14,15 @@ class ShoppingDetailsSeeder extends Seeder
      */
     public function run(): void
     {
-        //
+        DB::table('shopping_details')->insert([
+            [
+                'shopping_id'=> 1,
+                'model_id'=> 1,
+                'unit_price'=> 99.99,
+                'created_at'=> now(),
+                'updated_at'=> now()
+            ]
+        ]);
+
     }
 }

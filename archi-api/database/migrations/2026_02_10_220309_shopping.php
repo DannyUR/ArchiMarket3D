@@ -13,11 +13,12 @@ return new class extends Migration
     {
         Schema::create('shopping', function(Blueprint $table){
             $table->id();
-            $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->date('shop_date');
-            $table->decimal('total');
+            $table->foreignId('user_id')->constrained()->onDelete('cascade');
+            $table->dateTime('purchase_date');
+            $table->decimal('total', 10, 2);
             $table->timestamps();
         });
+
     }
 
     /**

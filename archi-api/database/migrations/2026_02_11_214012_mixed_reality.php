@@ -13,12 +13,13 @@ return new class extends Migration
     {
         Schema::create('mixed_reality', function(Blueprint $table){
             $table->id();
-            $table->foreignId('models_id')->constrained()->onDelete('cascade');
-            $table->boolean('compatible');
-            $table->enum('format',['HoloLens', 'ARCore', 'ARKit', 'WebXR', 'Unity', 'Unreal Engine', 'Vuforia', 'Meta Quest', '8th Wall', 'Spark AR', 'Blender', 'Amazon Sumerian', 'Wikitude', 'ZapWorks', 'Niantic Lightship', 'MRTK', 'A-Frame', 'Three.js'])->default('HoloLens');
-            $table->string('notes');
+            $table->foreignId('model_id') ->unique()->constrained()->onDelete('cascade');
+            $table->boolean('compatible')->default(true);
+            $table->enum('platform', ['HoloLens','ARCore','ARKit','WebXR','Unity','Unreal','MetaQuest']);
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
+
     }
 
     /**

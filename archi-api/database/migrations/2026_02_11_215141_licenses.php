@@ -13,11 +13,12 @@ return new class extends Migration
     {
         Schema::create('licenses', function(Blueprint $table){
             $table->id();
-            $table->foreignId('models_id')->constrained()->onDelete('cascade');
-            $table->enum('type',['personal', 'business', 'unlimited'])->default('personal');
-            $table->string('description');
+            $table->foreignId('model_id')->constrained()->onDelete('cascade');
+            $table->enum('type', ['personal','business','unlimited']);
+            $table->text('description');
             $table->timestamps();
         });
+
     }
 
     /**

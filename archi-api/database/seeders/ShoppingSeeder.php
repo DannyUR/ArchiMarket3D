@@ -14,12 +14,15 @@ class ShoppingSeeder extends Seeder
      */
     public function run(): void
     {
-         DB::table('shopping')->insert([
+        DB::table('shopping')->insert([
             [
-                'user_id'=> '1',
-                'shop_date' => date("Y-m-d h:m:s"),
-                'total'=>99.99
+                'user_id'=> 2,
+                'purchase_date' => now(),
+                'total'=> 199.99,
+                'created_at'=> now(),
+                'updated_at'=> now()
             ]
         ]);
+
     }
 }

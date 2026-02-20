@@ -14,14 +14,18 @@ return new class extends Migration
         Schema::create('models', function(Blueprint $table){
             $table->id();
             $table->string('name');
-            $table->string('description');
-            $table->decimal('price');
-            $table->enum('format',['.DWG', '.DXF', '.RVT', '.SKP', '.3DS', '.OBJ', '.FBX', '.IFC', '.DAE', '.GLTF', '.GLB', '.STL', '.3DM', '.PLN', '.3MF', '.BLEND'])->default('.blend');
-            $table->decimal('size_mb');
-            $table->foreignId('categories_id')->constrained()->onDelete('cascade');
+            $table->text('description');
+            $table->decimal('price', 10, 2);
+            $table->enum('format', [
+                'DWG','DXF','RVT','SKP','3DS','OBJ','FBX',
+                'IFC','DAE','GLTF','GLB','STL','3DM','PLN','3MF','BLEND'
+            ]);
+            $table->decimal('size_mb', 6, 2)->nullable();
+            $table->foreignId('category_id') ->constrained() ->onDelete('cascade');
             $table->date('publication_date');
             $table->timestamps();
         });
+
     }
 
     /**

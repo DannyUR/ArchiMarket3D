@@ -17,9 +17,17 @@ class CategoriesSeeder extends Seeder
         DB::table('categories')->insert([
             [
                 'name'=> 'Arquitectura Residencial',
-                'description' => 'Modelos 3D de casas, departamentos, villas y conjuntos habitacionales utilizados en proyectos de vivienda.',
-               
+                'description' => 'Modelos 3D de casas, departamentos y conjuntos habitacionales.',
+                'created_at'=> now(),
+                'updated_at'=> now()
+            ],
+            [
+                'name'=> 'Estructural',
+                'description' => 'Modelos estructurales para construcción de edificios y puentes.',
+                'created_at'=> now(),
+                'updated_at'=> now()
             ]
         ]);
+
     }
 }

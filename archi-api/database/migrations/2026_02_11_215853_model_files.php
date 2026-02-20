@@ -13,11 +13,12 @@ return new class extends Migration
     {
         Schema::create('model_files', function(Blueprint $table){
             $table->id();
-            $table->foreignId('models_id')->constrained()->onDelete('cascade');
-            $table->string('url_file');
-             $table->enum('file_type',['.DWG', '.DXF', '.RVT', '.SKP', '.3DS', '.OBJ', '.FBX', '.IFC', '.DAE', '.GLTF', '.GLB', '.STL', '.3DM', '.PLN', '.3MF', '.BLEND'])->default('.DWG');
+            $table->foreignId('model_id')->constrained()->onDelete('cascade');
+            $table->string('file_url');
+            $table->enum('file_type', ['preview','download','mixed_reality']);
             $table->timestamps();
         });
+
     }
 
     /**

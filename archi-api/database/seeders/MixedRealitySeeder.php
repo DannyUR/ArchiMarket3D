@@ -14,6 +14,16 @@ class MixedRealitySeeder extends Seeder
      */
     public function run(): void
     {
-        //
+        DB::table('mixed_reality')->insert([
+            [
+                'model_id'=> 1,
+                'compatible'=> true,
+                'platform'=> 'HoloLens',
+                'notes'=> 'Optimizado para visualización en obra.',
+                'created_at'=> now(),
+                'updated_at'=> now()
+            ]
+        ]);
+
     }
 }
