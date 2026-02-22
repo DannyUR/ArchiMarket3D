@@ -206,6 +206,17 @@ class ModelController extends Controller
         ]);
     }
 
+    public function adminIndex(Request $request)
+    {
+        $models = Model3D::with('category')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => $models
+        ]);
+    }
     /**
      * Crear nuevo modelo (admin)
      */

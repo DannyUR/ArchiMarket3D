@@ -11,7 +11,12 @@ use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\MixedRealityController;
 use App\Http\Controllers\Api\Admin\DashboardController;
 use App\Http\Controllers\Api\Admin\ReportController;
+use App\Http\Controllers\Api\Admin\ReviewController as AdminReviewController;
+use App\Http\Controllers\Api\Admin\PaymentController;
 use App\Http\Controllers\Api\WebhookController;
+use App\Http\Controllers\Api\Admin\AnalyticsController;
+use App\Http\Controllers\Api\Admin\NotificationController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -138,6 +143,7 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     
     // Modelos
     Route::prefix('models')->group(function () {
+        Route::get('/', [ModelController::class, 'adminIndex']);  
         Route::post('/', [ModelController::class, 'store']);
         Route::put('/{id}', [ModelController::class, 'update']);
         Route::delete('/{id}', [ModelController::class, 'destroy']);
@@ -194,6 +200,46 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
         Route::get('licenses', [ReportController::class, 'licenses']); // 👈 NUEVO
         Route::get('summary', [ReportController::class, 'summary']);   // 👈 NUEVO
     });
+
+    // Analytics (COMPLETO)
+    Route::prefix('analytics')->group(function () {
+        Route::get('user-behavior', [AnalyticsController::class, 'userBehavior']);
+        Route::get('trending-models', [AnalyticsController::class, 'trendingModels']);
+        Route::get('abandoned-carts', [AnalyticsController::class, 'abandonedCarts']);
+        Route::get('peak-hours', [AnalyticsController::class, 'peakHours']);
+        Route::get('user-segments', [AnalyticsController::class, 'userSegments']);
+        Route::get('retention', [AnalyticsController::class, 'retention']);
+    });
+
+    // Pagos (COMPLETO)
+    Route::prefix('payments')->group(function () {
+        Route::get('/', [PaymentController::class, 'index']);
+        Route::get('/stats', [PaymentController::class, 'stats']);
+        Route::get('/{id}', [PaymentController::class, 'show']);
+        Route::post('/{id}/refund', [PaymentController::class, 'refund']);
+        Route::post('/{id}/resend-receipt', [PaymentController::class, 'resendReceipt']);
+    });
+    
+    // Reseñas (COMPLETO)
+    Route::prefix('reviews')->group(function () {
+        Route::get('/', [AdminReviewController::class, 'index']);
+        Route::get('/stats', [AdminReviewController::class, 'stats']);
+        Route::post('/{id}/approve', [AdminReviewController::class, 'approve']);
+        Route::post('/{id}/reject', [AdminReviewController::class, 'reject']);
+        Route::post('/{id}/reply', [AdminReviewController::class, 'reply']);
+        Route::post('/{id}/toggle-report', [AdminReviewController::class, 'toggleReport']);
+        Route::delete('/{id}', [AdminReviewController::class, 'destroy']);
+    });
+
+    // Notificaciones
+    Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::get('/unread-count', [NotificationController::class, 'unreadCount']);
+        Route::post('/{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::post('/read-all', [NotificationController::class, 'markAllAsRead']);
+        Route::delete('/{id}', [NotificationController::class, 'destroy']);
+    });
+
 });
 
 /*

@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Carbon\Carbon;
 
 class UserController extends Controller
@@ -152,7 +153,6 @@ class UserController extends Controller
 
     /**
      * Ver mis licencias (usuario autenticado)
-     * GET /api/my-licenses
      */
     public function myLicenses()
     {
@@ -162,7 +162,6 @@ class UserController extends Controller
             ->with(['model:id,name,format,description'])
             ->get()
             ->map(function($license) {
-                // ✅ CORRECCIÓN: Convertir a Carbon para comparación real
                 $expiresAt = $license->expires_at ? Carbon::parse($license->expires_at) : null;
                 $now = Carbon::now();
                 
@@ -172,7 +171,6 @@ class UserController extends Controller
                     'price_paid' => $license->price_paid,
                     'expires_at' => $license->expires_at,
                     'is_active' => $license->is_active,
-                    // ✅ Comparación correcta de fechas
                     'is_expired' => $expiresAt ? $now->gt($expiresAt) : false,
                     'model' => [
                         'id' => $license->model->id,
@@ -183,7 +181,8 @@ class UserController extends Controller
                 ];
             });
         
-            \Log::info('Licencias enviadas:', $licenses->toArray());
+        Log::info('Licencias enviadas:', $licenses->toArray());
+        
         return response()->json([
             'success' => true,
             'data' => [
@@ -191,6 +190,7 @@ class UserController extends Controller
             ]
         ]);
     }
+
     /**
      * Listar usuarios (admin)
      */
@@ -336,7 +336,7 @@ class UserController extends Controller
     }
 
     /**
-     * Eliminar usuario (admin)
+     * Eliminar usuario (admin) - SOLO si no tiene compras
      */
     public function destroy($id)
     {
@@ -356,19 +356,63 @@ class UserController extends Controller
             ], 409);
         }
 
+        // Verificar si tiene compras
         if ($user->shopping()->count() > 0) {
             return response()->json([
                 'success' => false,
-                'message' => 'No se puede eliminar: el usuario tiene compras',
-                'purchases_count' => $user->shopping()->count()
+                'message' => 'No se puede eliminar: el usuario tiene compras asociadas',
+                'details' => [
+                    'purchases_count' => $user->shopping()->count(),
+                    'suggestion' => 'Puedes desactivar el usuario en su lugar'
+                ]
             ], 409);
         }
 
-        $user->delete();
+        // Verificar si tiene reseñas
+        if ($user->reviews()->count() > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede eliminar: el usuario tiene reseñas',
+                'details' => [
+                    'reviews_count' => $user->reviews()->count(),
+                    'suggestion' => 'Puedes desactivar el usuario en su lugar'
+                ]
+            ], 409);
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Usuario eliminado correctamente'
-        ]);
+        // Verificar si tiene licencias
+        if ($user->licenses()->count() > 0) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No se puede eliminar: el usuario tiene licencias activas',
+                'details' => [
+                    'licenses_count' => $user->licenses()->count(),
+                    'suggestion' => 'Puedes desactivar el usuario en su lugar'
+                ]
+            ], 409);
+        }
+
+        try {
+            $user->delete();
+            
+            Log::info('Usuario eliminado:', ['id' => $id, 'admin_id' => auth()->id()]);
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Usuario eliminado correctamente'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('Error eliminando usuario:', [
+                'id' => $id,
+                'error' => $e->getMessage()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al eliminar el usuario',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
 }

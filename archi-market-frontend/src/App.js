@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';  // 👈 AGREGAR Navigate
+import { BrowserRouter, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { CartProvider } from './context/CartContext';
 import { NotificationProvider } from './context/NotificationContext';
 import Navbar from './components/common/Navbar';
@@ -18,31 +18,31 @@ import Downloads from './components/user/Downloads';
 import PublicLicenses from './components/licenses/PublicLicenses';
 import Licenses from './components/user/Licenses';
 import AdminDashboard from './components/admin/Dashboard';
-import { useNotification } from './context/NotificationContext';  
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const AppContent = () => {
     const location = useLocation();
-    const hideNavbarPaths = ['/login', '/register'];
+    const hideNavbarPaths = ['/login', '/register', '/admin'];
     const shouldShowNavbar = !hideNavbarPaths.includes(location.pathname);
 
     const PrivateRoute = ({ children, adminOnly = false }) => {
         const token = localStorage.getItem('token');
         const user = JSON.parse(localStorage.getItem('user') || '{}');
-        const { showError } = useNotification(); // Si tienes notificaciones
 
-        if (!token) {
-            return <Navigate to="/login" />;
+        // Si está en login, no redirigir
+        if (location.pathname === '/login') {
+            return children;
         }
 
+        // Si no hay token, redirigir a login
+        if (!token) {
+            return <Navigate to="/login" replace />;
+        }
+
+        // Si es ruta de admin y no es admin, redirigir a home
         if (adminOnly && user.user_type !== 'admin') {
-            // Mostrar mensaje (si tienes notificaciones)
-            if (showError) {
-                showError('⛔ No tienes permisos de administrador');
-            }
-            // Redirigir al perfil del usuario
-            return <Navigate to="/profile" />;
+            return <Navigate to="/" replace />;
         }
 
         return children;
@@ -52,30 +52,64 @@ const AppContent = () => {
         <>
             {shouldShowNavbar && <Navbar />}
             <Routes>
+                {/* Rutas públicas */}
                 <Route path="/" element={<LandingPage />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/models" element={<ModelList />} />
                 <Route path="/models/:id" element={<ModelDetail />} />
-                <Route path="/cart" element={<Cart />} />
-                <Route path="/checkout" element={<Checkout />} />
                 <Route path="/categories" element={<Categories />} />
-                <Route path="/profile" element={<Profile />} />
-                <Route path="/purchases" element={<MyPurchases />} />
-                <Route path="/purchases/:id" element={<PurchaseDetail />} />
-                <Route path="/downloads" element={<Downloads />} />
                 <Route path="/licenses" element={<PublicLicenses />} />
-                <Route path="/my-licenses" element={<Licenses />} />
-
-                {/* ✅ RUTA DE ADMIN DENTRO DE <Routes> */}
+                
+                {/* Rutas protegidas (requieren login) */}
+                <Route path="/cart" element={
+                    <PrivateRoute>
+                        <Cart />
+                    </PrivateRoute>
+                } />
+                <Route path="/checkout" element={
+                    <PrivateRoute>
+                        <Checkout />
+                    </PrivateRoute>
+                } />
+                <Route path="/profile" element={
+                    <PrivateRoute>
+                        <Profile />
+                    </PrivateRoute>
+                } />
+                <Route path="/purchases" element={
+                    <PrivateRoute>
+                        <MyPurchases />
+                    </PrivateRoute>
+                } />
+                <Route path="/purchases/:id" element={
+                    <PrivateRoute>
+                        <PurchaseDetail />
+                    </PrivateRoute>
+                } />
+                <Route path="/downloads" element={
+                    <PrivateRoute>
+                        <Downloads />
+                    </PrivateRoute>
+                } />
+                <Route path="/my-licenses" element={
+                    <PrivateRoute>
+                        <Licenses />
+                    </PrivateRoute>
+                } />
+                
+                {/* Rutas de admin */}
                 <Route
-                    path="/admin"
+                    path="/admin/*"
                     element={
                         <PrivateRoute adminOnly={true}>
                             <AdminDashboard />
                         </PrivateRoute>
                     }
                 />
+                
+                {/* Ruta 404 - Redirigir a inicio */}
+                <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
         </>
     );

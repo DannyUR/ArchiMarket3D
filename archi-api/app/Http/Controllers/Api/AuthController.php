@@ -12,6 +12,8 @@ use Illuminate\Auth\Events\Verified;
 use Illuminate\Support\Facades\Password as PasswordFacade;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Str;
+use App\Events\NewUserRegistered;
+use App\Helpers\NotificationHelper;
 
 
 class AuthController extends Controller
@@ -21,6 +23,7 @@ class AuthController extends Controller
      */
     public function register(Request $request)
     {
+        
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
@@ -56,6 +59,9 @@ class AuthController extends Controller
                 'company' => $request->company,
                 'is_active' => true
             ]);
+
+            NotificationHelper::newUserRegistered($user);
+            event(new NewUserRegistered($user));
 
             // 🔥 SOLUCIÓN: Auto-verificar en desarrollo
             if (app()->environment('local')) {

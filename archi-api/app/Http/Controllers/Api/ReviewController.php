@@ -7,6 +7,9 @@ use App\Models\Review;
 use App\Models\Model3D;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use App\Events\NewReview;
+use App\Events\NewUserRegistered;
+use App\Helpers\NotificationHelper;
 
 class ReviewController extends Controller
 {
@@ -106,6 +109,9 @@ class ReviewController extends Controller
             'rating' => $request->rating,
             'comment' => $request->comment
         ]);
+        NotificationHelper::newReview($review);
+
+        event(new NewReview($review));
 
         return response()->json([
             'message' => 'Reseña creada exitosamente',

@@ -30,6 +30,7 @@ const Login = () => {
         setForm({ ...form, [e.target.name]: e.target.value });
     };
 
+    // En Login.jsx, handleSubmit debe ser así:
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
@@ -40,24 +41,21 @@ const Login = () => {
             localStorage.setItem('token', response.data.data.token);
             localStorage.setItem('user', JSON.stringify(response.data.data.user));
 
-            // ✅ VERIFICAR TIPO DE USUARIO
-            const userType = response.data.data.user.user_type;
-
-            showSuccess('👋 ¡Bienvenido de vuelta!');
-
-            // Redirigir según el tipo de usuario
-            if (userType === 'admin') {
-                navigate('/admin');  // Admin va al dashboard
+            // Solo redirigir UNA VEZ
+            if (response.data.data.user.user_type === 'admin') {
+                navigate('/admin', { replace: true });
             } else {
-                navigate('/models'); // Usuarios normales van a modelos
+                navigate('/models', { replace: true });
             }
 
         } catch (err) {
-            // ... manejo de errores
+            console.error('Error login:', err);
+            setError('Credenciales incorrectas');
         } finally {
             setLoading(false);
         }
     };
+    
     const styles = {
         container: {
             minHeight: '100vh',

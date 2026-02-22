@@ -12,6 +12,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Carbon\Carbon;
+use App\Events\NewPurchase;
+use App\Events\NewUserRegistered;
+use App\Helpers\NotificationHelper;
+
 
 class ShoppingController extends Controller
 {
@@ -185,6 +189,8 @@ class ShoppingController extends Controller
             }
 
             DB::commit();
+            NotificationHelper::newPurchase($shopping, $user);
+            event(new NewPurchase($shopping, $user));
             \Log::info('=== CHECKOUT EXITOSO ===');
 
             return response()->json([
@@ -317,5 +323,42 @@ class ShoppingController extends Controller
             'success' => true,
             'message' => 'Pago simulado correctamente'
         ]);
+    }
+
+    /**
+ * Procesar pago (separado de la compra)
+ */
+    public function processPayment(Request $request, $shoppingId)
+    {
+        try {
+            $shopping = Shopping::find($shoppingId);
+            
+            if (!$shopping) {
+                return response()->json(['error' => 'Compra no encontrada'], 404);
+            }
+
+            // Aquí iría la lógica real de pago con Stripe/PayPal
+            // Por ahora es simulado
+            
+            $shopping->status = 'completed';
+            $shopping->payment_id = 'pay_' . uniqid();
+            $shopping->payment_provider = 'stripe';
+            $shopping->save();
+
+            // ✅ DISPARAR EVENTO DE PAGO AQUÍ
+            event(new PaymentProcessed($shopping));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pago procesado correctamente'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error('Error procesando pago: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al procesar el pago'
+            ], 500);
+        }
     }
 }
