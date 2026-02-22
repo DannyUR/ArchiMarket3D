@@ -7,6 +7,11 @@ use Illuminate\Database\Eloquent\Model;
 class UserLicense extends Model
 {
     protected $table = 'user_licenses';
+    protected $casts = [
+        'is_active' => 'boolean',
+        'expires_at' => 'date',
+        'price_paid' => 'decimal:2'
+    ];
 
     protected $fillable = [
         'user_id',
@@ -14,12 +19,8 @@ class UserLicense extends Model
         'shopping_id',
         'license_type',
         'price_paid',
-        'expires_at'
-    ];
-
-    protected $casts = [
-        'expires_at' => 'date',
-        'price_paid' => 'decimal:2'
+        'expires_at',
+        'is_active'
     ];
 
     public function user()

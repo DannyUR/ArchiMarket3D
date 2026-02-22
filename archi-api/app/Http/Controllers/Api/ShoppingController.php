@@ -89,6 +89,9 @@ class ShoppingController extends Controller
      */
     public function store(Request $request)
     {
+        \Log::info('=== INICIO CHECKOUT ===');
+        \Log::info('Request:', $request->all());
+        
         $validator = Validator::make($request->all(), [
             'items' => 'required|array|min:1',
             'items.*.model_id' => 'required|exists:models,id',
@@ -96,6 +99,7 @@ class ShoppingController extends Controller
         ]);
 
         if ($validator->fails()) {
+            \Log::error('Validación falló:', $validator->errors()->toArray());
             return response()->json([
                 'success' => false,
                 'errors' => $validator->errors()
@@ -103,6 +107,7 @@ class ShoppingController extends Controller
         }
 
         $user = auth()->user();
+        \Log::info('Usuario ID: ' . $user->id);
 
         try {
             DB::beginTransaction();
@@ -113,20 +118,27 @@ class ShoppingController extends Controller
 
             foreach ($request->items as $item) {
                 $model = Model3D::find($item['model_id']);
-                
+                \Log::info('Procesando modelo:', [
+                    'id' => $model->id,
+                    'name' => $model->name,
+                    'price_base' => $model->price
+                ]);
+
                 // Verificar si ya lo compró antes
                 $alreadyPurchased = $user->licenses()
                     ->where('model_id', $model->id)
-                    ->where(function($q) {
-                        $q->whereNull('expires_at')
-                        ->orWhere('expires_at', '>=', now());
-                    })->exists();
+                    ->where('is_active', true)
+                    ->exists();
 
                 if ($alreadyPurchased) {
-                    throw new \Exception("El modelo '{$model->name}' ya tiene una licencia activa");
+                    throw new \Exception("El modelo '{$model->name}' ya fue comprado");
                 }
 
                 $licensePrice = $this->calculateLicensePrice($model->price, $item['license_type']);
+                \Log::info('Precio calculado:', [
+                    'license_type' => $item['license_type'],
+                    'price' => $licensePrice
+                ]);
                 
                 $items[] = [
                     'model' => $model,
@@ -138,17 +150,18 @@ class ShoppingController extends Controller
                 $purchasedModels[] = $model->name;
             }
 
-            // Crear la compra (SIEMPRE COMPLETADA EN MODO DEMO)
+            // Crear la compra
             $shopping = Shopping::create([
                 'user_id' => $user->id,
                 'purchase_date' => now(),
                 'total' => $total,
-                'status' => 'completed', // 👈 SIEMPRE COMPLETADA
-                'payment_id' => 'demo_' . uniqid(), // 👈 ID SIMULADO
+                'status' => 'completed',
+                'payment_id' => 'demo_' . uniqid(),
                 'payment_provider' => 'demo'
             ]);
+            \Log::info('Compra creada ID: ' . $shopping->id);
 
-            // Crear detalles y licencias (SIEMPRE ACTIVAS)
+            // Crear detalles y licencias
             foreach ($items as $item) {
                 // Detalle de compra
                 ShoppingDetail::create([
@@ -156,54 +169,39 @@ class ShoppingController extends Controller
                     'model_id' => $item['model']->id,
                     'unit_price' => $item['unit_price']
                 ]);
+                \Log::info('Detalle creado para modelo: ' . $item['model']->id);
 
-                // Registrar la licencia (SIEMPRE ACTIVA)
-                UserLicense::create([
+                // ✅ REGISTRAR LA LICENCIA
+                $license = UserLicense::create([
                     'user_id' => $user->id,
                     'model_id' => $item['model']->id,
                     'shopping_id' => $shopping->id,
                     'license_type' => $item['license_type'],
                     'price_paid' => $item['unit_price'],
                     'expires_at' => $this->getLicenseExpiration($item['license_type']),
-                    'is_active' => true // 👈 SIEMPRE ACTIVA
+                    'is_active' => true
                 ]);
+                \Log::info('Licencia creada ID: ' . $license->id);
             }
 
             DB::commit();
-
-            // Generar links de descarga inmediata
-            $downloadLinks = [];
-            foreach ($items as $item) {
-                foreach ($item['model']->files as $file) {
-                    if ($file->file_type === 'download') {
-                        $downloadLinks[] = [
-                            'model_name' => $item['model']->name,
-                            'file_id' => $file->id,
-                            'download_url' => url("/api/download/{$file->id}"),
-                            'expires_at' => now()->addHours(24)->toDateTimeString()
-                        ];
-                    }
-                }
-            }
+            \Log::info('=== CHECKOUT EXITOSO ===');
 
             return response()->json([
                 'success' => true,
-                'message' => '✅ Compra realizada en MODO DEMOSTRACIÓN',
-                'notice' => 'En producción se integrará con pasarela de pagos real',
+                'message' => 'Compra realizada exitosamente',
                 'data' => [
                     'purchase_id' => $shopping->id,
                     'total' => $total,
-                    'purchased_models' => $purchasedModels,
-                    'status' => 'completed',
-                    'download_links' => $downloadLinks,
-                    'licenses' => $user->licenses()
-                        ->where('shopping_id', $shopping->id)
-                        ->get(['model_id', 'license_type', 'expires_at', 'is_active'])
+                    'purchased_models' => $purchasedModels
                 ]
             ], 201);
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::error('ERROR EN CHECKOUT: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Error al procesar la compra',
@@ -211,7 +209,7 @@ class ShoppingController extends Controller
             ], 500);
         }
     }
-
+    
     /**
      * Obtener links de descarga para una compra
      */

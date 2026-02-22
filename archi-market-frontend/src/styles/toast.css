@@ -1,0 +1,23 @@
+:root {
+    --toastify-color-success: #10b981;
+    --toastify-color-error: #ef4444;
+    --toastify-color-warning: #f59e0b;
+    --toastify-color-info: #3b82f6;
+}
+
+.Toastify__toast {
+    border-radius: 10px;
+    font-family: 'Poppins', sans-serif;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+}
+
+.Toastify__toast-icon {
+    width: 24px;
+    height: 24px;
+}
+
+.Toastify__progress-bar {
+    height: 3px;
+}

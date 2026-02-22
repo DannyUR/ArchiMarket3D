@@ -57,9 +57,20 @@ class AuthController extends Controller
                 'is_active' => true
             ]);
 
-            $user->sendEmailVerificationNotification();
+            // 🔥 SOLUCIÓN: Auto-verificar en desarrollo
+            if (app()->environment('local')) {
+                // Auto-verificación automática
+                $user->markEmailAsVerified();
+                $verificationMessage = 'Cuenta verificada automáticamente (modo desarrollo)';
+                $needsVerification = false;
+            } else {
+                // En producción, enviar email real
+                $user->sendEmailVerificationNotification();
+                $verificationMessage = 'Por favor verifica tu email antes de iniciar sesión';
+                $needsVerification = true;
+            }
 
-            $token = $user->createToken('auth_token_' . $user->id, ['*'], now()->addDays(7))->plainTextToken;
+            $token = $user->createToken('auth_token_' . $user->id)->plainTextToken;
 
             return response()->json([
                 'success' => true,
@@ -72,11 +83,12 @@ class AuthController extends Controller
                         'user_type' => $user->user_type,
                         'company' => $user->company,
                         'is_active' => $user->is_active,
+                        'email_verified' => !is_null($user->email_verified_at),
                         'created_at' => $user->created_at
                     ],
                     'token' => $token,
-                    'token_type' => 'Bearer',
-                    'expires_in' => 7 * 24 * 60 * 60 // 7 días en segundos
+                    'verification_message' => $verificationMessage,
+                    'needs_verification' => $needsVerification
                 ]
             ], 201);
 
@@ -103,7 +115,6 @@ class AuthController extends Controller
         if ($validator->fails()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error de validación',
                 'errors' => $validator->errors()
             ], 422);
         }
@@ -117,28 +128,27 @@ class AuthController extends Controller
             ], 401);
         }
 
-        // Verificar si el usuario está activo
         if (!$user->is_active) {
             return response()->json([
                 'success' => false,
-                'message' => 'Tu cuenta está desactivada. Contacta al administrador.'
+                'message' => 'Tu cuenta está desactivada'
             ], 403);
         }
 
-        // 👇 AGREGAR VERIFICACIÓN DE EMAIL
+        // ✅ Mensaje claro si no ha verificado email
         if (is_null($user->email_verified_at)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Debes verificar tu email antes de iniciar sesión'
-            ], 403);
+            // En desarrollo, permitimos acceso con advertencia
+            if (app()->environment('local')) {
+                $warning = '⚠️ Modo desarrollo: Email no verificado (automático)';
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Debes verificar tu email antes de iniciar sesión'
+                ], 403);
+            }
         }
 
-        // Revocar tokens anteriores (opcional - seguridad)
-        if ($request->has('revoke_previous') && $request->revoke_previous) {
-            $user->tokens()->delete();
-        }
-
-        $token = $user->createToken('auth_token_' . $user->id, ['*'], now()->addDays(7))->plainTextToken;
+        $token = $user->createToken('auth_token_' . $user->id)->plainTextToken;
 
         return response()->json([
             'success' => true,
@@ -154,13 +164,10 @@ class AuthController extends Controller
                     'email_verified' => !is_null($user->email_verified_at)
                 ],
                 'token' => $token,
-                'token_type' => 'Bearer',
-                'expires_in' => 7 * 24 * 60 * 60,
-                'permissions' => $this->getUserPermissions($user)
+                'warning' => $warning ?? null
             ]
         ]);
     }
-
     /**
      * Obtener usuario autenticado
      */

@@ -7,6 +7,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Hash;
+use Carbon\Carbon;
 
 class UserController extends Controller
 {
@@ -158,41 +159,38 @@ class UserController extends Controller
         $user = auth()->user();
         
         $licenses = $user->licenses()
-            ->with([
-                'model:id,name,format,description',
-                'shopping'
-            ])
-            ->where('is_active', true)
-            ->orderBy('created_at', 'desc')
+            ->with(['model:id,name,format,description'])
             ->get()
             ->map(function($license) {
+                // ✅ CORRECCIÓN: Convertir a Carbon para comparación real
+                $expiresAt = $license->expires_at ? Carbon::parse($license->expires_at) : null;
+                $now = Carbon::now();
+                
                 return [
                     'id' => $license->id,
                     'license_type' => $license->license_type,
                     'price_paid' => $license->price_paid,
                     'expires_at' => $license->expires_at,
                     'is_active' => $license->is_active,
-                    'is_expired' => $license->expires_at ? now()->gt($license->expires_at) : false,
+                    // ✅ Comparación correcta de fechas
+                    'is_expired' => $expiresAt ? $now->gt($expiresAt) : false,
                     'model' => [
                         'id' => $license->model->id,
                         'name' => $license->model->name,
                         'format' => $license->model->format
                     ],
-                    'purchase_date' => $license->shopping->purchase_date ?? null,
-                    'created_at' => $license->created_at
+                    'purchase_date' => $license->created_at->format('Y-m-d H:i:s')
                 ];
             });
-
+        
+            \Log::info('Licencias enviadas:', $licenses->toArray());
         return response()->json([
             'success' => true,
             'data' => [
-                'total_licenses' => $licenses->count(),
-                'active_licenses' => $licenses->where('is_expired', false)->count(),
                 'licenses' => $licenses
             ]
         ]);
     }
-
     /**
      * Listar usuarios (admin)
      */
