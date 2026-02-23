@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    FiGrid, 
-    FiHome, 
-    FiBox, 
+import {
+    FiGrid,
+    FiHome,
+    FiBox,
     FiArrowRight,
     FiSearch,
     FiChevronRight,
@@ -38,9 +38,11 @@ const Categories = () => {
     const fetchCategories = async () => {
         try {
             const response = await API.get('/categories');
-            setCategories(response.data.data || response.data || []);
-            if (response.data.data?.length > 0) {
-                setSelectedCategory(response.data.data[0]);
+            console.log('📦 Categorías:', response.data);
+            const categoriesData = response.data.data || response.data || [];
+            setCategories(categoriesData);
+            if (categoriesData.length > 0) {
+                setSelectedCategory(categoriesData[0]);
             }
         } catch (error) {
             console.error('Error cargando categorías:', error);
@@ -53,11 +55,49 @@ const Categories = () => {
         setModelsLoading(true);
         try {
             const response = await API.get(`/categories/${categoryId}/models`);
-            setCategoryModels(response.data.data?.data || response.data.models || []);
+            console.log('📦 Modelos de categoría - RESPUESTA COMPLETA:', response.data);
+
+            const modelsData = response.data.data?.data || response.data.models || [];
+
+            // 👇 VER ESTRUCTURA DEL PRIMER MODELO
+            if (modelsData.length > 0) {
+                console.log('🔍 Primer modelo (estructura completa):', JSON.stringify(modelsData[0], null, 2));
+            }
+
+            setCategoryModels(modelsData);
         } catch (error) {
             console.error('Error cargando modelos:', error);
         } finally {
             setModelsLoading(false);
+        }
+    };
+
+    const getPreviewImage = (model) => {
+        try {
+            // Verificar si tiene files
+            if (!model.files || model.files.length === 0) {
+                console.log('❌ Modelo sin files:', model.id);
+                return null;
+            }
+
+            // Obtener el primer archivo
+            const file = model.files[0];
+            console.log('📁 Archivo:', file);
+
+            // Verificar si tiene file_url
+            if (!file || !file.file_url) {
+                console.log('❌ Archivo sin file_url');
+                return null;
+            }
+
+            // Construir URL completa
+            const fullUrl = 'http://127.0.0.1:8000' + file.file_url;
+            console.log('✅ URL generada:', fullUrl);
+            return fullUrl;
+
+        } catch (error) {
+            console.error('Error obteniendo imagen:', error);
+            return null;
         }
     };
 
@@ -105,7 +145,6 @@ const Categories = () => {
             gridTemplateColumns: '350px 1fr',
             gap: '2rem'
         },
-        // Panel de categorías
         categoriesPanel: {
             backgroundColor: colors.white,
             borderRadius: '20px',
@@ -181,7 +220,6 @@ const Categories = () => {
             color: colors.primary,
             opacity: 0.5
         },
-        // Panel de modelos
         modelsPanel: {
             backgroundColor: colors.white,
             borderRadius: '20px',
@@ -236,6 +274,11 @@ const Categories = () => {
             justifyContent: 'center',
             position: 'relative',
             overflow: 'hidden'
+        },
+        modelImageTag: {
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover'
         },
         modelOverlay: {
             position: 'absolute',
@@ -315,7 +358,6 @@ const Categories = () => {
 
     return (
         <div style={styles.container}>
-            {/* Header */}
             <div style={styles.header}>
                 <h1 style={styles.title}>
                     <FiGrid /> Categorías
@@ -325,9 +367,7 @@ const Categories = () => {
                 </p>
             </div>
 
-            {/* Main Grid */}
             <div style={styles.mainGrid}>
-                {/* Panel de categorías */}
                 <motion.div
                     style={styles.categoriesPanel}
                     initial={{ opacity: 0, x: -20 }}
@@ -371,7 +411,6 @@ const Categories = () => {
                     </div>
                 </motion.div>
 
-                {/* Panel de modelos */}
                 <motion.div
                     style={styles.modelsPanel}
                     initial={{ opacity: 0, x: 20 }}
@@ -398,50 +437,59 @@ const Categories = () => {
                             Cargando modelos...
                         </div>
                     ) : filteredModels.length === 0 ? (
-                        <div style={styles.emptyState}>
-                            <FiPackage style={styles.emptyIcon} />
-                            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
-                                No hay modelos en esta categoría
-                            </h3>
-                            <p style={{ color: '#94a3b8' }}>
-                                Próximamente agregaremos más modelos
-                            </p>
-                        </div>
+                        <div style={styles.emptyState}>No hay modelos disponibles en esta categoría.</div>
                     ) : (
                         <div style={styles.modelsGrid}>
-                            {filteredModels.map((model, index) => (
-                                <motion.div
-                                    key={model.id}
-                                    style={styles.modelCard}
-                                    initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    transition={{ delay: index * 0.05 }}
-                                    whileHover={{ y: -5, boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}
-                                    onClick={() => navigate(`/models/${model.id}`)}
-                                >
-                                    <div style={styles.modelImage}>
-                                        <HiOutlineCube size={48} color={colors.primary + '40'} />
-                                        <div style={styles.modelOverlay}
-                                            onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
-                                            onMouseLeave={(e) => e.currentTarget.style.opacity = 0}
-                                        >
-                                            <div style={styles.overlayBtn}>
-                                                <FiEye /> Vista previa
+                            {filteredModels.map((model, index) => {
+                                const previewImage = getPreviewImage(model);
+
+                                return (
+                                    <motion.div
+                                        key={model.id}
+                                        style={styles.modelCard}
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.05 }}
+                                        whileHover={{ y: -5, boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}
+                                        onClick={() => navigate(`/models/${model.id}`)}
+                                    >
+                                        <div style={styles.modelImage}>
+                                            {previewImage ? (
+                                                <img
+                                                    src={previewImage}
+                                                    alt={model.name}
+                                                    style={styles.modelImageTag}
+                                                    onError={(e) => {
+                                                        console.log('Error cargando imagen:', previewImage);
+                                                        e.target.style.display = 'none';
+                                                        e.target.parentNode.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%"><svg>...</svg></div>';
+                                                    }}
+                                                />
+                                            ) : (
+                                                <HiOutlineCube size={48} color={colors.primary + '40'} />
+                                            )}
+                                            <div style={styles.modelOverlay}
+                                                onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
+                                                onMouseLeave={(e) => e.currentTarget.style.opacity = 0}
+                                            >
+                                                <div style={styles.overlayBtn}>
+                                                    <FiEye /> Vista previa
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div style={styles.modelInfo}>
-                                        <h3 style={styles.modelName}>{model.name}</h3>
-                                        <div style={styles.modelMeta}>
-                                            <span>{model.format}</span>
-                                            <span>{model.size_mb} MB</span>
+                                        <div style={styles.modelInfo}>
+                                            <h3 style={styles.modelName}>{model.name}</h3>
+                                            <div style={styles.modelMeta}>
+                                                <span>{model.format}</span>
+                                                <span>{model.size_mb} MB</span>
+                                            </div>
+                                            <div style={styles.modelPrice}>
+                                                ${model.price}
+                                            </div>
                                         </div>
-                                        <div style={styles.modelPrice}>
-                                            ${model.price}
-                                        </div>
-                                    </div>
-                                </motion.div>
-                            ))}
+                                    </motion.div>
+                                );
+                            })}
                         </div>
                     )}
                 </motion.div>

@@ -16,16 +16,15 @@ class ModelController extends Controller
     public function index(Request $request)
     {
         $query = Model3D::with([
-                'category:id,name',
-                'files' => function($q) {
-                    $q->where('file_type', 'preview')
-                      ->select('id', 'model_id', 'file_url');
-                }
-            ])
-            ->select(
-                'id', 'name', 'description', 'price', 'format', 
-                'size_mb', 'publication_date', 'category_id', 'featured'
-            );
+            'category:id,name',
+            'files' => function($q) {
+                $q->where('file_type', 'preview');
+            }
+        ])
+        ->select(
+            'id', 'name', 'description', 'price', 'format', 
+            'size_mb', 'publication_date', 'category_id', 'featured', 'sketchfab_id'
+        );
 
         // Filtros
         if ($request->has('category')) {
@@ -116,7 +115,7 @@ class ModelController extends Controller
                 }
             ])
             ->where('featured', true)
-            ->select('id', 'name', 'price', 'format', 'category_id')
+            ->select('id', 'name', 'price', 'format', 'category_id', 'sketchfab_id') // ← AGREGAR
             ->latest()
             ->limit(8)
             ->get();
@@ -152,22 +151,30 @@ class ModelController extends Controller
     /**
      * Mostrar detalle completo de un modelo
      */
+// En el método show() de ModelController
     public function show($id)
     {
         $model = Model3D::with([
-                'category:id,name',
-                'licenses:id,model_id,type,description',
-                'files:id,model_id,file_url,file_type',
-                'mixedReality:id,model_id,compatible,platform,notes',
-                'reviews' => function($q) {
-                    $q->with('user:id,name')
-                      ->latest()
-                      ->limit(5);
-                }
-            ])
-            ->withAvg('reviews as average_rating', 'rating')
-            ->withCount('reviews')
-            ->find($id);
+        'category:id,name',
+        'licenses:id,model_id,type,description',
+        'files:id,model_id,file_url,file_type',
+        'mixedReality:id,model_id,compatible,platform,notes',
+        'reviews' => function($q) {
+            $q->with('user:id,name')
+              ->latest()
+              ->limit(5);
+            }   
+        ])
+        ->select(
+            'id', 'name', 'description', 'price', 'format', 
+            'size_mb', 'publication_date', 'category_id', 'featured', 
+            'sketchfab_id', 'author_name', 'author_avatar', 'author_bio',
+            'polygon_count', 'material_count', 'has_animations', 
+            'has_rigging', 'technical_specs'  // ← NUEVOS CAMPOS
+        )
+        ->withAvg('reviews as average_rating', 'rating')
+        ->withCount('reviews')
+        ->find($id);
 
         if (!$model) {
             return response()->json([
@@ -176,10 +183,8 @@ class ModelController extends Controller
             ], 404);
         }
 
-        // Verificar si el usuario autenticado ya compró este modelo
         $user = auth()->user();
         $isPurchased = false;
-        $canPreview = true;
         
         if ($user) {
             $isPurchased = $user->shopping()
@@ -192,6 +197,11 @@ class ModelController extends Controller
             'success' => true,
             'data' => [
                 'model' => $model,
+                'author' => [  // ← NUEVO: Información del autor
+                    'name' => $model->author_name ?? 'ArchiMarket3D',
+                    'avatar' => $model->author_avatar ?? null,
+                    'bio' => $model->author_bio ?? 'Creador profesional de modelos 3D'
+                ],
                 'stats' => [
                     'average_rating' => round($model->average_rating ?? 0, 1),
                     'total_reviews' => $model->reviews_count,
@@ -200,7 +210,7 @@ class ModelController extends Controller
                 'access' => [
                     'can_download' => $isPurchased,
                     'can_preview' => true,
-                    'can_review' => $user && !$isPurchased ? false : true // Solo si compró puede reseñar
+                    'can_review' => $user && !$isPurchased ? false : true
                 ]
             ]
         ]);
@@ -229,7 +239,8 @@ class ModelController extends Controller
             'format' => 'required|in:DWG,DXF,RVT,SKP,3DS,OBJ,FBX,IFC,DAE,GLTF,GLB,STL,3DM,PLN,3MF,BLEND',
             'size_mb' => 'required|numeric|min:0',
             'category_id' => 'required|exists:categories,id',
-            'featured' => 'sometimes|boolean'
+            'featured' => 'sometimes|boolean',
+            'sketchfab_id' => 'nullable|string|max:255' // ← AGREGAR VALIDACIÓN
         ]);
 
         if ($validator->fails()) {
@@ -250,7 +261,8 @@ class ModelController extends Controller
                 'size_mb' => $request->size_mb,
                 'category_id' => $request->category_id,
                 'featured' => $request->featured ?? false,
-                'publication_date' => now()
+                'publication_date' => now(),
+                'sketchfab_id' => $request->sketchfab_id // ← AGREGAR ESTO
             ]);
 
             DB::commit();
@@ -270,11 +282,10 @@ class ModelController extends Controller
             ], 500);
         }
     }
-
     /**
      * Actualizar modelo (admin)
      */
-    public function update(Request $request, $id)
+ public function update(Request $request, $id)
     {
         $model = Model3D::find($id);
 
@@ -292,7 +303,8 @@ class ModelController extends Controller
             'format' => 'sometimes|in:DWG,DXF,RVT,SKP,3DS,OBJ,FBX,IFC,DAE,GLTF,GLB,STL,3DM,PLN,3MF,BLEND',
             'size_mb' => 'sometimes|numeric|min:0',
             'category_id' => 'sometimes|exists:categories,id',
-            'featured' => 'sometimes|boolean'
+            'featured' => 'sometimes|boolean',
+            'sketchfab_id' => 'nullable|string|max:255' // ← AGREGAR VALIDACIÓN
         ]);
 
         if ($validator->fails()) {
@@ -304,7 +316,8 @@ class ModelController extends Controller
 
         $model->update($request->only([
             'name', 'description', 'price', 'format', 
-            'size_mb', 'category_id', 'featured'
+            'size_mb', 'category_id', 'featured',
+            'sketchfab_id' // ← AGREGAR ESTO
         ]));
 
         return response()->json([

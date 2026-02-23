@@ -18,6 +18,7 @@ class Model3D extends Model
         'format',
         'size_mb',
         'category_id',
+        'featured',
         'publication_date'
     ];
 

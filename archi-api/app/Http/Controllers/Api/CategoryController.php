@@ -87,12 +87,12 @@ class CategoryController extends Controller
         }
 
         $models = $category->models()
-            ->with(['files' => function($q) {
-                $q->where('file_type', 'preview')
-                  ->select('id', 'model_id', 'file_url');
-            }])
-            ->select('id', 'name', 'price', 'format', 'size_mb', 'featured', 'created_at')
-            ->paginate(12);
+        ->with(['files' => function($q) {
+            $q->where('file_type', 'preview')
+              ->select('id', 'model_id', 'file_url');
+        }])  // 👈 IMPORTANTE: incluir files
+        ->select('id', 'name', 'price', 'format', 'size_mb', 'featured', 'created_at')
+        ->paginate(12);
 
         return response()->json([
             'success' => true,

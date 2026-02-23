@@ -17,13 +17,14 @@ import PurchaseDetail from './components/purchases/PurchaseDetail';
 import Downloads from './components/user/Downloads';
 import PublicLicenses from './components/licenses/PublicLicenses';
 import Licenses from './components/user/Licenses';
+import 'react-intersection-observer';
 import AdminDashboard from './components/admin/Dashboard';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const AppContent = () => {
     const location = useLocation();
-    const hideNavbarPaths = ['/login', '/register', '/admin'];
+    const hideNavbarPaths = ['/','/login', '/register', '/admin'];
     const shouldShowNavbar = !hideNavbarPaths.includes(location.pathname);
 
     const PrivateRoute = ({ children, adminOnly = false }) => {

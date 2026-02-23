@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiHome,
@@ -26,6 +26,10 @@ const Navbar = () => {
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [user, setUser] = useState(null);
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Detectar si estamos en LandingPage
+    const isLandingPage = location.pathname === '/';
 
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth <= 768);
@@ -42,6 +46,12 @@ const Navbar = () => {
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
+    // Cerrar menús al cambiar de ruta
+    useEffect(() => {
+        setIsOpen(false);
+        setUserMenuOpen(false);
+    }, [location]);
+
     const handleLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
@@ -52,6 +62,7 @@ const Navbar = () => {
     };
 
     const getInitials = (name) => {
+        if (!name) return 'U';
         return name
             .split(' ')
             .map(word => word[0])
@@ -62,13 +73,13 @@ const Navbar = () => {
 
     const styles = {
         navbar: {
-            backgroundColor: colors.white,
-            boxShadow: '0 2px 10px rgba(0,0,0,0.05)',
-            padding: '1rem 2rem',
+            backgroundColor: isLandingPage ? 'transparent' : colors.white,
+            boxShadow: isLandingPage ? 'none' : '0 2px 10px rgba(0,0,0,0.05)',
+            padding: isMobile ? '0.8rem 1rem' : '1rem 2rem',
             position: 'sticky',
             top: 0,
             zIndex: 1000,
-            borderBottom: `1px solid #e2e8f0`
+            borderBottom: isLandingPage ? 'none' : `1px solid #e2e8f0`
         },
         container: {
             maxWidth: '1400px',
@@ -81,7 +92,7 @@ const Navbar = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '10px',
-            fontSize: '1.5rem',
+            fontSize: isMobile ? '1.2rem' : '1.5rem',
             fontWeight: '700',
             color: colors.primary,
             textDecoration: 'none',
@@ -91,57 +102,92 @@ const Navbar = () => {
             display: isMobile ? 'block' : 'none',
             fontSize: '1.5rem',
             cursor: 'pointer',
-            color: colors.dark
+            color: colors.dark,
+            zIndex: 1001
         },
         navLinks: {
             display: isMobile ? (isOpen ? 'flex' : 'none') : 'flex',
             flexDirection: isMobile ? 'column' : 'row',
             position: isMobile ? 'absolute' : 'static',
-            top: '70px',
+            top: isMobile ? '70px' : 'auto',
             left: 0,
             right: 0,
             backgroundColor: colors.white,
-            padding: isMobile ? '1.5rem' : 0,
-            gap: '2rem',
+            padding: isMobile ? '2rem' : 0,
+            gap: isMobile ? '1rem' : '2rem',
             boxShadow: isMobile ? '0 10px 20px rgba(0,0,0,0.1)' : 'none',
             borderBottom: isMobile ? `1px solid #e2e8f0` : 'none',
-            zIndex: 999
+            zIndex: 999,
+            maxHeight: isMobile ? 'calc(100vh - 70px)' : 'none',
+            overflowY: isMobile ? 'auto' : 'visible'
         },
         link: {
             color: colors.dark,
             textDecoration: 'none',
             fontWeight: '500',
-            padding: '0.5rem 1rem',
-            transition: 'color 0.3s',
+            padding: isMobile ? '1rem' : '0.5rem 1rem',
+            transition: 'all 0.3s',
             cursor: 'pointer',
-            fontSize: '1rem',
-            borderRadius: '5px'
+            fontSize: isMobile ? '1.1rem' : '1rem',
+            borderRadius: '5px',
+            width: isMobile ? '100%' : 'auto',
+            textAlign: isMobile ? 'center' : 'left',
+            borderBottom: isMobile ? '1px solid #e2e8f0' : 'none'
         },
-        linkHover: {
+        // Versión simplificada para LandingPage
+        landingLinks: {
+            display: 'flex',
+            gap: isMobile ? '1rem' : '2rem',
+            alignItems: 'center',
+            flexDirection: isMobile ? 'column' : 'row',
+            width: isMobile ? '100%' : 'auto'
+        },
+        landingLoginBtn: {
             color: colors.primary,
-            backgroundColor: colors.primary + '10'
+            textDecoration: 'none',
+            fontWeight: '600',
+            padding: isMobile ? '1rem' : '0.5rem 1rem',
+            fontSize: isMobile ? '1.1rem' : '1rem',
+            width: isMobile ? '100%' : 'auto',
+            textAlign: 'center'
         },
-        // Menú de usuario
+        landingRegisterBtn: {
+            backgroundColor: colors.primary,
+            color: colors.white,
+            padding: isMobile ? '1rem' : '0.6rem 1.5rem',
+            borderRadius: '8px',
+            textDecoration: 'none',
+            fontWeight: '600',
+            fontSize: isMobile ? '1.1rem' : '1rem',
+            width: isMobile ? '100%' : 'auto',
+            textAlign: 'center',
+            border: 'none'
+        },
+        // Menú de usuario (solo para no-landing)
         userSection: {
             position: 'relative',
             display: 'flex',
             alignItems: 'center',
-            gap: '1rem'
+            gap: '1rem',
+            width: isMobile ? '100%' : 'auto',
+            justifyContent: isMobile ? 'center' : 'flex-start'
         },
         userButton: {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.5rem 1rem',
+            padding: isMobile ? '1rem' : '0.5rem 1rem',
             backgroundColor: colors.primary + '10',
             border: `1px solid ${colors.primary}20`,
             borderRadius: '30px',
             cursor: 'pointer',
-            transition: 'all 0.3s'
+            transition: 'all 0.3s',
+            width: isMobile ? '100%' : 'auto',
+            justifyContent: 'center'
         },
         userAvatar: {
-            width: '32px',
-            height: '32px',
+            width: isMobile ? '32px' : '32px',
+            height: isMobile ? '32px' : '32px',
             borderRadius: '50%',
             background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.dark} 100%)`,
             display: 'flex',
@@ -160,31 +206,28 @@ const Navbar = () => {
             whiteSpace: 'nowrap'
         },
         dropdownMenu: {
-            position: 'absolute',
-            top: '60px',
+            position: isMobile ? 'static' : 'absolute',
+            top: isMobile ? 'auto' : '60px',
             right: 0,
-            width: '250px',
+            width: isMobile ? '100%' : '250px',
             backgroundColor: colors.white,
-            borderRadius: '10px',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-            border: `1px solid #e2e8f0`,
+            borderRadius: isMobile ? '0' : '10px',
+            boxShadow: isMobile ? 'none' : '0 10px 30px rgba(0,0,0,0.1)',
+            border: isMobile ? 'none' : `1px solid #e2e8f0`,
             overflow: 'hidden',
-            zIndex: 1000
+            zIndex: 1000,
+            marginTop: isMobile ? '1rem' : 0
         },
         dropdownItem: {
             display: 'flex',
             alignItems: 'center',
             gap: '0.75rem',
-            padding: '1rem 1.5rem',
+            padding: isMobile ? '1rem' : '1rem 1.5rem',
             cursor: 'pointer',
             transition: 'all 0.3s',
             color: colors.dark,
             textDecoration: 'none',
             borderBottom: `1px solid #e2e8f0`
-        },
-        dropdownItemHover: {
-            backgroundColor: colors.primary + '10',
-            color: colors.primary
         },
         dropdownLogout: {
             color: colors.danger,
@@ -196,7 +239,7 @@ const Navbar = () => {
             margin: '0.5rem 0'
         },
         userStats: {
-            padding: '1rem 1.5rem',
+            padding: isMobile ? '1rem' : '1rem 1.5rem',
             backgroundColor: '#f8fafc',
             borderBottom: `1px solid #e2e8f0`
         },
@@ -210,24 +253,18 @@ const Navbar = () => {
         statValue: {
             fontWeight: '600',
             color: colors.primary
-        },
-        loginBtn: {
-            backgroundColor: colors.primary,
-            color: 'white',
-            padding: '0.5rem 1.5rem',
-            borderRadius: '30px',
-            textDecoration: 'none',
-            fontWeight: '500',
-            transition: 'background-color 0.3s'
-        },
-        registerBtn: {
-            border: `2px solid ${colors.primary}`,
-            color: colors.primary,
-            padding: '0.5rem 1.5rem',
-            borderRadius: '30px',
-            textDecoration: 'none',
-            fontWeight: '500'
         }
+    };
+
+    // Función para manejar hover
+    const handleMouseEnter = (e) => {
+        e.currentTarget.style.color = colors.primary;
+        e.currentTarget.style.backgroundColor = colors.primary + '10';
+    };
+
+    const handleMouseLeave = (e) => {
+        e.currentTarget.style.color = colors.dark;
+        e.currentTarget.style.backgroundColor = 'transparent';
     };
 
     return (
@@ -235,209 +272,311 @@ const Navbar = () => {
             <div style={styles.container}>
                 {/* Logo */}
                 <Link to="/" style={styles.logo}>
-                    <HiOutlineCube size={32} />
+                    <HiOutlineCube size={isMobile ? 28 : 32} />
                     <span>ArchiMarket3D</span>
                 </Link>
 
-                {/* Menú hamburguesa (móvil) */}
-                <div style={styles.menuIcon} onClick={() => setIsOpen(!isOpen)}>
-                    {isOpen ? <FiX /> : <FiMenu />}
-                </div>
+                {/* Menú hamburguesa (solo en móvil) */}
+                {isMobile && (
+                    <div style={styles.menuIcon} onClick={() => setIsOpen(!isOpen)}>
+                        {isOpen ? <FiX /> : <FiMenu />}
+                    </div>
+                )}
 
                 {/* Enlaces de navegación */}
                 <div style={styles.navLinks}>
-                    <Link
-                        to="/"
-                        style={styles.link}
-                        onMouseEnter={(e) => {
-                            e.target.style.color = colors.primary;
-                            e.target.style.backgroundColor = colors.primary + '10';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.color = colors.dark;
-                            e.target.style.backgroundColor = 'transparent';
-                        }}
-                    >
-                        Inicio
-                    </Link>
-
-                    <Link
-                        to="/models"
-                        style={styles.link}
-                        onMouseEnter={(e) => {
-                            e.target.style.color = colors.primary;
-                            e.target.style.backgroundColor = colors.primary + '10';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.color = colors.dark;
-                            e.target.style.backgroundColor = 'transparent';
-                        }}
-                    >
-                        Modelos
-                    </Link>
-
-                    <Link
-                        to="/categories"
-                        style={styles.link}
-                        onMouseEnter={(e) => {
-                            e.target.style.color = colors.primary;
-                            e.target.style.backgroundColor = colors.primary + '10';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.color = colors.dark;
-                            e.target.style.backgroundColor = 'transparent';
-                        }}
-                    >
-                        Categorías
-                    </Link>
-
-                    <Link
-                        to="/licenses"
-                        style={styles.link}
-                        onMouseEnter={(e) => {
-                            e.target.style.color = colors.primary;
-                            e.target.style.backgroundColor = colors.primary + '10';
-                        }}
-                        onMouseLeave={(e) => {
-                            e.target.style.color = colors.dark;
-                            e.target.style.backgroundColor = 'transparent';
-                        }}
-                    >
-                        Licencias
-                    </Link>
-
-                    {isLoggedIn ? (
-                        <div style={styles.userSection}>
-                            <motion.div
-                                style={styles.userButton}
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
-                                onClick={() => setUserMenuOpen(!userMenuOpen)}
-                            >
-                                <div style={styles.userAvatar}>
-                                    {getInitials(user?.name || 'Usuario')}
-                                </div>
-                                <span style={styles.userName}>{user?.name?.split(' ')[0]}</span>
-                                <FiChevronDown size={16} color={colors.primary} />
-                            </motion.div>
-
-                            <AnimatePresence>
-                                {userMenuOpen && (
-                                    <motion.div
-                                        style={styles.dropdownMenu}
-                                        initial={{ opacity: 0, y: -10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -10 }}
-                                        transition={{ duration: 0.2 }}
+                    {/* VERSIÓN LANDING PAGE (simplificada) */}
+                    {isLandingPage ? (
+                        <div style={styles.landingLinks}>
+                            {!isLoggedIn ? (
+                                <>
+                                    <Link
+                                        to="/login"
+                                        style={styles.landingLoginBtn}
+                                        onClick={() => setIsOpen(false)}
                                     >
-                                        <div style={styles.userStats}>
-                                            <div style={styles.statRow}>
-                                                <span>Compras</span>
-                                                <span style={styles.statValue}>0</span>
-                                            </div>
-                                            <div style={styles.statRow}>
-                                                <span>Miembro desde</span>
-                                                <span style={styles.statValue}>2026</span>
-                                            </div>
+                                        Iniciar Sesión
+                                    </Link>
+                                    <Link
+                                        to="/register"
+                                        style={styles.landingRegisterBtn}
+                                        onClick={() => setIsOpen(false)}
+                                    >
+                                        Registrarse
+                                    </Link>
+                                </>
+                            ) : (
+                                // Usuario logueado en LandingPage (también simplificado)
+                                <div style={styles.userSection}>
+                                    <motion.div
+                                        style={styles.userButton}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => setUserMenuOpen(!userMenuOpen)}
+                                    >
+                                        <div style={styles.userAvatar}>
+                                            {getInitials(user?.name || 'Usuario')}
                                         </div>
-
-                                        <Link
-                                            to="/profile"
-                                            style={styles.dropdownItem}
-                                            onMouseEnter={(e) => {
-                                                e.target.style.backgroundColor = colors.primary + '10';
-                                                e.target.style.color = colors.primary;
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.target.style.backgroundColor = 'transparent';
-                                                e.target.style.color = colors.dark;
-                                            }}
-                                            onClick={() => setUserMenuOpen(false)}
-                                        >
-                                            <FiUser /> Mi Perfil
-                                        </Link>
-
-                                        <Link
-                                            to="/purchases"
-                                            style={styles.dropdownItem}
-                                            onMouseEnter={(e) => {
-                                                e.target.style.backgroundColor = colors.primary + '10';
-                                                e.target.style.color = colors.primary;
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.target.style.backgroundColor = 'transparent';
-                                                e.target.style.color = colors.dark;
-                                            }}
-                                            onClick={() => setUserMenuOpen(false)}
-                                        >
-                                            <FiShoppingCart /> Mis Compras
-                                        </Link>
-
-                                        <Link
-                                            to="/downloads"
-                                            style={styles.dropdownItem}
-                                            onMouseEnter={(e) => {
-                                                e.target.style.backgroundColor = colors.primary + '10';
-                                                e.target.style.color = colors.primary;
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.target.style.backgroundColor = 'transparent';
-                                                e.target.style.color = colors.dark;
-                                            }}
-                                            onClick={() => setUserMenuOpen(false)}
-                                        >
-                                            <FiDownload /> Descargas
-                                        </Link>
-
-                                        <div style={styles.dropdownDivider} />
-
-                                        <div
-                                            style={{ ...styles.dropdownItem, ...styles.dropdownLogout }}
-                                            onMouseEnter={(e) => {
-                                                e.target.style.backgroundColor = colors.danger + '10';
-                                                e.target.style.color = colors.danger;
-                                            }}
-                                            onMouseLeave={(e) => {
-                                                e.target.style.backgroundColor = 'transparent';
-                                                e.target.style.color = colors.danger;
-                                            }}
-                                            onClick={handleLogout}
-                                        >
-                                            <FiLogOut /> Cerrar Sesión
-                                        </div>
+                                        <span style={styles.userName}>{user?.name?.split(' ')[0]}</span>
+                                        <FiChevronDown size={16} color={colors.primary} />
                                     </motion.div>
-                                )}
-                            </AnimatePresence>
+
+                                    <AnimatePresence>
+                                        {userMenuOpen && (
+                                            <motion.div
+                                                style={styles.dropdownMenu}
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -10 }}
+                                                transition={{ duration: 0.2 }}
+                                            >
+                                                <div style={styles.userStats}>
+                                                    <div style={styles.statRow}>
+                                                        <span>Compras</span>
+                                                        <span style={styles.statValue}>0</span>
+                                                    </div>
+                                                    <div style={styles.statRow}>
+                                                        <span>Miembro desde</span>
+                                                        <span style={styles.statValue}>2026</span>
+                                                    </div>
+                                                </div>
+
+                                                <Link
+                                                    to="/profile"
+                                                    style={styles.dropdownItem}
+                                                    onMouseEnter={handleMouseEnter}
+                                                    onMouseLeave={handleMouseLeave}
+                                                    onClick={() => {
+                                                        setUserMenuOpen(false);
+                                                        setIsOpen(false);
+                                                    }}
+                                                >
+                                                    <FiUser /> Mi Perfil
+                                                </Link>
+
+                                                <Link
+                                                    to="/purchases"
+                                                    style={styles.dropdownItem}
+                                                    onMouseEnter={handleMouseEnter}
+                                                    onMouseLeave={handleMouseLeave}
+                                                    onClick={() => {
+                                                        setUserMenuOpen(false);
+                                                        setIsOpen(false);
+                                                    }}
+                                                >
+                                                    <FiShoppingCart /> Mis Compras
+                                                </Link>
+
+                                                <Link
+                                                    to="/downloads"
+                                                    style={styles.dropdownItem}
+                                                    onMouseEnter={handleMouseEnter}
+                                                    onMouseLeave={handleMouseLeave}
+                                                    onClick={() => {
+                                                        setUserMenuOpen(false);
+                                                        setIsOpen(false);
+                                                    }}
+                                                >
+                                                    <FiDownload /> Descargas
+                                                </Link>
+
+                                                <div style={styles.dropdownDivider} />
+
+                                                <div
+                                                    style={{ ...styles.dropdownItem, ...styles.dropdownLogout }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.backgroundColor = colors.danger + '10';
+                                                        e.currentTarget.style.color = colors.danger;
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                                        e.currentTarget.style.color = colors.danger;
+                                                    }}
+                                                    onClick={handleLogout}
+                                                >
+                                                    <FiLogOut /> Cerrar Sesión
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            )}
                         </div>
                     ) : (
-                        <div style={{ display: 'flex', gap: '1rem' }}>
+                        /* VERSIÓN NORMAL (para el resto de la app) */
+                        <>
+
                             <Link
-                                to="/login"
+                                to="/models"
                                 style={styles.link}
-                                onMouseEnter={(e) => {
-                                    e.target.style.color = colors.primary;
-                                    e.target.style.backgroundColor = colors.primary + '10';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.target.style.color = colors.dark;
-                                    e.target.style.backgroundColor = 'transparent';
-                                }}
+                                onMouseEnter={handleMouseEnter}
+                                onMouseLeave={handleMouseLeave}
+                                onClick={() => setIsOpen(false)}
                             >
-                                Iniciar Sesión
+                                Modelos
                             </Link>
+
                             <Link
-                                to="/register"
-                                style={styles.registerBtn}
-                                onMouseEnter={(e) => {
-                                    e.target.style.backgroundColor = colors.primary + '10';
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.target.style.backgroundColor = 'transparent';
-                                }}
+                                to="/categories"
+                                style={styles.link}
+                                onMouseEnter={handleMouseEnter}
+                                onMouseLeave={handleMouseLeave}
+                                onClick={() => setIsOpen(false)}
                             >
-                                Registrarse
+                                Categorías
                             </Link>
-                        </div>
+
+                            <Link
+                                to="/licenses"
+                                style={styles.link}
+                                onMouseEnter={handleMouseEnter}
+                                onMouseLeave={handleMouseLeave}
+                                onClick={() => setIsOpen(false)}
+                            >
+                                Licencias
+                            </Link>
+
+                            {isLoggedIn ? (
+                                <div style={styles.userSection}>
+                                    <motion.div
+                                        style={styles.userButton}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => setUserMenuOpen(!userMenuOpen)}
+                                    >
+                                        <div style={styles.userAvatar}>
+                                            {getInitials(user?.name || 'Usuario')}
+                                        </div>
+                                        <span style={styles.userName}>{user?.name?.split(' ')[0]}</span>
+                                        <FiChevronDown size={16} color={colors.primary} />
+                                    </motion.div>
+
+                                    <AnimatePresence>
+                                        {userMenuOpen && (
+                                            <motion.div
+                                                style={styles.dropdownMenu}
+                                                initial={{ opacity: 0, y: -10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, y: -10 }}
+                                                transition={{ duration: 0.2 }}
+                                            >
+                                                <div style={styles.userStats}>
+                                                    <div style={styles.statRow}>
+                                                        <span>Compras</span>
+                                                        <span style={styles.statValue}>0</span>
+                                                    </div>
+                                                    <div style={styles.statRow}>
+                                                        <span>Miembro desde</span>
+                                                        <span style={styles.statValue}>2026</span>
+                                                    </div>
+                                                </div>
+
+                                                <Link
+                                                    to="/profile"
+                                                    style={styles.dropdownItem}
+                                                    onMouseEnter={handleMouseEnter}
+                                                    onMouseLeave={handleMouseLeave}
+                                                    onClick={() => {
+                                                        setUserMenuOpen(false);
+                                                        setIsOpen(false);
+                                                    }}
+                                                >
+                                                    <FiUser /> Mi Perfil
+                                                </Link>
+
+                                                <Link
+                                                    to="/purchases"
+                                                    style={styles.dropdownItem}
+                                                    onMouseEnter={handleMouseEnter}
+                                                    onMouseLeave={handleMouseLeave}
+                                                    onClick={() => {
+                                                        setUserMenuOpen(false);
+                                                        setIsOpen(false);
+                                                    }}
+                                                >
+                                                    <FiShoppingCart /> Mis Compras
+                                                </Link>
+
+                                                <Link
+                                                    to="/downloads"
+                                                    style={styles.dropdownItem}
+                                                    onMouseEnter={handleMouseEnter}
+                                                    onMouseLeave={handleMouseLeave}
+                                                    onClick={() => {
+                                                        setUserMenuOpen(false);
+                                                        setIsOpen(false);
+                                                    }}
+                                                >
+                                                    <FiDownload /> Descargas
+                                                </Link>
+
+                                                <Link
+                                                    to="/cart"
+                                                    style={styles.dropdownItem}
+                                                    onMouseEnter={handleMouseEnter}
+                                                    onMouseLeave={handleMouseLeave}
+                                                    onClick={() => {
+                                                        setUserMenuOpen(false);
+                                                        setIsOpen(false);
+                                                    }}
+                                                >
+                                                    <FiShoppingCart /> Carrito
+                                                </Link>
+
+                                                <div style={styles.dropdownDivider} />
+
+                                                <div
+                                                    style={{ ...styles.dropdownItem, ...styles.dropdownLogout }}
+                                                    onMouseEnter={(e) => {
+                                                        e.currentTarget.style.backgroundColor = colors.danger + '10';
+                                                        e.currentTarget.style.color = colors.danger;
+                                                    }}
+                                                    onMouseLeave={(e) => {
+                                                        e.currentTarget.style.backgroundColor = 'transparent';
+                                                        e.currentTarget.style.color = colors.danger;
+                                                    }}
+                                                    onClick={handleLogout}
+                                                >
+                                                    <FiLogOut /> Cerrar Sesión
+                                                </div>
+                                            </motion.div>
+                                        )}
+                                    </AnimatePresence>
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', gap: '1rem', flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
+                                    <Link
+                                        to="/login"
+                                        style={styles.link}
+                                        onMouseEnter={handleMouseEnter}
+                                        onMouseLeave={handleMouseLeave}
+                                        onClick={() => setIsOpen(false)}
+                                    >
+                                        Iniciar Sesión
+                                    </Link>
+                                    <Link
+                                        to="/register"
+                                        style={{
+                                            ...styles.link,
+                                            backgroundColor: colors.primary,
+                                            color: colors.white,
+                                            textAlign: 'center'
+                                        }}
+                                        onMouseEnter={(e) => {
+                                            e.currentTarget.style.backgroundColor = colors.dark;
+                                            e.currentTarget.style.color = colors.white;
+                                        }}
+                                        onMouseLeave={(e) => {
+                                            e.currentTarget.style.backgroundColor = colors.primary;
+                                            e.currentTarget.style.color = colors.white;
+                                        }}
+                                        onClick={() => setIsOpen(false)}
+                                    >
+                                        Registrarse
+                                    </Link>
+                                </div>
+                            )}
+                        </>
                     )}
                 </div>
             </div>

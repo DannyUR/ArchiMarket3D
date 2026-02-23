@@ -11,7 +11,8 @@ import {
     FiUser,
     FiMapPin,
     FiPhone,
-    FiMail
+    FiMail,
+    FiInfo
 } from 'react-icons/fi';
 import { useCart } from '../../context/CartContext';
 import { colors } from '../../styles/theme';
@@ -19,7 +20,7 @@ import { colors } from '../../styles/theme';
 const Checkout = () => {
     const navigate = useNavigate();
     const { cartItems, getCartTotal, checkout, loading } = useCart();
-    const [step, setStep] = useState(1); // 1: Información, 2: Pago, 3: Confirmación
+    const [step, setStep] = useState(1);
     const [orderComplete, setOrderComplete] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
@@ -337,6 +338,34 @@ const Checkout = () => {
         successText: {
             color: '#64748b',
             marginBottom: '2rem'
+        },
+        demoBadge: {
+            backgroundColor: '#FFE5E5',
+            color: '#FF4444',
+            padding: '0.25rem 1rem',
+            borderRadius: '20px',
+            fontSize: '0.8rem',
+            fontWeight: '600',
+            border: '1px solid #FF4444',
+            marginLeft: '1rem'
+        },
+        demoBanner: {
+            backgroundColor: '#E3F2FD',
+            border: '1px solid #2196F3',
+            borderRadius: '8px',
+            padding: '1rem',
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+        },
+        demoDisclaimer: {
+            marginTop: '1rem',
+            padding: '0.75rem',
+            backgroundColor: '#FFF3E0',
+            borderRadius: '8px',
+            border: '1px dashed #FF9800',
+            textAlign: 'center'
         }
     };
 
@@ -368,7 +397,12 @@ const Checkout = () => {
                 >
                     <FiArrowLeft /> Volver al carrito
                 </button>
-                <h1 style={styles.title}>Finalizar compra</h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                    <h1 style={styles.title}>Finalizar compra</h1>
+                    <span style={styles.demoBadge}>
+                        🧪 MODO DEMO
+                    </span>
+                </div>
             </div>
 
             {/* Steps */}
@@ -405,6 +439,14 @@ const Checkout = () => {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                         >
+                            {/* Banner demo para step 1 */}
+                            <div style={styles.demoBanner}>
+                                <FiInfo color="#2196F3" size={20} />
+                                <span style={{ color: '#0D47A1', fontSize: '0.9rem' }}>
+                                    <strong>Modo demostración:</strong> Todos los datos son de prueba
+                                </span>
+                            </div>
+
                             <h2 style={styles.formTitle}>Información de contacto</h2>
 
                             <div style={styles.formGrid}>
@@ -532,6 +574,14 @@ const Checkout = () => {
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                         >
+                            {/* Banner demo para pago */}
+                            <div style={styles.demoBanner}>
+                                <FiInfo color="#2196F3" size={20} />
+                                <span style={{ color: '#0D47A1', fontSize: '0.9rem' }}>
+                                    <strong>Modo demostración:</strong> Usa 4242 4242 4242 4242 (cualquier fecha/CVV)
+                                </span>
+                            </div>
+
                             <h2 style={styles.formTitle}>Información de pago</h2>
 
                             <div style={styles.formGroup}>
@@ -541,7 +591,7 @@ const Checkout = () => {
                                     <input
                                         type="text"
                                         name="cardNumber"
-                                        placeholder="1234 5678 9012 3456"
+                                        placeholder="4242 4242 4242 4242"
                                         style={{ ...styles.input, ...styles.inputWithIcon }}
                                         value={formData.cardNumber}
                                         onChange={handleInputChange}
@@ -631,6 +681,7 @@ const Checkout = () => {
                                     </div>
                                 ))}
                             </div>
+
                             {errorMessage && (
                                 <div style={{
                                     backgroundColor: colors.danger + '10',
@@ -643,7 +694,21 @@ const Checkout = () => {
                                     {errorMessage}
                                 </div>
                             )}
+
+                            {/* Disclaimer demo en confirmación */}
+                            <div style={styles.demoDisclaimer}>
+                                <p style={{ color: '#E65100', fontSize: '0.85rem', margin: 0 }}>
+                                    🧪 <strong>Entorno de prueba</strong> - No se realizarán cargos reales
+                                </p>
+                            </div>
+
                             <div style={styles.buttonGroup}>
+                                <button
+                                    style={styles.secondaryButton}
+                                    onClick={handlePrevStep}
+                                >
+                                    Volver
+                                </button>
                                 <button
                                     style={styles.primaryButton}
                                     onClick={handleSubmitOrder}
@@ -659,10 +724,10 @@ const Checkout = () => {
                                                 borderRadius: '50%',
                                                 animation: 'spin 1s linear infinite'
                                             }} />
-                                            Procesando...
+                                            Procesando demo...
                                         </>
                                     ) : (
-                                        'Confirmar y pagar'
+                                        'Confirmar pedido (demo)'
                                     )}
                                 </button>
                             </div>
@@ -709,7 +774,14 @@ const Checkout = () => {
                     </div>
 
                     <div style={styles.secureBadge}>
-                        <FiShield /> Pago 100% seguro
+                        <FiShield /> Pago 100% seguro (demo)
+                    </div>
+
+                    {/* Disclaimer en resumen */}
+                    <div style={styles.demoDisclaimer}>
+                        <p style={{ color: '#E65100', fontSize: '0.8rem', margin: 0 }}>
+                            🧪 Este es un flujo de demostración para validación
+                        </p>
                     </div>
                 </div>
             </div>
