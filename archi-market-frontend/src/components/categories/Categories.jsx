@@ -10,9 +10,13 @@ import {
     FiChevronRight,
     FiPackage,
     FiDownload,
-    FiEye
+    FiEye,
+    FiStar,
+    FiTrendingUp,
+    FiDollarSign,
+    FiLayers
 } from 'react-icons/fi';
-import { HiOutlineCube } from 'react-icons/hi';
+import { HiOutlineCube, HiOutlineOfficeBuilding, HiOutlineLightBulb } from 'react-icons/hi';
 import API from '../../services/api';
 import { colors } from '../../styles/theme';
 
@@ -24,6 +28,14 @@ const Categories = () => {
     const [loading, setLoading] = useState(true);
     const [modelsLoading, setModelsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const [isMobile, setIsMobile] = useState(false);
+
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     useEffect(() => {
         fetchCategories();
@@ -55,15 +67,9 @@ const Categories = () => {
         setModelsLoading(true);
         try {
             const response = await API.get(`/categories/${categoryId}/models`);
-            console.log('📦 Modelos de categoría - RESPUESTA COMPLETA:', response.data);
+            console.log('📦 Modelos de categoría:', response.data);
 
             const modelsData = response.data.data?.data || response.data.models || [];
-
-            // 👇 VER ESTRUCTURA DEL PRIMER MODELO
-            if (modelsData.length > 0) {
-                console.log('🔍 Primer modelo (estructura completa):', JSON.stringify(modelsData[0], null, 2));
-            }
-
             setCategoryModels(modelsData);
         } catch (error) {
             console.error('Error cargando modelos:', error);
@@ -74,42 +80,28 @@ const Categories = () => {
 
     const getPreviewImage = (model) => {
         try {
-            // Verificar si tiene files
-            if (!model.files || model.files.length === 0) {
-                console.log('❌ Modelo sin files:', model.id);
-                return null;
-            }
-
-            // Obtener el primer archivo
+            if (!model.files || model.files.length === 0) return null;
             const file = model.files[0];
-            console.log('📁 Archivo:', file);
-
-            // Verificar si tiene file_url
-            if (!file || !file.file_url) {
-                console.log('❌ Archivo sin file_url');
-                return null;
-            }
-
-            // Construir URL completa
-            const fullUrl = 'http://127.0.0.1:8000' + file.file_url;
-            console.log('✅ URL generada:', fullUrl);
-            return fullUrl;
-
+            if (!file || !file.file_url) return null;
+            return 'http://127.0.0.1:8000' + file.file_url;
         } catch (error) {
-            console.error('Error obteniendo imagen:', error);
             return null;
         }
     };
 
-    const getCategoryIcon = (categoryName) => {
+    const getCategoryIcon = (categoryName, isActive = false) => {
+        const color = isActive ? colors.white : colors.primary;
+        const size = isMobile ? 20 : 24;
+        
         const icons = {
-            'Arquitectura Residencial': <FiHome />,
-            'Estructural': <FiBox />,
-            'Arquitectura Comercial': <FiGrid />,
-            'Interiores': <FiPackage />,
-            'Urbanismo': <FiGrid />
+            'Arquitectura Residencial': <FiHome size={size} color={color} />,
+            'Estructural': <FiBox size={size} color={color} />,
+            'Arquitectura Comercial': <HiOutlineOfficeBuilding size={size} color={color} />,
+            'Interiores': <FiPackage size={size} color={color} />,
+            'Urbanismo': <FiGrid size={size} color={color} />,
+            'Instalaciones': <HiOutlineLightBulb size={size} color={color} />
         };
-        return icons[categoryName] || <FiGrid />;
+        return icons[categoryName] || <FiGrid size={size} color={color} />;
     };
 
     const filteredModels = categoryModels.filter(model =>
@@ -121,37 +113,49 @@ const Categories = () => {
         container: {
             maxWidth: '1400px',
             margin: '0 auto',
-            padding: '2rem'
+            padding: isMobile ? '5rem 1rem 2rem' : '6rem 2rem 2rem',
+            minHeight: '100vh'
         },
         header: {
-            marginBottom: '3rem'
+            marginBottom: isMobile ? '2rem' : '3rem',
+            textAlign: isMobile ? 'left' : 'center'
         },
         title: {
-            fontSize: '2.5rem',
+            fontSize: isMobile ? '2rem' : '2.8rem',
             fontWeight: '700',
             color: colors.dark,
-            marginBottom: '0.5rem',
+            marginBottom: '0.75rem',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: isMobile ? 'flex-start' : 'center',
             gap: '1rem'
         },
+        titleIcon: {
+            color: colors.primary,
+            fontSize: isMobile ? '2rem' : '2.8rem'
+        },
         subtitle: {
-            fontSize: '1.1rem',
+            fontSize: isMobile ? '1rem' : '1.1rem',
             color: '#64748b',
-            maxWidth: '600px'
+            maxWidth: '600px',
+            margin: isMobile ? '0' : '0 auto',
+            lineHeight: '1.6'
         },
         mainGrid: {
             display: 'grid',
-            gridTemplateColumns: '350px 1fr',
-            gap: '2rem'
+            gridTemplateColumns: isMobile ? '1fr' : '320px 1fr',
+            gap: isMobile ? '1.5rem' : '2rem'
         },
+        // Panel de categorías
         categoriesPanel: {
             backgroundColor: colors.white,
-            borderRadius: '20px',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
-            border: '1px solid #e2e8f0',
-            height: 'fit-content'
+            borderRadius: '24px',
+            padding: isMobile ? '1.2rem' : '1.8rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
+            border: '1px solid #f0f0f0',
+            height: 'fit-content',
+            position: isMobile ? 'static' : 'sticky',
+            top: isMobile ? 'auto' : '100px'
         },
         categoriesHeader: {
             display: 'flex',
@@ -159,10 +163,10 @@ const Categories = () => {
             alignItems: 'center',
             marginBottom: '1.5rem',
             paddingBottom: '1rem',
-            borderBottom: `2px solid #e2e8f0`
+            borderBottom: `2px solid ${colors.primary}10`
         },
         categoriesTitle: {
-            fontSize: '1.2rem',
+            fontSize: isMobile ? '1.1rem' : '1.2rem',
             fontWeight: '600',
             color: colors.dark,
             display: 'flex',
@@ -173,8 +177,9 @@ const Categories = () => {
             backgroundColor: colors.primary + '10',
             color: colors.primary,
             padding: '0.25rem 0.75rem',
-            borderRadius: '20px',
-            fontSize: '0.9rem'
+            borderRadius: '30px',
+            fontSize: '0.85rem',
+            fontWeight: '600'
         },
         categoryList: {
             display: 'flex',
@@ -185,16 +190,17 @@ const Categories = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '1rem 1.2rem',
-            borderRadius: '12px',
+            padding: isMobile ? '0.8rem 1rem' : '1rem 1.2rem',
+            borderRadius: '16px',
             cursor: 'pointer',
-            transition: 'all 0.3s',
-            border: `1px solid transparent`
+            transition: 'all 0.2s ease',
+            border: '1px solid transparent',
+            backgroundColor: 'transparent'
         },
         categoryItemActive: {
-            backgroundColor: colors.primary + '10',
-            borderColor: colors.primary + '30',
-            boxShadow: '0 4px 10px rgba(37, 99, 235, 0.1)'
+            background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primary}dd 100%)`,
+            borderColor: 'transparent',
+            boxShadow: `0 8px 20px ${colors.primary}30`
         },
         categoryLeft: {
             display: 'flex',
@@ -202,72 +208,107 @@ const Categories = () => {
             gap: '1rem'
         },
         categoryIcon: {
-            fontSize: '1.5rem',
-            color: colors.primary,
-            opacity: 0.8
+            width: isMobile ? '36px' : '40px',
+            height: isMobile ? '36px' : '40px',
+            borderRadius: '12px',
+            background: colors.primary + '10',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s ease'
         },
         categoryName: {
-            fontSize: '1rem',
+            fontSize: isMobile ? '0.95rem' : '1rem',
             fontWeight: '500',
             color: colors.dark
         },
+        categoryNameActive: {
+            color: colors.white,
+            fontWeight: '600'
+        },
         categoryCount: {
-            fontSize: '0.9rem',
+            fontSize: '0.85rem',
             color: '#64748b',
             marginLeft: '0.5rem'
         },
-        categoryArrow: {
-            color: colors.primary,
-            opacity: 0.5
+        categoryCountActive: {
+            color: 'rgba(255,255,255,0.8)'
         },
+        categoryArrow: {
+            color: '#94a3b8',
+            fontSize: isMobile ? '1rem' : '1.2rem'
+        },
+        categoryArrowActive: {
+            color: colors.white
+        },
+        // Panel de modelos
         modelsPanel: {
             backgroundColor: colors.white,
-            borderRadius: '20px',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
-            border: '1px solid #e2e8f0'
+            borderRadius: '24px',
+            padding: isMobile ? '1.5rem' : '2rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
+            border: '1px solid #f0f0f0'
         },
         modelsHeader: {
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: isMobile ? 'stretch' : 'center',
+            gap: isMobile ? '1rem' : '0',
             marginBottom: '2rem'
         },
+        modelsTitleSection: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem'
+        },
         modelsTitle: {
-            fontSize: '1.3rem',
+            fontSize: isMobile ? '1.3rem' : '1.5rem',
             fontWeight: '600',
             color: colors.dark
+        },
+        modelsBadge: {
+            backgroundColor: colors.primary + '10',
+            color: colors.primary,
+            padding: '0.3rem 1rem',
+            borderRadius: '30px',
+            fontSize: '0.85rem',
+            fontWeight: '600'
         },
         searchBox: {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.5rem 1rem',
+            padding: isMobile ? '0.6rem 1rem' : '0.8rem 1.2rem',
             border: `2px solid #e2e8f0`,
-            borderRadius: '10px',
-            width: '300px'
+            borderRadius: '14px',
+            width: isMobile ? '100%' : '300px',
+            transition: 'all 0.2s ease',
+            backgroundColor: '#f8fafc'
         },
         searchInput: {
             border: 'none',
             outline: 'none',
             width: '100%',
-            fontSize: '0.95rem'
+            fontSize: '0.95rem',
+            backgroundColor: 'transparent'
         },
         modelsGrid: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-            gap: '1.5rem'
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(240px, 1fr))',
+            gap: isMobile ? '1rem' : '1.5rem'
         },
         modelCard: {
             backgroundColor: '#f8fafc',
-            borderRadius: '15px',
+            borderRadius: '20px',
             overflow: 'hidden',
             cursor: 'pointer',
-            transition: 'all 0.3s',
-            border: '1px solid #e2e8f0'
+            transition: 'all 0.3s ease',
+            border: '1px solid #e2e8f0',
+            position: 'relative'
         },
         modelImage: {
-            height: '180px',
+            height: isMobile ? '160px' : '180px',
             backgroundColor: '#e2e8f0',
             display: 'flex',
             alignItems: 'center',
@@ -278,53 +319,60 @@ const Categories = () => {
         modelImageTag: {
             width: '100%',
             height: '100%',
-            objectFit: 'cover'
+            objectFit: 'cover',
+            transition: 'transform 0.5s ease'
         },
-        modelOverlay: {
+        modelBadge: {
             position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(37, 99, 235, 0.8)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '1rem',
-            opacity: 0,
-            transition: 'opacity 0.3s'
-        },
-        overlayBtn: {
-            backgroundColor: 'white',
+            top: '0.8rem',
+            right: '0.8rem',
+            backgroundColor: 'rgba(255,255,255,0.9)',
+            backdropFilter: 'blur(5px)',
+            padding: '0.3rem 0.8rem',
+            borderRadius: '30px',
+            fontSize: '0.7rem',
+            fontWeight: '600',
             color: colors.primary,
-            padding: '0.5rem 1rem',
-            borderRadius: '8px',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            fontSize: '0.9rem',
-            fontWeight: '500'
+            gap: '0.2rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
         },
         modelInfo: {
-            padding: '1.2rem'
+            padding: isMobile ? '1rem' : '1.2rem'
         },
         modelName: {
-            fontSize: '1.1rem',
+            fontSize: isMobile ? '0.95rem' : '1rem',
             fontWeight: '600',
             color: colors.dark,
-            marginBottom: '0.5rem'
+            marginBottom: '0.5rem',
+            lineHeight: '1.4'
         },
         modelMeta: {
             display: 'flex',
-            gap: '1rem',
-            fontSize: '0.9rem',
+            gap: isMobile ? '0.5rem' : '1rem',
+            fontSize: '0.8rem',
             color: '#64748b',
-            marginBottom: '0.5rem'
+            marginBottom: '0.75rem',
+            flexWrap: 'wrap'
+        },
+        modelMetaItem: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.3rem'
         },
         modelPrice: {
-            fontSize: '1.2rem',
+            fontSize: isMobile ? '1.1rem' : '1.2rem',
             fontWeight: '700',
             color: colors.primary
+        },
+        modelStats: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginTop: '0.5rem',
+            fontSize: '0.75rem',
+            color: '#94a3b8'
         },
         loadingState: {
             textAlign: 'center',
@@ -334,9 +382,9 @@ const Categories = () => {
         },
         emptyState: {
             textAlign: 'center',
-            padding: '4rem',
+            padding: isMobile ? '3rem 1rem' : '4rem',
             backgroundColor: '#f8fafc',
-            borderRadius: '15px',
+            borderRadius: '20px',
             color: '#64748b'
         },
         emptyIcon: {
@@ -358,16 +406,23 @@ const Categories = () => {
 
     return (
         <div style={styles.container}>
-            <div style={styles.header}>
+            {/* Header */}
+            <motion.div
+                style={styles.header}
+                initial={{ opacity: 0, y: -20 }}
+                animate={{ opacity: 1, y: 0 }}
+            >
                 <h1 style={styles.title}>
-                    <FiGrid /> Categorías
+                    <FiGrid style={styles.titleIcon} />
+                    Categorías
                 </h1>
                 <p style={styles.subtitle}>
-                    Explora nuestra colección de modelos 3D organizados por categorías
+                    Explora nuestra colección de modelos 3D profesionales organizados por categorías
                 </p>
-            </div>
+            </motion.div>
 
             <div style={styles.mainGrid}>
+                {/* Panel de categorías */}
                 <motion.div
                     style={styles.categoriesPanel}
                     initial={{ opacity: 0, x: -20 }}
@@ -375,56 +430,79 @@ const Categories = () => {
                 >
                     <div style={styles.categoriesHeader}>
                         <div style={styles.categoriesTitle}>
-                            <FiGrid /> Todas las categorías
+                            <FiLayers /> Todas las categorías
                         </div>
                         <span style={styles.categoriesCount}>{categories.length}</span>
                     </div>
 
                     <div style={styles.categoryList}>
-                        {categories.map((category, index) => (
-                            <motion.div
-                                key={category.id}
-                                style={{
-                                    ...styles.categoryItem,
-                                    ...(selectedCategory?.id === category.id ? styles.categoryItemActive : {})
-                                }}
-                                whileHover={{ x: 5 }}
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                transition={{ delay: index * 0.05 }}
-                                onClick={() => setSelectedCategory(category)}
-                            >
-                                <div style={styles.categoryLeft}>
-                                    <span style={styles.categoryIcon}>
-                                        {getCategoryIcon(category.name)}
-                                    </span>
-                                    <span style={styles.categoryName}>
-                                        {category.name}
-                                        <span style={styles.categoryCount}>
-                                            ({category.models_count || 0})
+                        {categories.map((category, index) => {
+                            const isActive = selectedCategory?.id === category.id;
+                            return (
+                                <motion.div
+                                    key={category.id}
+                                    style={{
+                                        ...styles.categoryItem,
+                                        ...(isActive ? styles.categoryItemActive : {})
+                                    }}
+                                    whileHover={{ x: isMobile ? 0 : 5 }}
+                                    initial={{ opacity: 0, x: -20 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: index * 0.05 }}
+                                    onClick={() => setSelectedCategory(category)}
+                                >
+                                    <div style={styles.categoryLeft}>
+                                        <div style={{
+                                            ...styles.categoryIcon,
+                                            backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : colors.primary + '10'
+                                        }}>
+                                            {getCategoryIcon(category.name, isActive)}
+                                        </div>
+                                        <span style={{
+                                            ...styles.categoryName,
+                                            ...(isActive ? styles.categoryNameActive : {})
+                                        }}>
+                                            {category.name}
+                                            <span style={{
+                                                ...styles.categoryCount,
+                                                ...(isActive ? styles.categoryCountActive : {})
+                                            }}>
+                                                ({category.models_count || 0})
+                                            </span>
                                         </span>
-                                    </span>
-                                </div>
-                                <FiChevronRight style={styles.categoryArrow} />
-                            </motion.div>
-                        ))}
+                                    </div>
+                                    <FiChevronRight style={{
+                                        ...styles.categoryArrow,
+                                        ...(isActive ? styles.categoryArrowActive : {})
+                                    }} />
+                                </motion.div>
+                            );
+                        })}
                     </div>
                 </motion.div>
 
+                {/* Panel de modelos */}
                 <motion.div
                     style={styles.modelsPanel}
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
                 >
                     <div style={styles.modelsHeader}>
-                        <h2 style={styles.modelsTitle}>
-                            {selectedCategory?.name || 'Selecciona una categoría'}
-                        </h2>
+                        <div style={styles.modelsTitleSection}>
+                            <h2 style={styles.modelsTitle}>
+                                {selectedCategory?.name || 'Selecciona una categoría'}
+                            </h2>
+                            {selectedCategory && (
+                                <span style={styles.modelsBadge}>
+                                    {categoryModels.length} modelos
+                                </span>
+                            )}
+                        </div>
                         <div style={styles.searchBox}>
                             <FiSearch color="#94a3b8" />
                             <input
                                 type="text"
-                                placeholder="Buscar en esta categoría..."
+                                placeholder="Buscar modelos..."
                                 style={styles.searchInput}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -437,7 +515,10 @@ const Categories = () => {
                             Cargando modelos...
                         </div>
                     ) : filteredModels.length === 0 ? (
-                        <div style={styles.emptyState}>No hay modelos disponibles en esta categoría.</div>
+                        <div style={styles.emptyState}>
+                            <HiOutlineCube style={styles.emptyIcon} />
+                            <p>No hay modelos disponibles en esta categoría.</p>
+                        </div>
                     ) : (
                         <div style={styles.modelsGrid}>
                             {filteredModels.map((model, index) => {
@@ -450,7 +531,7 @@ const Categories = () => {
                                         initial={{ opacity: 0, y: 20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ delay: index * 0.05 }}
-                                        whileHover={{ y: -5, boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}
+                                        whileHover={{ y: -5, boxShadow: '0 15px 30px rgba(0,0,0,0.1)' }}
                                         onClick={() => navigate(`/models/${model.id}`)}
                                     >
                                         <div style={styles.modelImage}>
@@ -460,7 +541,6 @@ const Categories = () => {
                                                     alt={model.name}
                                                     style={styles.modelImageTag}
                                                     onError={(e) => {
-                                                        console.log('Error cargando imagen:', previewImage);
                                                         e.target.style.display = 'none';
                                                         e.target.parentNode.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%"><svg>...</svg></div>';
                                                     }}
@@ -468,23 +548,25 @@ const Categories = () => {
                                             ) : (
                                                 <HiOutlineCube size={48} color={colors.primary + '40'} />
                                             )}
-                                            <div style={styles.modelOverlay}
-                                                onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
-                                                onMouseLeave={(e) => e.currentTarget.style.opacity = 0}
-                                            >
-                                                <div style={styles.overlayBtn}>
-                                                    <FiEye /> Vista previa
-                                                </div>
+                                            <div style={styles.modelBadge}>
+                                                <FiEye size={10} /> 3D
                                             </div>
                                         </div>
                                         <div style={styles.modelInfo}>
                                             <h3 style={styles.modelName}>{model.name}</h3>
                                             <div style={styles.modelMeta}>
-                                                <span>{model.format}</span>
-                                                <span>{model.size_mb} MB</span>
+                                                <span style={styles.modelMetaItem}>
+                                                    <FiBox size={12} /> {model.format || 'GLTF'}
+                                                </span>
+                                                <span style={styles.modelMetaItem}>
+                                                    <FiDownload size={12} /> {model.size_mb || '0'} MB
+                                                </span>
                                             </div>
                                             <div style={styles.modelPrice}>
-                                                ${model.price}
+                                                ${model.price?.toFixed(2) || '99.99'}
+                                            </div>
+                                            <div style={styles.modelStats}>
+                                                <FiStar /> {model.rating || '4.5'} · {model.downloads || '120'} descargas
                                             </div>
                                         </div>
                                     </motion.div>

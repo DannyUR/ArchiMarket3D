@@ -754,7 +754,7 @@ const LandingPage = () => {
                             <Link to="/register" style={styles.primaryBtn}>
                                 Comenzar gratis <FiArrowRight />
                             </Link>
-                            <Link to="/models" style={styles.secondaryBtn}>
+                            <Link to="/register" style={styles.secondaryBtn}>
                                 Explorar modelos <BsArrowRightShort />
                             </Link>
                         </div>
@@ -921,7 +921,7 @@ const LandingPage = () => {
                         )}
                     </div>
                     <div style={{ textAlign: 'center', marginTop: '2rem' }}>
-                        <Link to="/models" style={styles.secondaryBtn}>
+                        <Link to="/register" style={styles.secondaryBtn}>
                             Ver todos los modelos <FiArrowRight />
                         </Link>
                     </div>

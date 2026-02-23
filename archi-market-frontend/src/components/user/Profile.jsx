@@ -20,7 +20,15 @@ import {
     FiEye,
     FiCheckCircle,
     FiFileText,
-    FiXCircle
+    FiXCircle,
+    FiAward,
+    FiTrendingUp,
+    FiHeart,
+    FiShare2,
+    FiSettings,
+    FiCreditCard,
+    FiMapPin,
+    FiPhone
 } from 'react-icons/fi';
 import { HiOutlineCube } from 'react-icons/hi';
 import { colors } from '../../styles/theme';
@@ -32,6 +40,7 @@ const Profile = () => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [editing, setEditing] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
     const [formData, setFormData] = useState({
         name: '',
         company: ''
@@ -46,6 +55,16 @@ const Profile = () => {
     });
     const [userLicenses, setUserLicenses] = useState([]);
     const { showSuccess, showError } = useNotification();
+
+    // Detectar móvil
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     useEffect(() => {
         const fetchAllData = async () => {
@@ -170,95 +189,114 @@ const Profile = () => {
         container: {
             maxWidth: '1400px',
             margin: '0 auto',
-            padding: '2rem',
-            backgroundColor: '#f8fafc',
-            minHeight: 'calc(100vh - 80px)'
+            padding: isMobile ? '5rem 1rem 2rem' : '6rem 2rem 2rem',
+            minHeight: '100vh',
+            backgroundColor: '#f8fafc'
         },
         header: {
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: isMobile ? 'flex-start' : 'center',
+            gap: isMobile ? '1rem' : '0',
             marginBottom: '2rem'
         },
         titleSection: {
             display: 'flex',
             alignItems: 'center',
-            gap: '1rem'
+            gap: '1rem',
+            flexWrap: 'wrap'
         },
         title: {
-            fontSize: '2rem',
+            fontSize: isMobile ? '2rem' : '2.5rem',
             fontWeight: '700',
             color: colors.dark,
-            margin: 0
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
+        },
+        titleIcon: {
+            color: colors.primary,
+            fontSize: isMobile ? '2rem' : '2.5rem'
         },
         titleBadge: {
             backgroundColor: colors.primary + '10',
             color: colors.primary,
-            padding: '0.25rem 1rem',
-            borderRadius: '20px',
+            padding: '0.5rem 1.5rem',
+            borderRadius: '30px',
             fontSize: '0.9rem',
-            fontWeight: '500'
+            fontWeight: '600',
+            border: `1px solid ${colors.primary}20`
         },
         logoutBtn: {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.75rem 1.5rem',
+            padding: isMobile ? '0.8rem 1.2rem' : '0.8rem 1.5rem',
             backgroundColor: colors.white,
             color: colors.danger,
             border: `1px solid ${colors.danger}20`,
-            borderRadius: '10px',
+            borderRadius: '30px',
             cursor: 'pointer',
             transition: 'all 0.3s',
             fontSize: '0.95rem',
             fontWeight: '500',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.02)'
+            boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
         },
         statsGrid: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '1.5rem',
+            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+            gap: isMobile ? '1rem' : '1.5rem',
             marginBottom: '2rem'
         },
         statCard: {
             backgroundColor: colors.white,
-            borderRadius: '15px',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
-            border: '1px solid #e2e8f0'
+            borderRadius: '24px',
+            padding: isMobile ? '1.2rem' : '1.8rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+            border: '1px solid #f0f0f0',
+            transition: 'all 0.3s'
         },
         statIcon: {
-            fontSize: '1.5rem',
+            fontSize: isMobile ? '1.5rem' : '2rem',
             color: colors.primary,
-            marginBottom: '1rem'
+            marginBottom: isMobile ? '0.5rem' : '1rem',
+            background: colors.primary + '10',
+            width: 'fit-content',
+            padding: '0.5rem',
+            borderRadius: '16px'
         },
         statValue: {
-            fontSize: '1.8rem',
+            fontSize: isMobile ? '1.5rem' : '2rem',
             fontWeight: '700',
             color: colors.dark,
-            marginBottom: '0.25rem'
+            marginBottom: '0.25rem',
+            lineHeight: '1.2'
         },
         statLabel: {
-            fontSize: '0.9rem',
+            fontSize: isMobile ? '0.8rem' : '0.9rem',
             color: '#64748b'
         },
         mainGrid: {
             display: 'grid',
-            gridTemplateColumns: '350px 1fr',
-            gap: '1.5rem'
+            gridTemplateColumns: isMobile ? '1fr' : '320px 1fr',
+            gap: isMobile ? '1.5rem' : '2rem'
         },
         sidebar: {
             backgroundColor: colors.white,
-            borderRadius: '20px',
-            padding: '2rem',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
-            border: '1px solid #e2e8f0',
-            height: 'fit-content'
+            borderRadius: '32px',
+            padding: isMobile ? '2rem 1.5rem' : '2rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+            border: '1px solid #f0f0f0',
+            height: 'fit-content',
+            position: isMobile ? 'static' : 'sticky',
+            top: isMobile ? 'auto' : '100px'
         },
         avatarContainer: {
             position: 'relative',
-            width: '120px',
-            height: '120px',
+            width: isMobile ? '100px' : '120px',
+            height: isMobile ? '100px' : '120px',
             margin: '0 auto 1.5rem'
         },
         avatar: {
@@ -270,16 +308,17 @@ const Profile = () => {
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontSize: '2.5rem',
+            fontSize: isMobile ? '2rem' : '2.5rem',
             fontWeight: '600',
-            boxShadow: '0 10px 20px rgba(37, 99, 235, 0.2)'
+            boxShadow: `0 10px 30px ${colors.primary}30`,
+            border: '4px solid white'
         },
         avatarBadge: {
             position: 'absolute',
             bottom: '5px',
             right: '5px',
-            width: '25px',
-            height: '25px',
+            width: '30px',
+            height: '30px',
             backgroundColor: colors.success,
             borderRadius: '50%',
             border: `3px solid ${colors.white}`,
@@ -287,22 +326,25 @@ const Profile = () => {
             alignItems: 'center',
             justifyContent: 'center',
             color: 'white',
-            fontSize: '0.8rem'
+            fontSize: '0.9rem',
+            boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
         },
         userInfo: {
             textAlign: 'center',
-            marginBottom: '2rem'
+            marginBottom: '2rem',
+            paddingBottom: '2rem',
+            borderBottom: `2px solid ${colors.primary}10`
         },
         userName: {
-            fontSize: '1.3rem',
-            fontWeight: '600',
+            fontSize: isMobile ? '1.3rem' : '1.5rem',
+            fontWeight: '700',
             color: colors.dark,
-            marginBottom: '0.25rem'
+            marginBottom: '0.5rem'
         },
         userEmail: {
-            fontSize: '0.9rem',
+            fontSize: '0.95rem',
             color: '#64748b',
-            marginBottom: '0.5rem',
+            marginBottom: '1rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -310,12 +352,12 @@ const Profile = () => {
         },
         userType: {
             display: 'inline-block',
-            padding: '0.5rem 1rem',
+            padding: '0.5rem 1.5rem',
             backgroundColor: colors.primary + '10',
             color: colors.primary,
             borderRadius: '30px',
             fontSize: '0.9rem',
-            fontWeight: '500',
+            fontWeight: '600',
             marginBottom: '1rem'
         },
         memberSince: {
@@ -325,21 +367,21 @@ const Profile = () => {
             gap: '0.5rem',
             fontSize: '0.9rem',
             color: '#64748b',
-            padding: '0.5rem',
+            padding: '0.75rem',
             backgroundColor: '#f8fafc',
-            borderRadius: '8px'
+            borderRadius: '20px'
         },
         navMenu: {
-            marginTop: '2rem'
+            marginTop: '1rem'
         },
         navItem: {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '1rem',
-            borderRadius: '12px',
+            padding: '1rem 1.2rem',
+            borderRadius: '16px',
             cursor: 'pointer',
-            transition: 'all 0.3s',
+            transition: 'all 0.2s',
             marginBottom: '0.5rem'
         },
         navItemLeft: {
@@ -349,10 +391,11 @@ const Profile = () => {
         },
         navIcon: {
             fontSize: '1.2rem',
-            color: '#64748b'
+            color: '#64748b',
+            width: '24px'
         },
         navText: {
-            fontSize: '1rem',
+            fontSize: isMobile ? '1rem' : '0.95rem',
             fontWeight: '500',
             color: colors.dark
         },
@@ -365,22 +408,25 @@ const Profile = () => {
         },
         mainContent: {
             backgroundColor: colors.white,
-            borderRadius: '20px',
-            padding: '2rem',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
-            border: '1px solid #e2e8f0'
+            borderRadius: '32px',
+            padding: isMobile ? '1.5rem' : '2rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+            border: '1px solid #f0f0f0',
+            minHeight: '500px'
         },
         sectionHeader: {
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: isMobile ? 'flex-start' : 'center',
+            gap: isMobile ? '1rem' : '0',
             marginBottom: '2rem',
-            paddingBottom: '1rem',
-            borderBottom: `2px solid #e2e8f0`
+            paddingBottom: '1.5rem',
+            borderBottom: `2px solid ${colors.primary}10`
         },
         sectionTitle: {
-            fontSize: '1.3rem',
-            fontWeight: '600',
+            fontSize: isMobile ? '1.3rem' : '1.5rem',
+            fontWeight: '700',
             color: colors.dark,
             display: 'flex',
             alignItems: 'center',
@@ -390,25 +436,27 @@ const Profile = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.6rem 1.2rem',
+            padding: '0.8rem 1.5rem',
             backgroundColor: 'transparent',
             color: colors.primary,
             border: `2px solid ${colors.primary}`,
-            borderRadius: '8px',
+            borderRadius: '30px',
             cursor: 'pointer',
-            fontSize: '0.9rem',
-            fontWeight: '500',
-            transition: 'all 0.3s'
+            fontSize: '0.95rem',
+            fontWeight: '600',
+            transition: 'all 0.2s'
         },
         infoGrid: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
             gap: '1.5rem'
         },
         infoItem: {
             backgroundColor: '#f8fafc',
             padding: '1.5rem',
-            borderRadius: '12px'
+            borderRadius: '20px',
+            border: '1px solid #f0f0f0',
+            transition: 'all 0.2s'
         },
         infoLabel: {
             display: 'flex',
@@ -416,53 +464,56 @@ const Profile = () => {
             gap: '0.5rem',
             color: '#64748b',
             fontSize: '0.9rem',
-            marginBottom: '0.5rem'
+            marginBottom: '0.75rem'
         },
         infoValue: {
-            fontSize: '1.1rem',
+            fontSize: '1.2rem',
             fontWeight: '600',
-            color: colors.dark
+            color: colors.dark,
+            lineHeight: '1.4'
         },
         input: {
             width: '100%',
-            padding: '0.8rem 1rem',
+            padding: '1rem',
             border: `2px solid #e2e8f0`,
-            borderRadius: '10px',
+            borderRadius: '16px',
             fontSize: '1rem',
-            transition: 'all 0.3s',
+            transition: 'all 0.2s',
             outline: 'none',
             backgroundColor: colors.white
         },
         buttonGroup: {
             display: 'flex',
             gap: '1rem',
-            marginTop: '1.5rem'
+            marginTop: '2rem',
+            flexWrap: 'wrap'
         },
         saveBtn: {
-            padding: '0.8rem 1.5rem',
+            padding: '1rem 2rem',
             backgroundColor: colors.primary,
             color: 'white',
             border: 'none',
-            borderRadius: '10px',
+            borderRadius: '30px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            fontSize: '0.95rem',
-            fontWeight: '500'
+            fontSize: '1rem',
+            fontWeight: '600',
+            boxShadow: `0 8px 20px ${colors.primary}30`
         },
         cancelBtn: {
-            padding: '0.8rem 1.5rem',
+            padding: '1rem 2rem',
             backgroundColor: 'white',
             color: colors.dark,
             border: `2px solid #e2e8f0`,
-            borderRadius: '10px',
+            borderRadius: '30px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            fontSize: '0.95rem',
-            fontWeight: '500'
+            fontSize: '1rem',
+            fontWeight: '600'
         },
         purchaseGrid: {
             display: 'grid',
@@ -470,26 +521,26 @@ const Profile = () => {
         },
         purchaseCard: {
             backgroundColor: '#f8fafc',
-            borderRadius: '12px',
+            borderRadius: '20px',
             padding: '1.5rem',
             display: 'grid',
-            gridTemplateColumns: 'auto 1fr auto',
-            gap: '1.5rem',
+            gridTemplateColumns: isMobile ? '1fr' : 'auto 1fr auto',
+            gap: isMobile ? '1rem' : '1.5rem',
             alignItems: 'center',
-            transition: 'transform 0.2s',
+            transition: 'all 0.2s',
             cursor: 'pointer',
-            border: '1px solid #e2e8f0'
+            border: '1px solid #f0f0f0'
         },
         purchaseIcon: {
-            width: '50px',
-            height: '50px',
+            width: isMobile ? '60px' : '50px',
+            height: isMobile ? '60px' : '50px',
             backgroundColor: colors.primary + '10',
-            borderRadius: '10px',
+            borderRadius: '16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: colors.primary,
-            fontSize: '1.5rem'
+            fontSize: isMobile ? '2rem' : '1.5rem'
         },
         purchaseDetails: {
             flex: 1
@@ -504,64 +555,66 @@ const Profile = () => {
             display: 'flex',
             gap: '1rem',
             fontSize: '0.9rem',
-            color: '#64748b'
+            color: '#64748b',
+            flexWrap: 'wrap'
         },
         purchaseAmount: {
-            fontSize: '1.3rem',
+            fontSize: isMobile ? '1.5rem' : '1.3rem',
             fontWeight: '700',
             color: colors.primary
         },
         viewBtn: {
-            padding: '0.5rem 1rem',
+            padding: '0.8rem 1.5rem',
             backgroundColor: colors.primary,
             color: 'white',
             border: 'none',
-            borderRadius: '8px',
+            borderRadius: '30px',
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            fontSize: '0.9rem'
+            fontSize: '0.9rem',
+            fontWeight: '600'
         },
         emptyState: {
             textAlign: 'center',
-            padding: '4rem',
+            padding: isMobile ? '3rem 1.5rem' : '4rem',
             backgroundColor: '#f8fafc',
-            borderRadius: '15px',
+            borderRadius: '24px',
             color: '#64748b'
         },
         emptyIcon: {
-            fontSize: '3rem',
+            fontSize: '4rem',
             color: colors.primary + '40',
             marginBottom: '1rem'
         },
         licensesGrid: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))',
             gap: '1.5rem'
         },
         licenseCard: {
             backgroundColor: '#f8fafc',
-            borderRadius: '12px',
+            borderRadius: '24px',
             padding: '1.5rem',
-            border: '1px solid #e2e8f0',
-            transition: 'all 0.3s',
+            border: '1px solid #f0f0f0',
+            transition: 'all 0.2s',
             cursor: 'pointer'
         },
         licenseHeader: {
             display: 'flex',
             alignItems: 'center',
             gap: '1rem',
-            marginBottom: '1rem'
+            marginBottom: '1.5rem'
         },
         licenseIcon: {
-            width: '40px',
-            height: '40px',
-            borderRadius: '8px',
+            width: '50px',
+            height: '50px',
+            borderRadius: '16px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            fontSize: '1.2rem'
+            fontSize: '1.5rem'
         },
         licenseName: {
             fontSize: '1.1rem',
@@ -570,10 +623,10 @@ const Profile = () => {
         },
         licenseType: {
             display: 'inline-block',
-            padding: '0.25rem 0.75rem',
-            borderRadius: '20px',
+            padding: '0.3rem 1rem',
+            borderRadius: '30px',
             fontSize: '0.8rem',
-            fontWeight: '500',
+            fontWeight: '600',
             color: 'white',
             marginLeft: '0.5rem'
         },
@@ -588,19 +641,19 @@ const Profile = () => {
         },
         licenseLabel: {
             color: '#64748b',
-            fontSize: '0.85rem',
+            fontSize: '0.8rem',
             marginBottom: '0.25rem'
         },
         licenseValue: {
-            fontWeight: '500',
+            fontWeight: '600',
             color: colors.dark
         },
         licenseStatus: {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.25rem 0.75rem',
-            borderRadius: '20px',
+            padding: '0.5rem 1rem',
+            borderRadius: '30px',
             fontSize: '0.85rem',
             width: 'fit-content'
         }
@@ -609,8 +662,23 @@ const Profile = () => {
     if (loading) {
         return (
             <div style={styles.container}>
-                <div style={{ textAlign: 'center', padding: '4rem' }}>
-                    <div style={{ fontSize: '1.2rem', color: colors.primary }}>Cargando perfil...</div>
+                <div style={{ 
+                    display: 'flex', 
+                    flexDirection: 'column', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    minHeight: '60vh',
+                    gap: '1.5rem'
+                }}>
+                    <div style={{
+                        width: '60px',
+                        height: '60px',
+                        border: `4px solid ${colors.primary}20`,
+                        borderTop: `4px solid ${colors.primary}`,
+                        borderRadius: '50%',
+                        animation: 'spin 1s linear infinite'
+                    }} />
+                    <p style={{ color: colors.primary, fontSize: '1.1rem' }}>Cargando perfil...</p>
                 </div>
             </div>
         );
@@ -621,22 +689,26 @@ const Profile = () => {
             {/* Header */}
             <div style={styles.header}>
                 <div style={styles.titleSection}>
-                    <h1 style={styles.title}>Mi Perfil</h1>
+                    <h1 style={styles.title}>
+                        <FiAward style={styles.titleIcon} />
+                        Mi Perfil
+                    </h1>
                     <span style={styles.titleBadge}>
                         {user?.user_type === 'architect' && 'Arquitecto'}
                         {user?.user_type === 'engineer' && 'Ingeniero'}
                         {user?.user_type === 'company' && 'Empresa'}
                     </span>
                 </div>
+                
             </div>
 
             {/* Stats Cards */}
             <div style={styles.statsGrid}>
                 {[
-                    { icon: <FiDollarSign />, value: `$${stats.totalSpent || 0}`, label: 'Total gastado' },
-                    { icon: <FiPackage />, value: stats.totalPurchases || 0, label: 'Compras realizadas' },
-                    { icon: <FiDownload />, value: stats.totalDownloads || 0, label: 'Descargas' },
-                    { icon: <FiClock />, value: stats.memberSince ? stats.memberSince.split(' ')[2] : '...', label: 'Miembro desde' }
+                    { icon: <FiDollarSign />, value: `$${stats.totalSpent.toFixed(2)}`, label: 'Total gastado' },
+                    { icon: <FiPackage />, value: stats.totalPurchases, label: 'Compras realizadas' },
+                    { icon: <FiDownload />, value: stats.totalDownloads, label: 'Descargas' },
+                    { icon: <FiCalendar />, value: stats.memberSince ? stats.memberSince.split(' ')[2] : '...', label: 'Miembro desde' }
                 ].map((stat, index) => (
                     <motion.div
                         key={index}
@@ -644,7 +716,7 @@ const Profile = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        whileHover={{ y: -5, boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }}
+                        whileHover={{ y: -5, boxShadow: '0 20px 40px rgba(0,0,0,0.05)' }}
                     >
                         <div style={styles.statIcon}>{stat.icon}</div>
                         <div style={styles.statValue}>{stat.value}</div>
@@ -666,22 +738,22 @@ const Profile = () => {
                             {getInitials(user?.name)}
                         </div>
                         <div style={styles.avatarBadge}>
-                            <FiCheckCircle size={12} />
+                            <FiCheckCircle size={14} />
                         </div>
                     </div>
 
                     <div style={styles.userInfo}>
                         <div style={styles.userName}>{user?.name || 'Usuario'}</div>
                         <div style={styles.userEmail}>
-                            <FiMail size={14} /> {user?.email || 'cargando...'}
+                            <FiMail /> {user?.email || 'cargando...'}
                         </div>
                         {user?.company && (
                             <div style={{ ...styles.userEmail, marginBottom: '1rem' }}>
-                                <FiBriefcase size={14} /> {user?.company}
+                                <FiBriefcase /> {user?.company}
                             </div>
                         )}
                         <div style={styles.memberSince}>
-                            <FiCalendar size={14} /> Miembro desde {stats.memberSince || '...'}
+                            <FiCalendar /> Miembro desde {stats.memberSince || '...'}
                         </div>
                     </div>
 
@@ -729,6 +801,7 @@ const Profile = () => {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.2 }}
                             >
                                 <div style={styles.sectionHeader}>
                                     <h2 style={styles.sectionTitle}>
@@ -748,27 +821,39 @@ const Profile = () => {
 
                                 {!editing ? (
                                     <div style={styles.infoGrid}>
-                                        <div style={styles.infoItem}>
+                                        <motion.div 
+                                            style={styles.infoItem}
+                                            whileHover={{ y: -2, boxShadow: '0 10px 20px rgba(0,0,0,0.03)' }}
+                                        >
                                             <div style={styles.infoLabel}>
                                                 <FiUser /> Nombre completo
                                             </div>
                                             <div style={styles.infoValue}>{user?.name || 'No disponible'}</div>
-                                        </div>
-                                        <div style={styles.infoItem}>
+                                        </motion.div>
+                                        <motion.div 
+                                            style={styles.infoItem}
+                                            whileHover={{ y: -2, boxShadow: '0 10px 20px rgba(0,0,0,0.03)' }}
+                                        >
                                             <div style={styles.infoLabel}>
                                                 <FiMail /> Correo electrónico
                                             </div>
                                             <div style={styles.infoValue}>{user?.email || 'No disponible'}</div>
-                                        </div>
+                                        </motion.div>
                                         {user?.company && (
-                                            <div style={styles.infoItem}>
+                                            <motion.div 
+                                                style={styles.infoItem}
+                                                whileHover={{ y: -2, boxShadow: '0 10px 20px rgba(0,0,0,0.03)' }}
+                                            >
                                                 <div style={styles.infoLabel}>
                                                     <FiBriefcase /> Empresa
                                                 </div>
                                                 <div style={styles.infoValue}>{user?.company}</div>
-                                            </div>
+                                            </motion.div>
                                         )}
-                                        <div style={styles.infoItem}>
+                                        <motion.div 
+                                            style={styles.infoItem}
+                                            whileHover={{ y: -2, boxShadow: '0 10px 20px rgba(0,0,0,0.03)' }}
+                                        >
                                             <div style={styles.infoLabel}>
                                                 <FiCalendar /> Fecha de registro
                                             </div>
@@ -781,19 +866,21 @@ const Profile = () => {
                                                     })
                                                     : 'No disponible'}
                                             </div>
-                                        </div>
+                                        </motion.div>
                                     </div>
                                 ) : (
                                     <div>
                                         <div style={styles.infoGrid}>
                                             <div style={styles.infoItem}>
-                                                <label style={styles.infoLabel}>Nombre</label>
+                                                <label style={styles.infoLabel}>Nombre completo</label>
                                                 <input
                                                     type="text"
                                                     style={styles.input}
                                                     value={formData.name}
                                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                                     placeholder="Tu nombre"
+                                                    onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                                                 />
                                             </div>
                                             <div style={styles.infoItem}>
@@ -804,6 +891,8 @@ const Profile = () => {
                                                     value={formData.company}
                                                     onChange={(e) => setFormData({ ...formData, company: e.target.value })}
                                                     placeholder="Nombre de la empresa"
+                                                    onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                                                 />
                                             </div>
                                         </div>
@@ -837,6 +926,7 @@ const Profile = () => {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.2 }}
                             >
                                 <div style={styles.sectionHeader}>
                                     <h2 style={styles.sectionTitle}>
@@ -845,23 +935,30 @@ const Profile = () => {
                                 </div>
 
                                 {purchases.length === 0 ? (
-                                    <div style={styles.emptyState}>
+                                    <motion.div 
+                                        style={styles.emptyState}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                    >
                                         <FiPackage style={styles.emptyIcon} />
-                                        <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
+                                        <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem', color: colors.dark }}>
                                             No hay compras aún
                                         </h3>
-                                        <p style={{ color: '#94a3b8' }}>
+                                        <p style={{ color: '#94a3b8', maxWidth: '400px', margin: '0 auto' }}>
                                             Explora nuestro catálogo y encuentra el modelo perfecto para tu proyecto
                                         </p>
-                                    </div>
+                                    </motion.div>
                                 ) : (
                                     <div style={styles.purchaseGrid}>
                                         {purchases.map((purchase, index) => (
                                             <motion.div
                                                 key={purchase.id || index}
                                                 style={styles.purchaseCard}
-                                                whileHover={{ scale: 1.01, boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }}
+                                                whileHover={{ y: -2, boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }}
                                                 onClick={() => navigate(`/purchases/${purchase.id}`)}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: index * 0.05 }}
                                             >
                                                 <div style={styles.purchaseIcon}>
                                                     <HiOutlineCube />
@@ -885,9 +982,13 @@ const Profile = () => {
                                                     <div style={styles.purchaseAmount}>
                                                         ${purchase.total || 0}
                                                     </div>
-                                                    <button style={styles.viewBtn}>
+                                                    <motion.button 
+                                                        style={styles.viewBtn}
+                                                        whileHover={{ scale: 1.02 }}
+                                                        whileTap={{ scale: 0.98 }}
+                                                    >
                                                         <FiEye /> Ver detalles
-                                                    </button>
+                                                    </motion.button>
                                                 </div>
                                             </motion.div>
                                         ))}
@@ -902,6 +1003,7 @@ const Profile = () => {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.2 }}
                             >
                                 <div style={styles.sectionHeader}>
                                     <h2 style={styles.sectionTitle}>
@@ -921,6 +1023,7 @@ const Profile = () => {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.2 }}
                             >
                                 <div style={styles.sectionHeader}>
                                     <h2 style={styles.sectionTitle}>
@@ -929,23 +1032,30 @@ const Profile = () => {
                                 </div>
 
                                 {!userLicenses || userLicenses.length === 0 ? (
-                                    <div style={styles.emptyState}>
+                                    <motion.div 
+                                        style={styles.emptyState}
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                    >
                                         <FiFileText style={styles.emptyIcon} />
-                                        <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
+                                        <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem', color: colors.dark }}>
                                             No tienes licencias aún
                                         </h3>
                                         <p style={{ color: '#94a3b8' }}>
                                             Realiza tu primera compra para obtener licencias de modelos
                                         </p>
-                                    </div>
+                                    </motion.div>
                                 ) : (
                                     <div style={styles.licensesGrid}>
-                                        {userLicenses.map((license) => (
+                                        {userLicenses.map((license, index) => (
                                             <motion.div
                                                 key={license.id}
                                                 style={styles.licenseCard}
-                                                whileHover={{ y: -5, boxShadow: '0 10px 20px rgba(0,0,0,0.1)' }}
+                                                whileHover={{ y: -5, boxShadow: '0 15px 30px rgba(0,0,0,0.1)' }}
                                                 onClick={() => navigate(`/models/${license.model?.id}`)}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: index * 0.05 }}
                                             >
                                                 <div style={styles.licenseHeader}>
                                                     <div style={{
@@ -999,9 +1109,9 @@ const Profile = () => {
                                                                 : colors.danger
                                                         }}>
                                                             {license.is_active && !license.is_expired ? (
-                                                                <><FiCheckCircle size={12} /> Activa</>
+                                                                <><FiCheckCircle /> Activa</>
                                                             ) : (
-                                                                <><FiXCircle size={12} /> Expirada</>
+                                                                <><FiXCircle /> Expirada</>
                                                             )}
                                                         </div>
                                                     </div>
@@ -1015,6 +1125,13 @@ const Profile = () => {
                     </AnimatePresence>
                 </motion.div>
             </div>
+
+            <style>{`
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 };

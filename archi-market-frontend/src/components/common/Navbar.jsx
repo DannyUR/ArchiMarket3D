@@ -15,9 +15,15 @@ import {
     FiDownload,
     FiHeart,
     FiFileText,
+    FiSearch,
+    FiBell,
+    FiPackage,
+    FiCreditCard,
+    FiStar
 } from 'react-icons/fi';
 import { HiOutlineCube } from 'react-icons/hi';
 import { colors } from '../../styles/theme';
+import InstallButton from './InstallButton';
 
 const Navbar = () => {
     const [isOpen, setIsOpen] = useState(false);
@@ -25,12 +31,20 @@ const Navbar = () => {
     const [isMobile, setIsMobile] = useState(false);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const [user, setUser] = useState(null);
+    const [scrolled, setScrolled] = useState(false);
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Detectar si estamos en LandingPage
-    const isLandingPage = location.pathname === '/';
+    // Detectar scroll
+    useEffect(() => {
+        const handleScroll = () => {
+            setScrolled(window.scrollY > 10);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
 
+    // Detectar móvil
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth <= 768);
         checkMobile();
@@ -71,15 +85,23 @@ const Navbar = () => {
             .slice(0, 2);
     };
 
+    // Detectar si estamos en LandingPage
+    const isLandingPage = location.pathname === '/';
+
+    // Estilos
     const styles = {
         navbar: {
-            backgroundColor: isLandingPage ? 'transparent' : colors.white,
-            boxShadow: isLandingPage ? 'none' : '0 2px 10px rgba(0,0,0,0.05)',
+            backgroundColor: isLandingPage && !scrolled ? 'transparent' : 'rgba(255,255,255,0.98)',
+            backdropFilter: scrolled || !isLandingPage ? 'blur(10px)' : 'none',
+            boxShadow: scrolled || !isLandingPage ? '0 4px 20px rgba(0,0,0,0.05)' : 'none',
             padding: isMobile ? '0.8rem 1rem' : '1rem 2rem',
-            position: 'sticky',
+            position: 'fixed', // Cambia de 'sticky' a 'fixed'
             top: 0,
+            left: 0,
+            right: 0,
             zIndex: 1000,
-            borderBottom: isLandingPage ? 'none' : `1px solid #e2e8f0`
+            borderBottom: scrolled || !isLandingPage ? `1px solid ${colors.primary}10` : 'none',
+            transition: 'all 0.3s ease'
         },
         container: {
             maxWidth: '1400px',
@@ -94,102 +116,124 @@ const Navbar = () => {
             gap: '10px',
             fontSize: isMobile ? '1.2rem' : '1.5rem',
             fontWeight: '700',
-            color: colors.primary,
+            color: scrolled || !isLandingPage ? colors.primary : 'white',
             textDecoration: 'none',
-            cursor: 'pointer'
+            cursor: 'pointer',
+            transition: 'color 0.3s ease'
+        },
+        logoIcon: {
+            color: scrolled || !isLandingPage ? colors.primary : 'white',
+            transition: 'color 0.3s ease'
         },
         menuIcon: {
             display: isMobile ? 'block' : 'none',
-            fontSize: '1.5rem',
+            fontSize: '1.8rem',
             cursor: 'pointer',
-            color: colors.dark,
-            zIndex: 1001
+            color: scrolled || !isLandingPage ? colors.dark : 'white',
+            zIndex: 1001,
+            transition: 'color 0.3s ease'
         },
-        navLinks: {
-            display: isMobile ? (isOpen ? 'flex' : 'none') : 'flex',
-            flexDirection: isMobile ? 'column' : 'row',
-            position: isMobile ? 'absolute' : 'static',
-            top: isMobile ? '70px' : 'auto',
+        desktopNav: {
+            display: isMobile ? 'none' : 'flex',
+            alignItems: 'center',
+            gap: '2rem'
+        },
+        mobileNav: {
+            position: 'fixed',
+            top: 0,
             left: 0,
             right: 0,
-            backgroundColor: colors.white,
-            padding: isMobile ? '2rem' : 0,
-            gap: isMobile ? '1rem' : '2rem',
-            boxShadow: isMobile ? '0 10px 20px rgba(0,0,0,0.1)' : 'none',
-            borderBottom: isMobile ? `1px solid #e2e8f0` : 'none',
+            bottom: 0,
+            background: 'rgba(255,255,255,0.98)',
+            backdropFilter: 'blur(10px)',
             zIndex: 999,
-            maxHeight: isMobile ? 'calc(100vh - 70px)' : 'none',
-            overflowY: isMobile ? 'auto' : 'visible'
+            display: isOpen ? 'flex' : 'none',
+            flexDirection: 'column',
+            padding: '80px 1.5rem 2rem', // ← Ajustado el padding superior
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch', // ← Scroll suave en iOS
+            height: '100vh', // ← Altura completa
+            width: '100vw', // ← Ancho completo
+            boxSizing: 'border-box'
         },
         link: {
-            color: colors.dark,
+            color: scrolled || !isLandingPage ? colors.dark : 'white',
             textDecoration: 'none',
             fontWeight: '500',
-            padding: isMobile ? '1rem' : '0.5rem 1rem',
+            fontSize: '1rem',
+            padding: '0.5rem 0',
+            position: 'relative',
             transition: 'all 0.3s',
-            cursor: 'pointer',
-            fontSize: isMobile ? '1.1rem' : '1rem',
-            borderRadius: '5px',
-            width: isMobile ? '100%' : 'auto',
-            textAlign: isMobile ? 'center' : 'left',
-            borderBottom: isMobile ? '1px solid #e2e8f0' : 'none'
+            opacity: 0.8,
+            ':hover': {
+                opacity: 1
+            }
         },
-        // Versión simplificada para LandingPage
-        landingLinks: {
+        linkActive: {
+            color: colors.primary,
+            opacity: 1,
+            fontWeight: '600'
+        },
+        linkUnderline: {
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '2px',
+            background: colors.primary,
+            borderRadius: '2px'
+        },
+        // Botones de landing
+        landingButtons: {
             display: 'flex',
-            gap: isMobile ? '1rem' : '2rem',
             alignItems: 'center',
-            flexDirection: isMobile ? 'column' : 'row',
-            width: isMobile ? '100%' : 'auto'
+            gap: '1rem'
         },
         landingLoginBtn: {
-            color: colors.primary,
+            color: scrolled || !isLandingPage ? colors.primary : 'white',
             textDecoration: 'none',
             fontWeight: '600',
-            padding: isMobile ? '1rem' : '0.5rem 1rem',
-            fontSize: isMobile ? '1.1rem' : '1rem',
-            width: isMobile ? '100%' : 'auto',
-            textAlign: 'center'
+            padding: '0.5rem 1rem',
+            fontSize: '1rem',
+            transition: 'all 0.3s',
+            opacity: 0.9
         },
         landingRegisterBtn: {
-            backgroundColor: colors.primary,
-            color: colors.white,
-            padding: isMobile ? '1rem' : '0.6rem 1.5rem',
-            borderRadius: '8px',
+            background: scrolled || !isLandingPage ? colors.primary : 'rgba(255,255,255,0.2)',
+            color: 'white',
+            padding: '0.6rem 1.5rem',
+            borderRadius: '30px',
             textDecoration: 'none',
             fontWeight: '600',
-            fontSize: isMobile ? '1.1rem' : '1rem',
-            width: isMobile ? '100%' : 'auto',
-            textAlign: 'center',
-            border: 'none'
+            fontSize: '1rem',
+            border: scrolled || !isLandingPage ? 'none' : '1px solid rgba(255,255,255,0.3)',
+            backdropFilter: 'blur(5px)',
+            transition: 'all 0.3s'
         },
-        // Menú de usuario (solo para no-landing)
-        userSection: {
-            position: 'relative',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            width: isMobile ? '100%' : 'auto',
-            justifyContent: isMobile ? 'center' : 'flex-start'
-        },
+        // Botón de usuario
         userButton: {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: isMobile ? '1rem' : '0.5rem 1rem',
-            backgroundColor: colors.primary + '10',
-            border: `1px solid ${colors.primary}20`,
+            padding: '0.5rem 1rem',
+            background: scrolled || !isLandingPage
+                ? colors.primary + '10'
+                : 'rgba(255,255,255,0.1)',
+            border: scrolled || !isLandingPage
+                ? `1px solid ${colors.primary}20`
+                : '1px solid rgba(255,255,255,0.2)',
             borderRadius: '30px',
             cursor: 'pointer',
             transition: 'all 0.3s',
-            width: isMobile ? '100%' : 'auto',
-            justifyContent: 'center'
+            color: scrolled || !isLandingPage ? colors.dark : 'white'
         },
         userAvatar: {
-            width: isMobile ? '32px' : '32px',
-            height: isMobile ? '32px' : '32px',
+            width: '32px',
+            height: '32px',
             borderRadius: '50%',
-            background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.dark} 100%)`,
+            background: scrolled || !isLandingPage
+                ? `linear-gradient(135deg, ${colors.primary} 0%, ${colors.dark} 100%)`
+                : 'rgba(255,255,255,0.2)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -199,386 +243,611 @@ const Navbar = () => {
         },
         userName: {
             fontWeight: '500',
-            color: colors.dark,
-            maxWidth: '150px',
+            maxWidth: '120px',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap'
         },
-        dropdownMenu: {
-            position: isMobile ? 'static' : 'absolute',
-            top: isMobile ? 'auto' : '60px',
+        // Dropdown - VERSIÓN MEJORADA
+        dropdownOverlay: {
+            position: 'fixed',
+            top: 0,
+            left: 0,
             right: 0,
-            width: isMobile ? '100%' : '250px',
-            backgroundColor: colors.white,
-            borderRadius: isMobile ? '0' : '10px',
-            boxShadow: isMobile ? 'none' : '0 10px 30px rgba(0,0,0,0.1)',
-            border: isMobile ? 'none' : `1px solid #e2e8f0`,
+            bottom: 0,
+            background: 'transparent',
+            zIndex: 999
+        },
+        dropdownMenu: {
+            position: 'absolute',
+            top: 'calc(100% + 10px)',
+            right: isMobile ? '1rem' : 0,
+            width: isMobile ? 'calc(100% - 2rem)' : '320px',
+            background: 'rgba(255,255,255,0.98)',
+            backdropFilter: 'blur(10px)',
+            borderRadius: '20px',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.15), 0 0 0 1px rgba(0,0,0,0.05)',
             overflow: 'hidden',
             zIndex: 1000,
-            marginTop: isMobile ? '1rem' : 0
+            border: '1px solid rgba(255,255,255,0.2)'
+        },
+        dropdownHeader: {
+            padding: '1.5rem',
+            background: `linear-gradient(135deg, ${colors.primary}10 0%, ${colors.primary}05 100%)`,
+            borderBottom: '1px solid #f0f0f0'
+        },
+        userFullName: {
+            fontSize: '1.1rem',
+            fontWeight: '600',
+            color: colors.dark,
+            marginBottom: '0.25rem'
+        },
+        userEmail: {
+            fontSize: '0.9rem',
+            color: '#64748b'
+        },
+        dropdownSection: {
+            padding: '0.5rem'
         },
         dropdownItem: {
             display: 'flex',
             alignItems: 'center',
-            gap: '0.75rem',
-            padding: isMobile ? '1rem' : '1rem 1.5rem',
+            gap: '1rem',
+            padding: '0.75rem 1rem',
+            borderRadius: '12px',
             cursor: 'pointer',
-            transition: 'all 0.3s',
+            transition: 'all 0.2s',
             color: colors.dark,
             textDecoration: 'none',
-            borderBottom: `1px solid #e2e8f0`
+            margin: '0.25rem 0'
         },
-        dropdownLogout: {
-            color: colors.danger,
-            borderBottom: 'none'
+        dropdownItemIcon: {
+            width: '36px',
+            height: '36px',
+            borderRadius: '10px',
+            background: colors.primary + '10',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: colors.primary,
+            fontSize: '1.1rem'
+        },
+        dropdownItemContent: {
+            flex: 1
+        },
+        dropdownItemTitle: {
+            fontWeight: '600',
+            fontSize: '0.95rem',
+            marginBottom: '0.2rem'
+        },
+        dropdownItemSubtitle: {
+            fontSize: '0.8rem',
+            color: '#94a3b8'
         },
         dropdownDivider: {
             height: '1px',
-            backgroundColor: '#e2e8f0',
+            background: '#f0f0f0',
             margin: '0.5rem 0'
         },
-        userStats: {
-            padding: isMobile ? '1rem' : '1rem 1.5rem',
-            backgroundColor: '#f8fafc',
-            borderBottom: `1px solid #e2e8f0`
-        },
-        statRow: {
-            display: 'flex',
-            justifyContent: 'space-between',
-            fontSize: '0.9rem',
-            color: '#64748b',
-            marginBottom: '0.25rem'
-        },
-        statValue: {
-            fontWeight: '600',
-            color: colors.primary
+        logoutItem: {
+            color: colors.danger
         }
     };
 
-    // Función para manejar hover
-    const handleMouseEnter = (e) => {
-        e.currentTarget.style.color = colors.primary;
-        e.currentTarget.style.backgroundColor = colors.primary + '10';
-    };
-
-    const handleMouseLeave = (e) => {
-        e.currentTarget.style.color = colors.dark;
-        e.currentTarget.style.backgroundColor = 'transparent';
-    };
+    // Items del menú para dropdown
+    const menuItems = [
+        {
+            icon: <FiUser />,
+            title: 'Mi Perfil',
+            subtitle: 'Ver y editar tu información',
+            path: '/profile'
+        },
+        {
+            icon: <FiPackage />,
+            title: 'Mis Compras',
+            subtitle: 'Historial de tus pedidos',
+            path: '/purchases'
+        },
+        {
+            icon: <FiDownload />,
+            title: 'Descargas',
+            subtitle: 'Modelos adquiridos',
+            path: '/downloads'
+        },
+        {
+            icon: <FiShoppingCart />,
+            title: 'Carrito',
+            subtitle: 'Productos pendientes',
+            path: '/cart'
+        }
+    ];
 
     return (
         <nav style={styles.navbar}>
             <div style={styles.container}>
                 {/* Logo */}
                 <Link to="/" style={styles.logo}>
-                    <HiOutlineCube size={isMobile ? 28 : 32} />
+                    <HiOutlineCube size={isMobile ? 28 : 32} style={styles.logoIcon} />
                     <span>ArchiMarket3D</span>
                 </Link>
 
-                {/* Menú hamburguesa (solo en móvil) */}
-                {isMobile && (
-                    <div style={styles.menuIcon} onClick={() => setIsOpen(!isOpen)}>
-                        {isOpen ? <FiX /> : <FiMenu />}
+                {/* Versión Desktop */}
+                {!isMobile && (
+                    <div style={styles.desktopNav}>
+                        {/* Links normales (solo si no es landing) */}
+                        {!isLandingPage && (
+                            <>
+                                <Link
+                                    to="/models"
+                                    style={{
+                                        ...styles.link,
+                                        ...(location.pathname === '/models' ? styles.linkActive : {})
+                                    }}
+                                >
+                                    Modelos
+                                    {location.pathname === '/models' && (
+                                        <motion.div
+                                            layoutId="underline"
+                                            style={styles.linkUnderline}
+                                            initial={false}
+                                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                        />
+                                    )}
+                                </Link>
+                                <Link
+                                    to="/categories"
+                                    style={{
+                                        ...styles.link,
+                                        ...(location.pathname === '/categories' ? styles.linkActive : {})
+                                    }}
+                                >
+                                    Categorías
+                                    {location.pathname === '/categories' && (
+                                        <motion.div
+                                            layoutId="underline"
+                                            style={styles.linkUnderline}
+                                            initial={false}
+                                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                        />
+                                    )}
+                                </Link>
+                                <Link
+                                    to="/licenses"
+                                    style={{
+                                        ...styles.link,
+                                        ...(location.pathname === '/licenses' ? styles.linkActive : {})
+                                    }}
+                                >
+                                    Licencias
+                                    {location.pathname === '/licenses' && (
+                                        <motion.div
+                                            layoutId="underline"
+                                            style={styles.linkUnderline}
+                                            initial={false}
+                                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                        />
+                                    )}
+                                </Link>
+                            </>
+                        )}
+
+                        {/* Botones de landing o usuario */}
+                        {isLandingPage ? (
+                            <div style={styles.landingButtons}>
+                                {!isLoggedIn ? (
+                                    <>
+                                        <Link to="/login" style={styles.landingLoginBtn}>
+                                            Iniciar Sesión
+                                        </Link>
+                                        <Link to="/register" style={styles.landingRegisterBtn}>
+                                            Registrarse
+                                        </Link>
+                                    </>
+                                ) : (
+                                    <div style={{ position: 'relative' }}>
+                                        <motion.div
+                                            style={styles.userButton}
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={() => setUserMenuOpen(!userMenuOpen)}
+                                        >
+                                            <div style={styles.userAvatar}>
+                                                {getInitials(user?.name || 'Usuario')}
+                                            </div>
+                                            <span style={styles.userName}>{user?.name?.split(' ')[0]}</span>
+                                            <FiChevronDown size={16} />
+                                        </motion.div>
+
+                                        <AnimatePresence>
+                                            {userMenuOpen && (
+                                                <>
+                                                    <motion.div
+                                                        style={styles.dropdownOverlay}
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        exit={{ opacity: 0 }}
+                                                        onClick={() => setUserMenuOpen(false)}
+                                                    />
+                                                    <motion.div
+                                                        style={styles.dropdownMenu}
+                                                        initial={{ opacity: 0, y: -10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, y: -10 }}
+                                                        transition={{ duration: 0.2 }}
+                                                    >
+                                                        <div style={styles.dropdownHeader}>
+                                                            <div style={styles.userFullName}>{user?.name}</div>
+                                                            <div style={styles.userEmail}>{user?.email}</div>
+                                                        </div>
+                                                        <div style={styles.dropdownSection}>
+                                                            {menuItems.map((item, index) => (
+                                                                <Link
+                                                                    key={index}
+                                                                    to={item.path}
+                                                                    style={styles.dropdownItem}
+                                                                    onClick={() => setUserMenuOpen(false)}
+                                                                >
+                                                                    <div style={styles.dropdownItemIcon}>
+                                                                        {item.icon}
+                                                                    </div>
+                                                                    <div style={styles.dropdownItemContent}>
+                                                                        <div style={styles.dropdownItemTitle}>
+                                                                            {item.title}
+                                                                        </div>
+                                                                        <div style={styles.dropdownItemSubtitle}>
+                                                                            {item.subtitle}
+                                                                        </div>
+                                                                    </div>
+                                                                </Link>
+                                                            ))}
+                                                            <div style={styles.dropdownDivider} />
+                                                            <div
+                                                                style={{ ...styles.dropdownItem, ...styles.logoutItem }}
+                                                                onClick={handleLogout}
+                                                            >
+                                                                <div style={styles.dropdownItemIcon}>
+                                                                    <FiLogOut />
+                                                                </div>
+                                                                <div style={styles.dropdownItemContent}>
+                                                                    <div style={styles.dropdownItemTitle}>
+                                                                        Cerrar Sesión
+                                                                    </div>
+                                                                    <div style={styles.dropdownItemSubtitle}>
+                                                                        Salir de tu cuenta
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </motion.div>
+                                                </>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
+                            </div>
+                        ) : (
+                            // No es landing page
+                            <>
+                                {!isLoggedIn ? (
+                                    <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+                                        <InstallButton />
+                                        <Link to="/login" style={styles.link}>Iniciar Sesión</Link>
+                                        <Link to="/register" style={{
+                                            ...styles.link,
+                                            background: colors.primary,
+                                            color: 'white',
+                                            padding: '0.6rem 1.5rem',
+                                            borderRadius: '30px'
+                                        }}>Registrarse</Link>
+                                    </div>
+                                ) : (
+                                    <div style={{ position: 'relative' }}>
+                                        <motion.div
+                                            style={styles.userButton}
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={() => setUserMenuOpen(!userMenuOpen)}
+                                        >
+                                            <div style={styles.userAvatar}>
+                                                {getInitials(user?.name || 'Usuario')}
+                                            </div>
+                                            <span style={styles.userName}>{user?.name?.split(' ')[0]}</span>
+                                            <FiChevronDown size={16} color={colors.primary} />
+                                        </motion.div>
+
+                                        <AnimatePresence>
+                                            {userMenuOpen && (
+                                                <>
+                                                    <motion.div
+                                                        style={styles.dropdownOverlay}
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        exit={{ opacity: 0 }}
+                                                        onClick={() => setUserMenuOpen(false)}
+                                                    />
+                                                    <motion.div
+                                                        style={styles.dropdownMenu}
+                                                        initial={{ opacity: 0, y: -10 }}
+                                                        animate={{ opacity: 1, y: 0 }}
+                                                        exit={{ opacity: 0, y: -10 }}
+                                                        transition={{ duration: 0.2 }}
+                                                    >
+                                                        <div style={styles.dropdownHeader}>
+                                                            <div style={styles.userFullName}>{user?.name}</div>
+                                                            <div style={styles.userEmail}>{user?.email}</div>
+                                                        </div>
+                                                        <div style={styles.dropdownSection}>
+                                                            {menuItems.map((item, index) => (
+                                                                <Link
+                                                                    key={index}
+                                                                    to={item.path}
+                                                                    style={styles.dropdownItem}
+                                                                    onClick={() => setUserMenuOpen(false)}
+                                                                >
+                                                                    <div style={styles.dropdownItemIcon}>
+                                                                        {item.icon}
+                                                                    </div>
+                                                                    <div style={styles.dropdownItemContent}>
+                                                                        <div style={styles.dropdownItemTitle}>
+                                                                            {item.title}
+                                                                        </div>
+                                                                        <div style={styles.dropdownItemSubtitle}>
+                                                                            {item.subtitle}
+                                                                        </div>
+                                                                    </div>
+                                                                </Link>
+                                                            ))}
+                                                            <div style={styles.dropdownDivider} />
+                                                            <div
+                                                                style={{ ...styles.dropdownItem, ...styles.logoutItem }}
+                                                                onClick={handleLogout}
+                                                            >
+                                                                <div style={styles.dropdownItemIcon}>
+                                                                    <FiLogOut />
+                                                                </div>
+                                                                <div style={styles.dropdownItemContent}>
+                                                                    <div style={styles.dropdownItemTitle}>
+                                                                        Cerrar Sesión
+                                                                    </div>
+                                                                    <div style={styles.dropdownItemSubtitle}>
+                                                                        Salir de tu cuenta
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </motion.div>
+                                                </>
+                                            )}
+                                        </AnimatePresence>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </div>
                 )}
 
-                {/* Enlaces de navegación */}
-                <div style={styles.navLinks}>
-                    {/* VERSIÓN LANDING PAGE (simplificada) */}
-                    {isLandingPage ? (
-                        <div style={styles.landingLinks}>
-                            {!isLoggedIn ? (
-                                <>
-                                    <Link
-                                        to="/login"
-                                        style={styles.landingLoginBtn}
-                                        onClick={() => setIsOpen(false)}
-                                    >
-                                        Iniciar Sesión
-                                    </Link>
-                                    <Link
-                                        to="/register"
-                                        style={styles.landingRegisterBtn}
-                                        onClick={() => setIsOpen(false)}
-                                    >
-                                        Registrarse
-                                    </Link>
-                                </>
-                            ) : (
-                                // Usuario logueado en LandingPage (también simplificado)
-                                <div style={styles.userSection}>
-                                    <motion.div
-                                        style={styles.userButton}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => setUserMenuOpen(!userMenuOpen)}
-                                    >
-                                        <div style={styles.userAvatar}>
-                                            {getInitials(user?.name || 'Usuario')}
-                                        </div>
-                                        <span style={styles.userName}>{user?.name?.split(' ')[0]}</span>
-                                        <FiChevronDown size={16} color={colors.primary} />
-                                    </motion.div>
-
-                                    <AnimatePresence>
-                                        {userMenuOpen && (
-                                            <motion.div
-                                                style={styles.dropdownMenu}
-                                                initial={{ opacity: 0, y: -10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: -10 }}
-                                                transition={{ duration: 0.2 }}
-                                            >
-                                                <div style={styles.userStats}>
-                                                    <div style={styles.statRow}>
-                                                        <span>Compras</span>
-                                                        <span style={styles.statValue}>0</span>
-                                                    </div>
-                                                    <div style={styles.statRow}>
-                                                        <span>Miembro desde</span>
-                                                        <span style={styles.statValue}>2026</span>
-                                                    </div>
-                                                </div>
-
-                                                <Link
-                                                    to="/profile"
-                                                    style={styles.dropdownItem}
-                                                    onMouseEnter={handleMouseEnter}
-                                                    onMouseLeave={handleMouseLeave}
-                                                    onClick={() => {
-                                                        setUserMenuOpen(false);
-                                                        setIsOpen(false);
-                                                    }}
-                                                >
-                                                    <FiUser /> Mi Perfil
-                                                </Link>
-
-                                                <Link
-                                                    to="/purchases"
-                                                    style={styles.dropdownItem}
-                                                    onMouseEnter={handleMouseEnter}
-                                                    onMouseLeave={handleMouseLeave}
-                                                    onClick={() => {
-                                                        setUserMenuOpen(false);
-                                                        setIsOpen(false);
-                                                    }}
-                                                >
-                                                    <FiShoppingCart /> Mis Compras
-                                                </Link>
-
-                                                <Link
-                                                    to="/downloads"
-                                                    style={styles.dropdownItem}
-                                                    onMouseEnter={handleMouseEnter}
-                                                    onMouseLeave={handleMouseLeave}
-                                                    onClick={() => {
-                                                        setUserMenuOpen(false);
-                                                        setIsOpen(false);
-                                                    }}
-                                                >
-                                                    <FiDownload /> Descargas
-                                                </Link>
-
-                                                <div style={styles.dropdownDivider} />
-
-                                                <div
-                                                    style={{ ...styles.dropdownItem, ...styles.dropdownLogout }}
-                                                    onMouseEnter={(e) => {
-                                                        e.currentTarget.style.backgroundColor = colors.danger + '10';
-                                                        e.currentTarget.style.color = colors.danger;
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.currentTarget.style.backgroundColor = 'transparent';
-                                                        e.currentTarget.style.color = colors.danger;
-                                                    }}
-                                                    onClick={handleLogout}
-                                                >
-                                                    <FiLogOut /> Cerrar Sesión
-                                                </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            )}
+                {/* Versión Móvil */}
+                {isMobile && (
+                    <>
+                        <div style={styles.menuIcon} onClick={() => setIsOpen(!isOpen)}>
+                            {isOpen ? <FiX /> : <FiMenu />}
                         </div>
-                    ) : (
-                        /* VERSIÓN NORMAL (para el resto de la app) */
-                        <>
 
-                            <Link
-                                to="/models"
-                                style={styles.link}
-                                onMouseEnter={handleMouseEnter}
-                                onMouseLeave={handleMouseLeave}
-                                onClick={() => setIsOpen(false)}
-                            >
-                                Modelos
-                            </Link>
+                        <AnimatePresence>
+                            {isOpen && (
+                                <motion.div
+                                    style={styles.mobileNav}
+                                    initial={{ x: '100%' }}
+                                    animate={{ x: 0 }}
+                                    exit={{ x: '100%' }}
+                                    transition={{ type: 'spring', damping: 20 }}
+                                >
 
-                            <Link
-                                to="/categories"
-                                style={styles.link}
-                                onMouseEnter={handleMouseEnter}
-                                onMouseLeave={handleMouseLeave}
-                                onClick={() => setIsOpen(false)}
-                            >
-                                Categorías
-                            </Link>
+                                    {/* Logo en móvil */}
+                                    <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
+                                        <HiOutlineCube size={60} color={colors.primary} />
+                                        <h2 style={{ color: colors.dark, marginTop: '0.5rem', fontSize: '1.5rem' }}>ArchiMarket3D</h2>
+                                    </div>
 
-                            <Link
-                                to="/licenses"
-                                style={styles.link}
-                                onMouseEnter={handleMouseEnter}
-                                onMouseLeave={handleMouseLeave}
-                                onClick={() => setIsOpen(false)}
-                            >
-                                Licencias
-                            </Link>
-
-                            {isLoggedIn ? (
-                                <div style={styles.userSection}>
-                                    <motion.div
-                                        style={styles.userButton}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={() => setUserMenuOpen(!userMenuOpen)}
-                                    >
-                                        <div style={styles.userAvatar}>
-                                            {getInitials(user?.name || 'Usuario')}
-                                        </div>
-                                        <span style={styles.userName}>{user?.name?.split(' ')[0]}</span>
-                                        <FiChevronDown size={16} color={colors.primary} />
-                                    </motion.div>
-
-                                    <AnimatePresence>
-                                        {userMenuOpen && (
-                                            <motion.div
-                                                style={styles.dropdownMenu}
-                                                initial={{ opacity: 0, y: -10 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                exit={{ opacity: 0, y: -10 }}
-                                                transition={{ duration: 0.2 }}
+                                    {/* Links móvil */}
+                                    {!isLandingPage && (
+                                        <div style={{ width: '100%' }}>
+                                            <Link
+                                                to="/models"
+                                                style={{
+                                                    display: 'block',
+                                                    color: colors.dark,
+                                                    fontSize: '1.2rem',
+                                                    padding: '1rem',
+                                                    textDecoration: 'none',
+                                                    borderBottom: '1px solid #f0f0f0',
+                                                    width: '100%',
+                                                    boxSizing: 'border-box'
+                                                }}
+                                                onClick={() => setIsOpen(false)}
                                             >
-                                                <div style={styles.userStats}>
-                                                    <div style={styles.statRow}>
-                                                        <span>Compras</span>
-                                                        <span style={styles.statValue}>0</span>
-                                                    </div>
-                                                    <div style={styles.statRow}>
-                                                        <span>Miembro desde</span>
-                                                        <span style={styles.statValue}>2026</span>
-                                                    </div>
+                                                Modelos
+                                            </Link>
+                                            <Link
+                                                to="/categories"
+                                                style={{
+                                                    display: 'block',
+                                                    color: colors.dark,
+                                                    fontSize: '1.2rem',
+                                                    padding: '1rem',
+                                                    textDecoration: 'none',
+                                                    borderBottom: '1px solid #f0f0f0',
+                                                    width: '100%',
+                                                    boxSizing: 'border-box'
+                                                }}
+                                                onClick={() => setIsOpen(false)}
+                                            >
+                                                Categorías
+                                            </Link>
+                                            <Link
+                                                to="/licenses"
+                                                style={{
+                                                    display: 'block',
+                                                    color: colors.dark,
+                                                    fontSize: '1.2rem',
+                                                    padding: '1rem',
+                                                    textDecoration: 'none',
+                                                    borderBottom: '1px solid #f0f0f0',
+                                                    width: '100%',
+                                                    boxSizing: 'border-box'
+                                                }}
+                                                onClick={() => setIsOpen(false)}
+                                            >
+                                                Licencias
+                                            </Link>
+                                        </div>
+                                    )}
+
+                                    {/* Usuario en móvil */}
+                                    {isLoggedIn ? (
+                                        <div style={{ width: '100%', marginTop: '1rem' }}>
+                                            {/* Tarjeta de usuario mejorada */}
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: '1rem',
+                                                padding: '1rem',
+                                                background: colors.primary + '10',
+                                                borderRadius: '15px',
+                                                marginBottom: '1.5rem',
+                                                border: `1px solid ${colors.primary}20`
+                                            }}>
+                                                <div style={{
+                                                    width: '60px',
+                                                    height: '60px',
+                                                    borderRadius: '50%',
+                                                    background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.dark} 100%)`,
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    color: 'white',
+                                                    fontSize: '1.5rem',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    {getInitials(user?.name)}
                                                 </div>
-
-                                                <Link
-                                                    to="/profile"
-                                                    style={styles.dropdownItem}
-                                                    onMouseEnter={handleMouseEnter}
-                                                    onMouseLeave={handleMouseLeave}
-                                                    onClick={() => {
-                                                        setUserMenuOpen(false);
-                                                        setIsOpen(false);
-                                                    }}
-                                                >
-                                                    <FiUser /> Mi Perfil
-                                                </Link>
-
-                                                <Link
-                                                    to="/purchases"
-                                                    style={styles.dropdownItem}
-                                                    onMouseEnter={handleMouseEnter}
-                                                    onMouseLeave={handleMouseLeave}
-                                                    onClick={() => {
-                                                        setUserMenuOpen(false);
-                                                        setIsOpen(false);
-                                                    }}
-                                                >
-                                                    <FiShoppingCart /> Mis Compras
-                                                </Link>
-
-                                                <Link
-                                                    to="/downloads"
-                                                    style={styles.dropdownItem}
-                                                    onMouseEnter={handleMouseEnter}
-                                                    onMouseLeave={handleMouseLeave}
-                                                    onClick={() => {
-                                                        setUserMenuOpen(false);
-                                                        setIsOpen(false);
-                                                    }}
-                                                >
-                                                    <FiDownload /> Descargas
-                                                </Link>
-
-                                                <Link
-                                                    to="/cart"
-                                                    style={styles.dropdownItem}
-                                                    onMouseEnter={handleMouseEnter}
-                                                    onMouseLeave={handleMouseLeave}
-                                                    onClick={() => {
-                                                        setUserMenuOpen(false);
-                                                        setIsOpen(false);
-                                                    }}
-                                                >
-                                                    <FiShoppingCart /> Carrito
-                                                </Link>
-
-                                                <div style={styles.dropdownDivider} />
-
-                                                <div
-                                                    style={{ ...styles.dropdownItem, ...styles.dropdownLogout }}
-                                                    onMouseEnter={(e) => {
-                                                        e.currentTarget.style.backgroundColor = colors.danger + '10';
-                                                        e.currentTarget.style.color = colors.danger;
-                                                    }}
-                                                    onMouseLeave={(e) => {
-                                                        e.currentTarget.style.backgroundColor = 'transparent';
-                                                        e.currentTarget.style.color = colors.danger;
-                                                    }}
-                                                    onClick={handleLogout}
-                                                >
-                                                    <FiLogOut /> Cerrar Sesión
+                                                <div style={{ flex: 1 }}>
+                                                    <div style={{ fontWeight: '600', color: colors.dark, fontSize: '1.1rem' }}>{user?.name}</div>
+                                                    <div style={{ fontSize: '0.9rem', color: '#64748b' }}>{user?.email}</div>
                                                 </div>
-                                            </motion.div>
-                                        )}
-                                    </AnimatePresence>
-                                </div>
-                            ) : (
-                                <div style={{ display: 'flex', gap: '1rem', flexDirection: isMobile ? 'column' : 'row', width: isMobile ? '100%' : 'auto' }}>
-                                    <Link
-                                        to="/login"
-                                        style={styles.link}
-                                        onMouseEnter={handleMouseEnter}
-                                        onMouseLeave={handleMouseLeave}
-                                        onClick={() => setIsOpen(false)}
-                                    >
-                                        Iniciar Sesión
-                                    </Link>
-                                    <Link
-                                        to="/register"
-                                        style={{
-                                            ...styles.link,
-                                            backgroundColor: colors.primary,
-                                            color: colors.white,
-                                            textAlign: 'center'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            e.currentTarget.style.backgroundColor = colors.dark;
-                                            e.currentTarget.style.color = colors.white;
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            e.currentTarget.style.backgroundColor = colors.primary;
-                                            e.currentTarget.style.color = colors.white;
-                                        }}
-                                        onClick={() => setIsOpen(false)}
-                                    >
-                                        Registrarse
-                                    </Link>
-                                </div>
+                                            </div>
+
+                                            {/* Items del menú */}
+                                            {menuItems.map((item, index) => (
+                                                <Link
+                                                    key={index}
+                                                    to={item.path}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '1rem',
+                                                        padding: '1rem',
+                                                        textDecoration: 'none',
+                                                        color: colors.dark,
+                                                        borderBottom: '1px solid #f0f0f0',
+                                                        width: '100%',
+                                                        boxSizing: 'border-box'
+                                                    }}
+                                                    onClick={() => setIsOpen(false)}
+                                                >
+                                                    <div style={{
+                                                        width: '40px',
+                                                        height: '40px',
+                                                        borderRadius: '10px',
+                                                        background: colors.primary + '10',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        justifyContent: 'center',
+                                                        color: colors.primary
+                                                    }}>
+                                                        {item.icon}
+                                                    </div>
+                                                    <div>
+                                                        <div style={{ fontWeight: '600' }}>{item.title}</div>
+                                                        <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>{item.subtitle}</div>
+                                                    </div>
+                                                </Link>
+                                            ))}
+
+                                            {/* Botón de logout */}
+                                            <button
+                                                onClick={handleLogout}
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '1rem',
+                                                    marginTop: '1.5rem',
+                                                    background: colors.danger + '10',
+                                                    border: `1px solid ${colors.danger}20`,
+                                                    borderRadius: '12px',
+                                                    color: colors.danger,
+                                                    fontWeight: '600',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    gap: '0.5rem',
+                                                    cursor: 'pointer',
+                                                    fontSize: '1rem'
+                                                }}
+                                            >
+                                                <FiLogOut /> Cerrar Sesión
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div style={{
+                                            marginTop: '2rem',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                            gap: '1rem',
+                                            width: '100%'
+                                        }}>
+                                            <InstallButton />
+                                            <Link
+                                                to="/login"
+                                                style={{
+                                                    padding: '1rem',
+                                                    background: 'none',
+                                                    border: `2px solid ${colors.primary}`,
+                                                    borderRadius: '12px',
+                                                    color: colors.primary,
+                                                    textDecoration: 'none',
+                                                    textAlign: 'center',
+                                                    fontWeight: '600',
+                                                    width: '100%',
+                                                    boxSizing: 'border-box'
+                                                }}
+                                                onClick={() => setIsOpen(false)}
+                                            >
+                                                Iniciar Sesión
+                                            </Link>
+                                            <Link
+                                                to="/register"
+                                                style={{
+                                                    padding: '1rem',
+                                                    background: colors.primary,
+                                                    borderRadius: '12px',
+                                                    color: 'white',
+                                                    textDecoration: 'none',
+                                                    textAlign: 'center',
+                                                    fontWeight: '600',
+                                                    width: '100%',
+                                                    boxSizing: 'border-box'
+                                                }}
+                                                onClick={() => setIsOpen(false)}
+                                            >
+                                                Registrarse
+                                            </Link>
+                                        </div>
+                                    )}
+                                </motion.div>
                             )}
-                        </>
-                    )}
-                </div>
+                        </AnimatePresence>
+                    </>
+                )}
             </div>
         </nav>
     );

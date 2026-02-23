@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiArrowLeft,
     FiCreditCard,
@@ -12,8 +12,16 @@ import {
     FiMapPin,
     FiPhone,
     FiMail,
-    FiInfo
+    FiInfo,
+    FiPackage,
+    FiDollarSign,
+    FiCalendar,
+    FiHome,
+    FiBuilding,
+    FiSmartphone,
+    FiAtSign
 } from 'react-icons/fi';
+import { HiOutlineCube } from 'react-icons/hi';
 import { useCart } from '../../context/CartContext';
 import { colors } from '../../styles/theme';
 
@@ -24,6 +32,7 @@ const Checkout = () => {
     const [orderComplete, setOrderComplete] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [isMobile, setIsMobile] = useState(false);
 
     const [formData, setFormData] = useState({
         firstName: '',
@@ -38,6 +47,16 @@ const Checkout = () => {
         expiryDate: '',
         cvv: ''
     });
+
+    // Detectar móvil
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     const handleInputChange = (e) => {
         setFormData({
@@ -94,17 +113,29 @@ const Checkout = () => {
         return labels[license] || license;
     };
 
+    const subtotal = getCartTotal();
+    const tax = subtotal * 0.16;
+    const total = subtotal + tax;
+
     const styles = {
         container: {
-            maxWidth: '1200px',
+            maxWidth: '1400px',
             margin: '0 auto',
-            padding: '2rem'
+            padding: isMobile ? '5rem 1rem 2rem' : '6rem 2rem 2rem',
+            minHeight: '100vh'
         },
         header: {
             display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
+            flexDirection: isMobile ? 'column' : 'row',
+            justifyContent: 'space-between',
+            alignItems: isMobile ? 'flex-start' : 'center',
+            gap: isMobile ? '1rem' : '0',
             marginBottom: '2rem'
+        },
+        headerLeft: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem'
         },
         backButton: {
             display: 'flex',
@@ -114,22 +145,49 @@ const Checkout = () => {
             cursor: 'pointer',
             border: 'none',
             background: 'none',
-            fontSize: '1rem'
+            fontSize: '1rem',
+            padding: '0.8rem 1.5rem',
+            borderRadius: '30px',
+            transition: 'all 0.2s',
+            ':hover': {
+                backgroundColor: colors.primary + '10'
+            }
+        },
+        headerRight: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            flexWrap: 'wrap'
         },
         title: {
-            fontSize: '2rem',
+            fontSize: isMobile ? '2rem' : '2.5rem',
             fontWeight: '700',
-            color: colors.dark
+            color: colors.dark,
+            margin: 0
+        },
+        demoBadge: {
+            backgroundColor: '#FFE5E5',
+            color: '#FF4444',
+            padding: '0.5rem 1.5rem',
+            borderRadius: '30px',
+            fontSize: '0.9rem',
+            fontWeight: '600',
+            border: '1px solid #FF4444',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
         },
         steps: {
             display: 'flex',
             justifyContent: 'space-between',
             marginBottom: '3rem',
-            position: 'relative'
+            position: 'relative',
+            maxWidth: '800px',
+            margin: '0 auto 3rem auto'
         },
         stepLine: {
             position: 'absolute',
-            top: '25px',
+            top: '30px',
             left: '10%',
             right: '10%',
             height: '2px',
@@ -143,22 +201,26 @@ const Checkout = () => {
             gap: '0.5rem',
             zIndex: 2,
             backgroundColor: 'white',
-            padding: '0 1rem'
+            padding: '0 1rem',
+            position: 'relative'
         },
         stepNumber: {
-            width: '50px',
-            height: '50px',
+            width: '60px',
+            height: '60px',
             borderRadius: '50%',
             backgroundColor: '#e2e8f0',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             fontWeight: '600',
-            color: colors.dark
+            color: colors.dark,
+            fontSize: '1.2rem',
+            transition: 'all 0.3s'
         },
         stepNumberActive: {
             backgroundColor: colors.primary,
-            color: 'white'
+            color: 'white',
+            boxShadow: `0 8px 20px ${colors.primary}30`
         },
         stepNumberCompleted: {
             backgroundColor: colors.success,
@@ -166,7 +228,8 @@ const Checkout = () => {
         },
         stepLabel: {
             fontSize: '0.9rem',
-            color: '#64748b'
+            color: '#64748b',
+            fontWeight: '500'
         },
         stepLabelActive: {
             color: colors.primary,
@@ -174,29 +237,34 @@ const Checkout = () => {
         },
         content: {
             display: 'grid',
-            gridTemplateColumns: '2fr 1fr',
-            gap: '2rem'
+            gridTemplateColumns: isMobile ? '1fr' : '2fr 1fr',
+            gap: isMobile ? '1.5rem' : '2rem'
         },
+        // Formulario
         formSection: {
             backgroundColor: 'white',
-            borderRadius: '15px',
-            padding: '2rem',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.05)'
+            borderRadius: '32px',
+            padding: isMobile ? '1.5rem' : '2rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+            border: '1px solid #f0f0f0'
         },
         formTitle: {
-            fontSize: '1.2rem',
-            fontWeight: '600',
+            fontSize: '1.3rem',
+            fontWeight: '700',
             color: colors.dark,
-            marginBottom: '1.5rem'
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
         },
         formGrid: {
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
             gap: '1rem',
             marginBottom: '1rem'
         },
         formGroup: {
-            marginBottom: '1rem'
+            marginBottom: '1.5rem'
         },
         label: {
             display: 'block',
@@ -204,15 +272,6 @@ const Checkout = () => {
             color: colors.dark,
             fontSize: '0.9rem',
             fontWeight: '500'
-        },
-        input: {
-            width: '100%',
-            padding: '0.75rem',
-            border: `2px solid #e2e8f0`,
-            borderRadius: '8px',
-            fontSize: '0.95rem',
-            transition: 'all 0.3s',
-            outline: 'none'
         },
         inputWrapper: {
             position: 'relative',
@@ -222,31 +281,111 @@ const Checkout = () => {
         inputIcon: {
             position: 'absolute',
             left: '1rem',
-            color: '#94a3b8'
+            color: '#94a3b8',
+            fontSize: '1.2rem',
+            zIndex: 1
         },
-        inputWithIcon: {
-            paddingLeft: '2.5rem'
+        input: {
+            width: '100%',
+            padding: '1rem 1rem 1rem 3rem',
+            border: `2px solid #e2e8f0`,
+            borderRadius: '16px',
+            fontSize: '1rem',
+            transition: 'all 0.2s',
+            outline: 'none',
+            backgroundColor: '#f8fafc',
+            ':focus': {
+                borderColor: colors.primary,
+                boxShadow: `0 0 0 4px ${colors.primary}20`
+            }
         },
+        // Demo banners
+        demoBanner: {
+            backgroundColor: '#E3F2FD',
+            border: '1px solid #2196F3',
+            borderRadius: '16px',
+            padding: '1rem',
+            marginBottom: '2rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            flexWrap: 'wrap'
+        },
+        demoDisclaimer: {
+            marginTop: '1rem',
+            padding: '1rem',
+            backgroundColor: '#FFF3E0',
+            borderRadius: '12px',
+            border: '1px dashed #FF9800',
+            textAlign: 'center'
+        },
+        // Botones
+        buttonGroup: {
+            display: 'flex',
+            gap: '1rem',
+            marginTop: '2rem',
+            flexDirection: isMobile ? 'column' : 'row'
+        },
+        primaryButton: {
+            flex: 1,
+            backgroundColor: colors.primary,
+            color: 'white',
+            border: 'none',
+            borderRadius: '30px',
+            padding: '1rem',
+            fontSize: '1rem',
+            fontWeight: '600',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            boxShadow: `0 8px 20px ${colors.primary}30`,
+            transition: 'all 0.2s'
+        },
+        secondaryButton: {
+            flex: 1,
+            backgroundColor: 'white',
+            color: colors.primary,
+            border: `2px solid ${colors.primary}`,
+            borderRadius: '30px',
+            padding: '1rem',
+            fontSize: '1rem',
+            fontWeight: '600',
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            transition: 'all 0.2s'
+        },
+        // Resumen
         summary: {
             backgroundColor: 'white',
-            borderRadius: '15px',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
-            position: 'sticky',
-            top: '2rem'
+            borderRadius: '32px',
+            padding: isMobile ? '1.5rem' : '2rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+            border: '1px solid #f0f0f0',
+            position: isMobile ? 'static' : 'sticky',
+            top: '100px',
+            height: 'fit-content'
         },
         summaryTitle: {
-            fontSize: '1.2rem',
-            fontWeight: '600',
+            fontSize: '1.3rem',
+            fontWeight: '700',
             color: colors.dark,
-            marginBottom: '1.5rem'
+            marginBottom: '1.5rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
         },
         summaryItem: {
             display: 'flex',
             justifyContent: 'space-between',
             marginBottom: '1rem',
             paddingBottom: '1rem',
-            borderBottom: `1px solid #e2e8f0`
+            borderBottom: `1px solid #f0f0f0`,
+            gap: '1rem'
         },
         summaryItemDetails: {
             flex: 1
@@ -258,11 +397,15 @@ const Checkout = () => {
         },
         summaryItemMeta: {
             fontSize: '0.85rem',
-            color: '#64748b'
+            color: '#64748b',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
         },
         summaryItemPrice: {
-            fontWeight: '600',
-            color: colors.primary
+            fontWeight: '700',
+            color: colors.primary,
+            fontSize: '1.1rem'
         },
         summaryRow: {
             display: 'flex',
@@ -275,54 +418,31 @@ const Checkout = () => {
             justifyContent: 'space-between',
             marginTop: '1rem',
             paddingTop: '1rem',
-            borderTop: `2px solid #e2e8f0`,
+            borderTop: `2px solid #f0f0f0`,
             fontSize: '1.2rem',
-            fontWeight: '600',
+            fontWeight: '700',
             color: colors.dark
-        },
-        buttonGroup: {
-            display: 'flex',
-            gap: '1rem',
-            marginTop: '2rem'
-        },
-        primaryButton: {
-            flex: 1,
-            backgroundColor: colors.primary,
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            padding: '1rem',
-            fontSize: '1rem',
-            fontWeight: '600',
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.5rem'
-        },
-        secondaryButton: {
-            flex: 1,
-            backgroundColor: 'white',
-            color: colors.primary,
-            border: `2px solid ${colors.primary}`,
-            borderRadius: '8px',
-            padding: '1rem',
-            fontSize: '1rem',
-            fontWeight: '600',
-            cursor: 'pointer'
         },
         secureBadge: {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.5rem',
-            marginTop: '1rem',
+            gap: '1rem',
+            marginTop: '1.5rem',
             color: '#64748b',
-            fontSize: '0.9rem'
+            fontSize: '0.9rem',
+            flexWrap: 'wrap'
         },
+        // Success
         successSection: {
             textAlign: 'center',
-            padding: '4rem'
+            padding: isMobile ? '3rem 1rem' : '4rem',
+            backgroundColor: 'white',
+            borderRadius: '32px',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+            border: '1px solid #f0f0f0',
+            maxWidth: '600px',
+            margin: '0 auto'
         },
         successIcon: {
             fontSize: '5rem',
@@ -330,42 +450,24 @@ const Checkout = () => {
             marginBottom: '1rem'
         },
         successTitle: {
-            fontSize: '2rem',
-            fontWeight: '600',
+            fontSize: isMobile ? '2rem' : '2.5rem',
+            fontWeight: '700',
             color: colors.dark,
             marginBottom: '1rem'
         },
         successText: {
             color: '#64748b',
-            marginBottom: '2rem'
+            marginBottom: '2rem',
+            fontSize: '1.1rem'
         },
-        demoBadge: {
-            backgroundColor: '#FFE5E5',
-            color: '#FF4444',
-            padding: '0.25rem 1rem',
-            borderRadius: '20px',
-            fontSize: '0.8rem',
-            fontWeight: '600',
-            border: '1px solid #FF4444',
-            marginLeft: '1rem'
-        },
-        demoBanner: {
-            backgroundColor: '#E3F2FD',
-            border: '1px solid #2196F3',
-            borderRadius: '8px',
-            padding: '1rem',
-            marginBottom: '1.5rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
-        },
-        demoDisclaimer: {
-            marginTop: '1rem',
-            padding: '0.75rem',
-            backgroundColor: '#FFF3E0',
-            borderRadius: '8px',
-            border: '1px dashed #FF9800',
-            textAlign: 'center'
+        // Loading
+        spinner: {
+            width: '20px',
+            height: '20px',
+            border: `2px solid ${colors.white}`,
+            borderTop: `2px solid transparent`,
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
         }
     };
 
@@ -390,17 +492,22 @@ const Checkout = () => {
 
     return (
         <div style={styles.container}>
+            {/* Header */}
             <div style={styles.header}>
-                <button
-                    style={styles.backButton}
-                    onClick={() => navigate(-1)}
-                >
-                    <FiArrowLeft /> Volver al carrito
-                </button>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                <div style={styles.headerLeft}>
+                    <motion.button
+                        style={styles.backButton}
+                        whileHover={{ x: -5, backgroundColor: colors.primary + '10' }}
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => navigate(-1)}
+                    >
+                        <FiArrowLeft /> Volver al carrito
+                    </motion.button>
+                </div>
+                <div style={styles.headerRight}>
                     <h1 style={styles.title}>Finalizar compra</h1>
                     <span style={styles.demoBadge}>
-                        🧪 MODO DEMO
+                        <FiInfo /> MODO DEMO
                     </span>
                 </div>
             </div>
@@ -409,9 +516,9 @@ const Checkout = () => {
             <div style={styles.steps}>
                 <div style={styles.stepLine} />
                 {[
-                    { number: 1, label: 'Información' },
-                    { number: 2, label: 'Pago' },
-                    { number: 3, label: 'Confirmación' }
+                    { number: 1, label: 'Información', icon: <FiUser /> },
+                    { number: 2, label: 'Pago', icon: <FiCreditCard /> },
+                    { number: 3, label: 'Confirmación', icon: <FiCheckCircle /> }
                 ].map((s) => (
                     <div key={s.number} style={styles.stepItem}>
                         <div style={{
@@ -434,310 +541,354 @@ const Checkout = () => {
             <div style={styles.content}>
                 {/* Formulario */}
                 <div style={styles.formSection}>
-                    {step === 1 && (
-                        <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                        >
-                            {/* Banner demo para step 1 */}
-                            <div style={styles.demoBanner}>
-                                <FiInfo color="#2196F3" size={20} />
-                                <span style={{ color: '#0D47A1', fontSize: '0.9rem' }}>
-                                    <strong>Modo demostración:</strong> Todos los datos son de prueba
-                                </span>
-                            </div>
+                    <AnimatePresence mode="wait">
+                        {step === 1 && (
+                            <motion.div
+                                key="step1"
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 20 }}
+                            >
+                                {/* Banner demo */}
+                                <div style={styles.demoBanner}>
+                                    <FiInfo color="#2196F3" size={24} />
+                                    <span style={{ color: '#0D47A1', fontSize: '0.95rem', flex: 1 }}>
+                                        <strong>Modo demostración:</strong> Todos los datos ingresados son de prueba
+                                    </span>
+                                </div>
 
-                            <h2 style={styles.formTitle}>Información de contacto</h2>
+                                <h2 style={styles.formTitle}>
+                                    <FiUser /> Información de contacto
+                                </h2>
 
-                            <div style={styles.formGrid}>
+                                <div style={styles.formGrid}>
+                                    <div style={styles.formGroup}>
+                                        <label style={styles.label}>Nombre</label>
+                                        <div style={styles.inputWrapper}>
+                                            <FiUser style={styles.inputIcon} />
+                                            <input
+                                                type="text"
+                                                name="firstName"
+                                                placeholder="Juan"
+                                                style={styles.input}
+                                                value={formData.firstName}
+                                                onChange={handleInputChange}
+                                                onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div style={styles.formGroup}>
+                                        <label style={styles.label}>Apellido</label>
+                                        <div style={styles.inputWrapper}>
+                                            <FiUser style={styles.inputIcon} />
+                                            <input
+                                                type="text"
+                                                name="lastName"
+                                                placeholder="Pérez"
+                                                style={styles.input}
+                                                value={formData.lastName}
+                                                onChange={handleInputChange}
+                                                onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div style={styles.formGroup}>
-                                    <label style={styles.label}>Nombre</label>
+                                    <label style={styles.label}>Email</label>
                                     <div style={styles.inputWrapper}>
-                                        <FiUser style={styles.inputIcon} />
+                                        <FiMail style={styles.inputIcon} />
                                         <input
-                                            type="text"
-                                            name="firstName"
-                                            placeholder="Juan"
-                                            style={{ ...styles.input, ...styles.inputWithIcon }}
-                                            value={formData.firstName}
+                                            type="email"
+                                            name="email"
+                                            placeholder="juan@email.com"
+                                            style={styles.input}
+                                            value={formData.email}
                                             onChange={handleInputChange}
+                                            onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                                         />
                                     </div>
                                 </div>
 
                                 <div style={styles.formGroup}>
-                                    <label style={styles.label}>Apellido</label>
+                                    <label style={styles.label}>Teléfono</label>
                                     <div style={styles.inputWrapper}>
-                                        <FiUser style={styles.inputIcon} />
+                                        <FiPhone style={styles.inputIcon} />
                                         <input
-                                            type="text"
-                                            name="lastName"
-                                            placeholder="Pérez"
-                                            style={{ ...styles.input, ...styles.inputWithIcon }}
-                                            value={formData.lastName}
+                                            type="tel"
+                                            name="phone"
+                                            placeholder="+52 123 456 7890"
+                                            style={styles.input}
+                                            value={formData.phone}
                                             onChange={handleInputChange}
+                                            onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                                         />
                                     </div>
                                 </div>
-                            </div>
 
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Email</label>
-                                <div style={styles.inputWrapper}>
-                                    <FiMail style={styles.inputIcon} />
-                                    <input
-                                        type="email"
-                                        name="email"
-                                        placeholder="juan@email.com"
-                                        style={{ ...styles.input, ...styles.inputWithIcon }}
-                                        value={formData.email}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                            </div>
-
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Teléfono</label>
-                                <div style={styles.inputWrapper}>
-                                    <FiPhone style={styles.inputIcon} />
-                                    <input
-                                        type="tel"
-                                        name="phone"
-                                        placeholder="+52 123 456 7890"
-                                        style={{ ...styles.input, ...styles.inputWithIcon }}
-                                        value={formData.phone}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                            </div>
-
-                            <h2 style={{ ...styles.formTitle, marginTop: '2rem' }}>Dirección de facturación</h2>
-
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Dirección</label>
-                                <div style={styles.inputWrapper}>
-                                    <FiMapPin style={styles.inputIcon} />
-                                    <input
-                                        type="text"
-                                        name="address"
-                                        placeholder="Calle, número, colonia"
-                                        style={{ ...styles.input, ...styles.inputWithIcon }}
-                                        value={formData.address}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
-                            </div>
-
-                            <div style={styles.formGrid}>
-                                <div style={styles.formGroup}>
-                                    <label style={styles.label}>Ciudad</label>
-                                    <input
-                                        type="text"
-                                        name="city"
-                                        style={styles.input}
-                                        value={formData.city}
-                                        onChange={handleInputChange}
-                                    />
-                                </div>
+                                <h2 style={{ ...styles.formTitle, marginTop: '2rem' }}>
+                                    <FiHome /> Dirección de facturación
+                                </h2>
 
                                 <div style={styles.formGroup}>
-                                    <label style={styles.label}>Código postal</label>
-                                    <input
-                                        type="text"
-                                        name="zipCode"
-                                        style={styles.input}
-                                        value={formData.zipCode}
-                                        onChange={handleInputChange}
-                                    />
+                                    <label style={styles.label}>Dirección</label>
+                                    <div style={styles.inputWrapper}>
+                                        <FiMapPin style={styles.inputIcon} />
+                                        <input
+                                            type="text"
+                                            name="address"
+                                            placeholder="Calle, número, colonia"
+                                            style={styles.input}
+                                            value={formData.address}
+                                            onChange={handleInputChange}
+                                            onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div style={styles.buttonGroup}>
-                                <button
-                                    style={styles.secondaryButton}
-                                    onClick={() => navigate('/cart')}
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    style={styles.primaryButton}
-                                    onClick={handleNextStep}
-                                >
-                                    Continuar al pago
-                                </button>
-                            </div>
-                        </motion.div>
-                    )}
+                                <div style={styles.formGrid}>
+                                    <div style={styles.formGroup}>
+                                        <label style={styles.label}>Ciudad</label>
+                                        <input
+                                            type="text"
+                                            name="city"
+                                            style={styles.input}
+                                            value={formData.city}
+                                            onChange={handleInputChange}
+                                            onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                        />
+                                    </div>
 
-                    {step === 2 && (
-                        <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                        >
-                            {/* Banner demo para pago */}
-                            <div style={styles.demoBanner}>
-                                <FiInfo color="#2196F3" size={20} />
-                                <span style={{ color: '#0D47A1', fontSize: '0.9rem' }}>
-                                    <strong>Modo demostración:</strong> Usa 4242 4242 4242 4242 (cualquier fecha/CVV)
-                                </span>
-                            </div>
-
-                            <h2 style={styles.formTitle}>Información de pago</h2>
-
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Número de tarjeta</label>
-                                <div style={styles.inputWrapper}>
-                                    <FiCreditCard style={styles.inputIcon} />
-                                    <input
-                                        type="text"
-                                        name="cardNumber"
-                                        placeholder="4242 4242 4242 4242"
-                                        style={{ ...styles.input, ...styles.inputWithIcon }}
-                                        value={formData.cardNumber}
-                                        onChange={handleInputChange}
-                                    />
+                                    <div style={styles.formGroup}>
+                                        <label style={styles.label}>Código postal</label>
+                                        <input
+                                            type="text"
+                                            name="zipCode"
+                                            style={styles.input}
+                                            value={formData.zipCode}
+                                            onChange={handleInputChange}
+                                            onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                        />
+                                    </div>
                                 </div>
-                            </div>
 
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Nombre en la tarjeta</label>
-                                <input
-                                    type="text"
-                                    name="cardName"
-                                    placeholder="JUAN PEREZ"
-                                    style={styles.input}
-                                    value={formData.cardName}
-                                    onChange={handleInputChange}
-                                />
-                            </div>
+                                <div style={styles.buttonGroup}>
+                                    <motion.button
+                                        style={styles.secondaryButton}
+                                        whileHover={{ scale: 1.02, backgroundColor: colors.primary + '05' }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={() => navigate('/cart')}
+                                    >
+                                        Cancelar
+                                    </motion.button>
+                                    <motion.button
+                                        style={styles.primaryButton}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={handleNextStep}
+                                    >
+                                        Continuar al pago
+                                    </motion.button>
+                                </div>
+                            </motion.div>
+                        )}
 
-                            <div style={styles.formGrid}>
+                        {step === 2 && (
+                            <motion.div
+                                key="step2"
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 20 }}
+                            >
+                                {/* Banner demo */}
+                                <div style={styles.demoBanner}>
+                                    <FiInfo color="#2196F3" size={24} />
+                                    <span style={{ color: '#0D47A1', fontSize: '0.95rem', flex: 1 }}>
+                                        <strong>Modo demostración:</strong> Usa 4242 4242 4242 4242 (cualquier fecha/CVV)
+                                    </span>
+                                </div>
+
+                                <h2 style={styles.formTitle}>
+                                    <FiCreditCard /> Información de pago
+                                </h2>
+
                                 <div style={styles.formGroup}>
-                                    <label style={styles.label}>Fecha exp.</label>
-                                    <input
-                                        type="text"
-                                        name="expiryDate"
-                                        placeholder="MM/AA"
-                                        style={styles.input}
-                                        value={formData.expiryDate}
-                                        onChange={handleInputChange}
-                                    />
+                                    <label style={styles.label}>Número de tarjeta</label>
+                                    <div style={styles.inputWrapper}>
+                                        <FiCreditCard style={styles.inputIcon} />
+                                        <input
+                                            type="text"
+                                            name="cardNumber"
+                                            placeholder="4242 4242 4242 4242"
+                                            style={styles.input}
+                                            value={formData.cardNumber}
+                                            onChange={handleInputChange}
+                                            onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                        />
+                                    </div>
                                 </div>
 
                                 <div style={styles.formGroup}>
-                                    <label style={styles.label}>CVV</label>
+                                    <label style={styles.label}>Nombre en la tarjeta</label>
                                     <input
                                         type="text"
-                                        name="cvv"
-                                        placeholder="123"
+                                        name="cardName"
+                                        placeholder="JUAN PEREZ"
                                         style={styles.input}
-                                        value={formData.cvv}
+                                        value={formData.cardName}
                                         onChange={handleInputChange}
+                                        onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                        onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                                     />
                                 </div>
-                            </div>
 
-                            <div style={styles.secureBadge}>
-                                <FiLock /> Tus datos están seguros (SSL)
-                            </div>
+                                <div style={styles.formGrid}>
+                                    <div style={styles.formGroup}>
+                                        <label style={styles.label}>Fecha exp.</label>
+                                        <input
+                                            type="text"
+                                            name="expiryDate"
+                                            placeholder="MM/AA"
+                                            style={styles.input}
+                                            value={formData.expiryDate}
+                                            onChange={handleInputChange}
+                                            onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                        />
+                                    </div>
 
-                            <div style={styles.buttonGroup}>
-                                <button
-                                    style={styles.secondaryButton}
-                                    onClick={handlePrevStep}
-                                >
-                                    Volver
-                                </button>
-                                <button
-                                    style={styles.primaryButton}
-                                    onClick={handleNextStep}
-                                >
-                                    Revisar pedido
-                                </button>
-                            </div>
-                        </motion.div>
-                    )}
+                                    <div style={styles.formGroup}>
+                                        <label style={styles.label}>CVV</label>
+                                        <input
+                                            type="text"
+                                            name="cvv"
+                                            placeholder="123"
+                                            style={styles.input}
+                                            value={formData.cvv}
+                                            onChange={handleInputChange}
+                                            onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                        />
+                                    </div>
+                                </div>
 
-                    {step === 3 && (
-                        <motion.div
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                        >
-                            <h2 style={styles.formTitle}>Confirmar pedido</h2>
+                                <div style={styles.secureBadge}>
+                                    <FiLock /> Tus datos están seguros (SSL)
+                                </div>
 
-                            <div style={{ marginBottom: '2rem' }}>
-                                <h3 style={{ fontWeight: '600', marginBottom: '1rem' }}>Productos:</h3>
-                                {cartItems.map(item => (
-                                    <div key={`${item.model.id}-${item.license}`} style={styles.summaryItem}>
-                                        <div style={styles.summaryItemDetails}>
-                                            <div style={styles.summaryItemName}>{item.model.name}</div>
-                                            <div style={styles.summaryItemMeta}>
-                                                {getLicenseLabel(item.license)} × {item.quantity}
+                                <div style={styles.buttonGroup}>
+                                    <motion.button
+                                        style={styles.secondaryButton}
+                                        whileHover={{ scale: 1.02, backgroundColor: colors.primary + '05' }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={handlePrevStep}
+                                    >
+                                        Volver
+                                    </motion.button>
+                                    <motion.button
+                                        style={styles.primaryButton}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={handleNextStep}
+                                    >
+                                        Revisar pedido
+                                    </motion.button>
+                                </div>
+                            </motion.div>
+                        )}
+
+                        {step === 3 && (
+                            <motion.div
+                                key="step3"
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                exit={{ opacity: 0, x: 20 }}
+                            >
+                                <h2 style={styles.formTitle}>
+                                    <FiCheckCircle /> Confirmar pedido
+                                </h2>
+
+                                <div style={{ marginBottom: '2rem' }}>
+                                    {cartItems.map(item => (
+                                        <div key={`${item.model.id}-${item.license}`} style={styles.summaryItem}>
+                                            <div style={styles.summaryItemDetails}>
+                                                <div style={styles.summaryItemName}>{item.model.name}</div>
+                                                <div style={styles.summaryItemMeta}>
+                                                    <FiPackage /> {getLicenseLabel(item.license)} × {item.quantity}
+                                                </div>
+                                            </div>
+                                            <div style={styles.summaryItemPrice}>
+                                                ${(item.price * item.quantity).toFixed(2)}
                                             </div>
                                         </div>
-                                        <div style={styles.summaryItemPrice}>
-                                            ${(item.price * item.quantity).toFixed(2)}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-
-                            {errorMessage && (
-                                <div style={{
-                                    backgroundColor: colors.danger + '10',
-                                    color: colors.danger,
-                                    padding: '1rem',
-                                    borderRadius: '8px',
-                                    marginBottom: '1rem',
-                                    textAlign: 'center'
-                                }}>
-                                    {errorMessage}
+                                    ))}
                                 </div>
-                            )}
 
-                            {/* Disclaimer demo en confirmación */}
-                            <div style={styles.demoDisclaimer}>
-                                <p style={{ color: '#E65100', fontSize: '0.85rem', margin: 0 }}>
-                                    🧪 <strong>Entorno de prueba</strong> - No se realizarán cargos reales
-                                </p>
-                            </div>
+                                {errorMessage && (
+                                    <div style={{
+                                        backgroundColor: colors.danger + '10',
+                                        color: colors.danger,
+                                        padding: '1rem',
+                                        borderRadius: '12px',
+                                        marginBottom: '1rem',
+                                        textAlign: 'center',
+                                        border: `1px solid ${colors.danger}20`
+                                    }}>
+                                        {errorMessage}
+                                    </div>
+                                )}
 
-                            <div style={styles.buttonGroup}>
-                                <button
-                                    style={styles.secondaryButton}
-                                    onClick={handlePrevStep}
-                                >
-                                    Volver
-                                </button>
-                                <button
-                                    style={styles.primaryButton}
-                                    onClick={handleSubmitOrder}
-                                    disabled={processing}
-                                >
-                                    {processing ? (
-                                        <>
-                                            <div style={{
-                                                width: '20px',
-                                                height: '20px',
-                                                border: `2px solid ${colors.white}`,
-                                                borderTop: `2px solid transparent`,
-                                                borderRadius: '50%',
-                                                animation: 'spin 1s linear infinite'
-                                            }} />
-                                            Procesando demo...
-                                        </>
-                                    ) : (
-                                        'Confirmar pedido (demo)'
-                                    )}
-                                </button>
-                            </div>
-                        </motion.div>
-                    )}
+                                <div style={styles.demoDisclaimer}>
+                                    <p style={{ color: '#E65100', fontSize: '0.95rem', margin: 0 }}>
+                                        🧪 <strong>Entorno de prueba</strong> - No se realizarán cargos reales
+                                    </p>
+                                </div>
+
+                                <div style={styles.buttonGroup}>
+                                    <motion.button
+                                        style={styles.secondaryButton}
+                                        whileHover={{ scale: 1.02, backgroundColor: colors.primary + '05' }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={handlePrevStep}
+                                    >
+                                        Volver
+                                    </motion.button>
+                                    <motion.button
+                                        style={styles.primaryButton}
+                                        whileHover={{ scale: 1.02 }}
+                                        whileTap={{ scale: 0.98 }}
+                                        onClick={handleSubmitOrder}
+                                        disabled={processing}
+                                    >
+                                        {processing ? (
+                                            <>
+                                                <div style={styles.spinner} />
+                                                Procesando demo...
+                                            </>
+                                        ) : (
+                                            'Confirmar pedido (demo)'
+                                        )}
+                                    </motion.button>
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
 
                 {/* Resumen */}
                 <div style={styles.summary}>
-                    <h3 style={styles.summaryTitle}>Resumen del pedido</h3>
+                    <h3 style={styles.summaryTitle}>
+                        <FiPackage /> Resumen del pedido
+                    </h3>
 
                     {cartItems.map(item => (
                         <div key={`${item.model.id}-${item.license}`} style={styles.summaryItem}>
@@ -755,36 +906,43 @@ const Checkout = () => {
 
                     <div style={styles.summaryRow}>
                         <span>Subtotal</span>
-                        <span>${getCartTotal().toFixed(2)}</span>
+                        <span>${subtotal.toFixed(2)}</span>
                     </div>
 
                     <div style={styles.summaryRow}>
                         <span>Envío</span>
-                        <span>Gratis</span>
+                        <span style={{ color: colors.success }}>Gratis</span>
                     </div>
 
                     <div style={styles.summaryRow}>
-                        <span>Impuestos</span>
-                        <span>${(getCartTotal() * 0.16).toFixed(2)}</span>
+                        <span>Impuestos (16%)</span>
+                        <span>${tax.toFixed(2)}</span>
                     </div>
 
                     <div style={styles.summaryTotal}>
                         <span>Total</span>
-                        <span>${(getCartTotal() * 1.16).toFixed(2)}</span>
+                        <span>${total.toFixed(2)}</span>
                     </div>
 
                     <div style={styles.secureBadge}>
-                        <FiShield /> Pago 100% seguro (demo)
+                        <span><FiShield /> Pago seguro</span>
+                        <span><FiLock /> Demo</span>
                     </div>
 
-                    {/* Disclaimer en resumen */}
                     <div style={styles.demoDisclaimer}>
-                        <p style={{ color: '#E65100', fontSize: '0.8rem', margin: 0 }}>
-                            🧪 Este es un flujo de demostración para validación
+                        <p style={{ color: '#E65100', fontSize: '0.85rem', margin: 0 }}>
+                            🧪 Flujo de demostración para validación
                         </p>
                     </div>
                 </div>
             </div>
+
+            <style>{`
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 };

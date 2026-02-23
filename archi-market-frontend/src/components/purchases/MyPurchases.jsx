@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-    FiShoppingBag, 
-    FiPackage, 
+import {
+    FiShoppingBag,
+    FiPackage,
     FiCalendar,
     FiDollarSign,
     FiDownload,
@@ -14,7 +14,14 @@ import {
     FiClock,
     FiCheckCircle,
     FiXCircle,
-    FiArrowLeft
+    FiArrowLeft,
+    FiAward,
+    FiCreditCard,
+    FiTrendingUp,
+    FiBox,
+    FiTag,
+    FiUser,
+    FiMail
 } from 'react-icons/fi';
 import { HiOutlineCube } from 'react-icons/hi';
 import API from '../../services/api';
@@ -26,7 +33,18 @@ const MyPurchases = () => {
     const [loading, setLoading] = useState(true);
     const [selectedPurchase, setSelectedPurchase] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
-    const [filterStatus, setFilterStatus] = useState('all'); // all, completed, pending
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [isMobile, setIsMobile] = useState(false);
+
+    // Detectar móvil
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     useEffect(() => {
         fetchPurchases();
@@ -36,12 +54,10 @@ const MyPurchases = () => {
         try {
             const response = await API.get('/purchases');
             console.log('Respuesta completa:', response.data);
-            
-            // ✅ ESTRUCTURA CORRECTA
-            // response.data = { success: true, data: { data: [], current_page: 1, ... } }
+
             const purchasesData = response.data?.data?.data || [];
             setPurchases(purchasesData);
-            
+
         } catch (error) {
             console.error('Error cargando compras:', error);
             setPurchases([]);
@@ -51,7 +67,7 @@ const MyPurchases = () => {
     };
 
     const getStatusColor = (status) => {
-        switch(status) {
+        switch (status) {
             case 'completed':
                 return colors.success;
             case 'pending':
@@ -64,7 +80,7 @@ const MyPurchases = () => {
     };
 
     const getStatusIcon = (status) => {
-        switch(status) {
+        switch (status) {
             case 'completed':
                 return <FiCheckCircle />;
             case 'pending':
@@ -77,7 +93,7 @@ const MyPurchases = () => {
     };
 
     const getStatusText = (status) => {
-        switch(status) {
+        switch (status) {
             case 'completed':
                 return 'Completada';
             case 'pending':
@@ -90,12 +106,12 @@ const MyPurchases = () => {
     };
 
     const filteredPurchases = purchases.filter(purchase => {
-        const matchesSearch = purchase.models?.some(model => 
+        const matchesSearch = purchase.models?.some(model =>
             model.name?.toLowerCase().includes(searchTerm.toLowerCase())
         ) || purchase.id.toString().includes(searchTerm);
-        
+
         const matchesStatus = filterStatus === 'all' || purchase.status === filterStatus;
-        
+
         return matchesSearch && matchesStatus;
     });
 
@@ -109,11 +125,20 @@ const MyPurchases = () => {
         });
     };
 
+    const formatShortDate = (dateString) => {
+        return new Date(dateString).toLocaleDateString('es-MX', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric'
+        });
+    };
+
     const styles = {
         container: {
-            maxWidth: '1200px',
+            maxWidth: '1400px',
             margin: '0 auto',
-            padding: '2rem'
+            padding: isMobile ? '5rem 1rem 2rem' : '6rem 2rem 2rem',
+            minHeight: '100vh'
         },
         header: {
             marginBottom: '2rem'
@@ -127,58 +152,123 @@ const MyPurchases = () => {
             marginBottom: '1rem',
             fontSize: '0.95rem',
             border: 'none',
-            background: 'none'
+            background: 'none',
+            padding: '0.8rem 1.5rem',
+            borderRadius: '30px',
+            transition: 'all 0.2s',
+            ':hover': {
+                backgroundColor: colors.primary + '10'
+            }
         },
-        title: {
-            fontSize: '2rem',
-            fontWeight: '700',
-            color: colors.dark,
-            marginBottom: '0.5rem',
+        titleSection: {
             display: 'flex',
             alignItems: 'center',
-            gap: '1rem'
+            gap: '1rem',
+            marginBottom: '0.5rem',
+            flexWrap: 'wrap'
+        },
+        title: {
+            fontSize: isMobile ? '2rem' : '2.5rem',
+            fontWeight: '700',
+            color: colors.dark,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            margin: 0
+        },
+        titleIcon: {
+            color: colors.primary,
+            fontSize: isMobile ? '2rem' : '2.5rem'
         },
         subtitle: {
-            fontSize: '1rem',
+            fontSize: isMobile ? '0.95rem' : '1rem',
+            color: '#64748b',
+            lineHeight: '1.6'
+        },
+        statsGrid: {
+            display: 'grid',
+            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+            gap: isMobile ? '0.8rem' : '1rem',
+            marginBottom: '2rem'
+        },
+        statCard: {
+            backgroundColor: colors.white,
+            borderRadius: '20px',
+            padding: isMobile ? '1rem' : '1.2rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+            border: '1px solid #f0f0f0',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.8rem'
+        },
+        statIcon: {
+            width: isMobile ? '40px' : '48px',
+            height: isMobile ? '40px' : '48px',
+            borderRadius: '16px',
+            backgroundColor: colors.primary + '10',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: colors.primary,
+            fontSize: isMobile ? '1.2rem' : '1.5rem'
+        },
+        statContent: {
+            flex: 1
+        },
+        statValue: {
+            fontSize: isMobile ? '1.2rem' : '1.5rem',
+            fontWeight: '700',
+            color: colors.dark,
+            lineHeight: '1.2',
+            marginBottom: '0.25rem'
+        },
+        statLabel: {
+            fontSize: isMobile ? '0.75rem' : '0.8rem',
             color: '#64748b'
         },
         filtersBar: {
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '2rem',
+            alignItems: isMobile ? 'stretch' : 'center',
             gap: '1rem',
-            flexWrap: 'wrap'
+            marginBottom: '2rem'
         },
         searchBox: {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.75rem 1rem',
+            padding: isMobile ? '0.8rem 1rem' : '1rem 1.2rem',
             border: `2px solid #e2e8f0`,
-            borderRadius: '10px',
+            borderRadius: '20px',
             backgroundColor: colors.white,
             flex: 1,
-            maxWidth: '400px'
+            maxWidth: isMobile ? '100%' : '400px',
+            transition: 'all 0.2s'
         },
         searchInput: {
             border: 'none',
             outline: 'none',
             width: '100%',
-            fontSize: '0.95rem',
+            fontSize: isMobile ? '0.95rem' : '1rem',
             backgroundColor: 'transparent'
         },
         filterSelect: {
-            padding: '0.75rem 1rem',
+            padding: isMobile ? '0.8rem 1rem' : '1rem 1.5rem',
             border: `2px solid #e2e8f0`,
-            borderRadius: '10px',
-            fontSize: '0.95rem',
+            borderRadius: '20px',
+            fontSize: isMobile ? '0.95rem' : '1rem',
             color: colors.dark,
             backgroundColor: colors.white,
             cursor: 'pointer',
-            outline: 'none'
+            outline: 'none',
+            minWidth: isMobile ? '100%' : '200px',
+            appearance: 'none',
+            backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")`,
+            backgroundRepeat: 'no-repeat',
+            backgroundPosition: 'right 1rem center',
+            backgroundSize: '16px'
         },
-        // Lista de compras
         purchasesList: {
             display: 'flex',
             flexDirection: 'column',
@@ -186,26 +276,29 @@ const MyPurchases = () => {
         },
         purchaseCard: {
             backgroundColor: colors.white,
-            borderRadius: '15px',
-            padding: '1.5rem',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
-            border: '1px solid #e2e8f0',
+            borderRadius: '24px',
+            padding: isMobile ? '1.2rem' : '1.5rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+            border: '1px solid #f0f0f0',
             cursor: 'pointer',
             transition: 'all 0.3s'
         },
         purchaseHeader: {
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: isMobile ? 'flex-start' : 'center',
+            gap: isMobile ? '0.8rem' : '0',
             marginBottom: '1rem'
         },
         purchaseId: {
             display: 'flex',
             alignItems: 'center',
-            gap: '1rem'
+            gap: '1rem',
+            flexWrap: 'wrap'
         },
         purchaseNumber: {
-            fontSize: '1.1rem',
+            fontSize: isMobile ? '1rem' : '1.1rem',
             fontWeight: '600',
             color: colors.dark
         },
@@ -213,23 +306,26 @@ const MyPurchases = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.25rem 0.75rem',
-            borderRadius: '20px',
-            fontSize: '0.9rem',
-            fontWeight: '500'
+            padding: '0.4rem 1rem',
+            borderRadius: '30px',
+            fontSize: '0.85rem',
+            fontWeight: '600'
         },
         purchaseDate: {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
             color: '#64748b',
-            fontSize: '0.9rem'
+            fontSize: '0.9rem',
+            backgroundColor: '#f8fafc',
+            padding: '0.4rem 1rem',
+            borderRadius: '30px'
         },
         purchaseItems: {
             display: 'flex',
             flexWrap: 'wrap',
-            gap: '1rem',
-            marginBottom: '1rem'
+            gap: '0.8rem',
+            marginBottom: '1.5rem'
         },
         itemPreview: {
             display: 'flex',
@@ -237,8 +333,9 @@ const MyPurchases = () => {
             gap: '0.5rem',
             padding: '0.5rem 1rem',
             backgroundColor: '#f8fafc',
-            borderRadius: '8px',
-            fontSize: '0.9rem'
+            borderRadius: '30px',
+            fontSize: '0.9rem',
+            border: '1px solid #f0f0f0'
         },
         itemName: {
             fontWeight: '500',
@@ -246,21 +343,24 @@ const MyPurchases = () => {
         },
         itemLicense: {
             color: colors.primary,
-            fontSize: '0.8rem',
+            fontSize: '0.7rem',
             backgroundColor: colors.primary + '10',
-            padding: '0.2rem 0.5rem',
-            borderRadius: '12px'
+            padding: '0.2rem 0.6rem',
+            borderRadius: '30px',
+            fontWeight: '600'
         },
         purchaseFooter: {
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
-            alignItems: 'center',
+            alignItems: isMobile ? 'flex-start' : 'center',
+            gap: isMobile ? '1rem' : '0',
             marginTop: '1rem',
             paddingTop: '1rem',
-            borderTop: `1px solid #e2e8f0`
+            borderTop: `1px solid #f0f0f0`
         },
         purchaseTotal: {
-            fontSize: '1.3rem',
+            fontSize: isMobile ? '1.3rem' : '1.5rem',
             fontWeight: '700',
             color: colors.primary
         },
@@ -268,57 +368,76 @@ const MyPurchases = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.6rem 1.2rem',
+            padding: '0.8rem 1.5rem',
             backgroundColor: colors.primary,
             color: 'white',
             border: 'none',
-            borderRadius: '8px',
+            borderRadius: '30px',
             fontSize: '0.9rem',
-            fontWeight: '500',
-            cursor: 'pointer'
+            fontWeight: '600',
+            cursor: 'pointer',
+            boxShadow: `0 8px 20px ${colors.primary}30`,
+            transition: 'all 0.2s'
         },
         // Detalle de compra
         detailView: {
             backgroundColor: colors.white,
-            borderRadius: '20px',
-            padding: '2rem',
-            boxShadow: '0 4px 6px rgba(0,0,0,0.02)',
-            border: '1px solid #e2e8f0'
+            borderRadius: '32px',
+            padding: isMobile ? '1.5rem' : '2rem',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.02)',
+            border: '1px solid #f0f0f0'
         },
         detailHeader: {
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '2rem'
+            alignItems: isMobile ? 'flex-start' : 'center',
+            gap: isMobile ? '1rem' : '0',
+            marginBottom: '2rem',
+            paddingBottom: '1.5rem',
+            borderBottom: `2px solid ${colors.primary}10`
         },
         detailTitle: {
-            fontSize: '1.5rem',
-            fontWeight: '600',
+            fontSize: isMobile ? '1.5rem' : '1.8rem',
+            fontWeight: '700',
             color: colors.dark
         },
         closeButton: {
-            padding: '0.5rem',
+            padding: '0.8rem',
             backgroundColor: '#f8fafc',
             border: 'none',
-            borderRadius: '8px',
-            cursor: 'pointer'
+            borderRadius: '50%',
+            cursor: 'pointer',
+            color: '#64748b',
+            fontSize: '1.2rem',
+            width: '45px',
+            height: '45px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            transition: 'all 0.2s',
+            ':hover': {
+                backgroundColor: colors.danger + '10',
+                color: colors.danger
+            }
         },
         detailGrid: {
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '2rem',
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+            gap: '1.5rem',
             marginBottom: '2rem'
         },
         detailSection: {
             backgroundColor: '#f8fafc',
             padding: '1.5rem',
-            borderRadius: '12px'
+            borderRadius: '20px',
+            border: '1px solid #f0f0f0'
         },
         sectionTitle: {
-            fontSize: '1rem',
+            fontSize: '1.1rem',
             fontWeight: '600',
             color: colors.dark,
-            marginBottom: '1rem',
+            marginBottom: '1.2rem',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem'
@@ -327,10 +446,15 @@ const MyPurchases = () => {
             display: 'flex',
             justifyContent: 'space-between',
             marginBottom: '0.75rem',
-            fontSize: '0.95rem'
+            fontSize: '0.95rem',
+            padding: '0.5rem 0',
+            borderBottom: '1px dashed #e2e8f0'
         },
         detailLabel: {
-            color: '#64748b'
+            color: '#64748b',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
         },
         detailValue: {
             fontWeight: '500',
@@ -339,72 +463,107 @@ const MyPurchases = () => {
         itemsList: {
             display: 'flex',
             flexDirection: 'column',
-            gap: '1rem'
+            gap: '1rem',
+            marginTop: '1rem'
         },
         detailItem: {
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
-            alignItems: 'center',
-            padding: '1rem',
-            backgroundColor: colors.white,
-            borderRadius: '8px',
-            border: '1px solid #e2e8f0'
+            alignItems: isMobile ? 'flex-start' : 'center',
+            gap: isMobile ? '1rem' : '0',
+            padding: '1.5rem',
+            backgroundColor: '#f8fafc',
+            borderRadius: '20px',
+            border: '1px solid #f0f0f0'
         },
         itemInfo: {
             flex: 1
         },
         itemTitle: {
-            fontWeight: '600',
-            color: colors.dark,
-            marginBottom: '0.25rem'
-        },
-        itemSubtitle: {
-            fontSize: '0.9rem',
-            color: '#64748b'
-        },
-        itemPrice: {
             fontSize: '1.1rem',
             fontWeight: '600',
-            color: colors.primary
+            color: colors.dark,
+            marginBottom: '0.5rem'
+        },
+        itemMeta: {
+            display: 'flex',
+            gap: '1rem',
+            fontSize: '0.9rem',
+            color: '#64748b',
+            flexWrap: 'wrap'
+        },
+        itemPrice: {
+            fontSize: isMobile ? '1.2rem' : '1.3rem',
+            fontWeight: '700',
+            color: colors.primary,
+            marginBottom: isMobile ? '0.5rem' : '0'
         },
         downloadBtn: {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.5rem 1rem',
+            padding: '0.8rem 1.5rem',
             backgroundColor: colors.success + '10',
             color: colors.success,
             border: `1px solid ${colors.success}20`,
-            borderRadius: '6px',
+            borderRadius: '30px',
             fontSize: '0.9rem',
+            fontWeight: '600',
             cursor: 'pointer',
-            marginLeft: '1rem'
+            transition: 'all 0.2s',
+            ':hover': {
+                backgroundColor: colors.success,
+                color: 'white'
+            }
         },
         loadingState: {
-            textAlign: 'center',
-            padding: '3rem',
-            color: colors.primary,
-            fontSize: '1.1rem'
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            minHeight: '60vh',
+            gap: '1.5rem'
+        },
+        spinner: {
+            width: '60px',
+            height: '60px',
+            border: `4px solid ${colors.primary}20`,
+            borderTop: `4px solid ${colors.primary}`,
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
         },
         emptyState: {
             textAlign: 'center',
-            padding: '4rem',
+            padding: isMobile ? '4rem 1.5rem' : '5rem',
             backgroundColor: '#f8fafc',
-            borderRadius: '15px',
-            color: '#64748b'
+            borderRadius: '32px',
+            color: '#64748b',
+            border: '1px solid #f0f0f0'
         },
         emptyIcon: {
-            fontSize: '3rem',
+            fontSize: '4rem',
             color: colors.primary + '40',
             marginBottom: '1rem'
         }
     };
 
+    // Calcular estadísticas - CON CORRECCIÓN DE TIPOS
+    const totalSpent = purchases.reduce((acc, p) => {
+        const price = p.total ? parseFloat(p.total) : 0;
+        return acc + (isNaN(price) ? 0 : price);
+    }, 0);
+
+    const completedCount = purchases.filter(p => p.status === 'completed').length;
+    const pendingCount = purchases.filter(p => p.status === 'pending').length;
+    const totalModels = purchases.reduce((acc, p) => acc + (p.models?.length || 0), 0);
+
     if (loading) {
         return (
             <div style={styles.container}>
                 <div style={styles.loadingState}>
-                    Cargando tus compras...
+                    <div style={styles.spinner} />
+                    <p style={{ color: colors.primary, fontSize: '1.1rem' }}>Cargando tus compras...</p>
                 </div>
             </div>
         );
@@ -414,19 +573,24 @@ const MyPurchases = () => {
         <div style={styles.container}>
             <div style={styles.header}>
                 {selectedPurchase ? (
-                    <button 
+                    <motion.button
                         style={styles.backButton}
+                        whileHover={{ x: -5, backgroundColor: colors.primary + '10' }}
+                        whileTap={{ scale: 0.95 }}
                         onClick={() => setSelectedPurchase(null)}
                     >
                         <FiArrowLeft /> Volver a mis compras
-                    </button>
+                    </motion.button>
                 ) : (
                     <>
-                        <h1 style={styles.title}>
-                            <FiShoppingBag /> Mis Compras
-                        </h1>
+                        <div style={styles.titleSection}>
+                            <h1 style={styles.title}>
+                                <FiShoppingBag style={styles.titleIcon} />
+                                Mis Compras
+                            </h1>
+                        </div>
                         <p style={styles.subtitle}>
-                            Historial de todas tus transacciones
+                            Historial completo de todas tus transacciones y modelos adquiridos
                         </p>
                     </>
                 )}
@@ -434,19 +598,60 @@ const MyPurchases = () => {
 
             {!selectedPurchase ? (
                 <>
+                    {/* Stats Cards */}
+                    <div style={styles.statsGrid}>
+                        {[
+                            {
+                                icon: <FiDollarSign />,
+                                value: `$${typeof totalSpent === 'number' ? totalSpent.toFixed(2) : '0.00'}`,
+                                label: 'Total gastado'
+                            },
+                            {
+                                icon: <FiPackage />,
+                                value: completedCount,
+                                label: 'Compras completadas'
+                            },
+                            {
+                                icon: <FiClock />,
+                                value: pendingCount,
+                                label: 'Compras pendientes'
+                            },
+                            {
+                                icon: <FiBox />,
+                                value: totalModels,
+                                label: 'Modelos adquiridos'
+                            }
+                        ].map((stat, index) => (
+                            <motion.div
+                                key={index}
+                                style={styles.statCard}
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ delay: index * 0.1 }}
+                                whileHover={{ y: -2, boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }}
+                            >
+                                <div style={styles.statIcon}>{stat.icon}</div>
+                                <div style={styles.statContent}>
+                                    <div style={styles.statValue}>{stat.value}</div>
+                                    <div style={styles.statLabel}>{stat.label}</div>
+                                </div>
+                            </motion.div>
+                        ))}
+                    </div>
+
                     {/* Filtros */}
                     <div style={styles.filtersBar}>
                         <div style={styles.searchBox}>
                             <FiSearch color="#94a3b8" />
                             <input
                                 type="text"
-                                placeholder="Buscar por modelo o ID..."
+                                placeholder="Buscar por modelo o ID de compra..."
                                 style={styles.searchInput}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                             />
                         </div>
-                        <select 
+                        <select
                             style={styles.filterSelect}
                             value={filterStatus}
                             onChange={(e) => setFilterStatus(e.target.value)}
@@ -460,17 +665,21 @@ const MyPurchases = () => {
 
                     {/* Lista de compras */}
                     {filteredPurchases.length === 0 ? (
-                        <div style={styles.emptyState}>
+                        <motion.div
+                            style={styles.emptyState}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                        >
                             <FiPackage style={styles.emptyIcon} />
-                            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem' }}>
+                            <h3 style={{ fontSize: '1.3rem', marginBottom: '0.5rem', color: colors.dark }}>
                                 No hay compras para mostrar
                             </h3>
-                            <p style={{ color: '#94a3b8' }}>
-                                {searchTerm || filterStatus !== 'all' 
-                                    ? 'Intenta con otros filtros' 
+                            <p style={{ color: '#94a3b8', maxWidth: '400px', margin: '0 auto' }}>
+                                {searchTerm || filterStatus !== 'all'
+                                    ? 'Intenta con otros filtros de búsqueda'
                                     : 'Explora nuestros modelos y realiza tu primera compra'}
                             </p>
-                        </div>
+                        </motion.div>
                     ) : (
                         <div style={styles.purchasesList}>
                             {filteredPurchases.map((purchase, index) => (
@@ -480,7 +689,7 @@ const MyPurchases = () => {
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     transition={{ delay: index * 0.05 }}
-                                    whileHover={{ y: -2, boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }}
+                                    whileHover={{ y: -4, boxShadow: '0 20px 40px rgba(0,0,0,0.05)' }}
                                     onClick={() => setSelectedPurchase(purchase)}
                                 >
                                     <div style={styles.purchaseHeader}>
@@ -499,7 +708,7 @@ const MyPurchases = () => {
                                         </div>
                                         <div style={styles.purchaseDate}>
                                             <FiCalendar />
-                                            {formatDate(purchase.purchase_date)}
+                                            {formatShortDate(purchase.purchase_date)}
                                         </div>
                                     </div>
 
@@ -522,16 +731,20 @@ const MyPurchases = () => {
 
                                     <div style={styles.purchaseFooter}>
                                         <div>
-                                            <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
+                                            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
                                                 Total pagado
                                             </div>
                                             <div style={styles.purchaseTotal}>
                                                 ${purchase.total}
                                             </div>
                                         </div>
-                                        <button style={styles.viewButton}>
+                                        <motion.button
+                                            style={styles.viewButton}
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
+                                        >
                                             Ver detalles <FiChevronRight />
-                                        </button>
+                                        </motion.button>
                                     </div>
                                 </motion.div>
                             ))}
@@ -549,12 +762,14 @@ const MyPurchases = () => {
                         <h2 style={styles.detailTitle}>
                             Detalle de Compra #{selectedPurchase.id}
                         </h2>
-                        <button 
+                        <motion.button
                             style={styles.closeButton}
+                            whileHover={{ scale: 1.1, backgroundColor: colors.danger + '10', color: colors.danger }}
+                            whileTap={{ scale: 0.9 }}
                             onClick={() => setSelectedPurchase(null)}
                         >
                             ✕
-                        </button>
+                        </motion.button>
                     </div>
 
                     <div style={styles.detailGrid}>
@@ -580,14 +795,20 @@ const MyPurchases = () => {
                             <div style={styles.detailRow}>
                                 <span style={styles.detailLabel}>Método de pago:</span>
                                 <span style={styles.detailValue}>
-                                    {selectedPurchase.payment_provider || 'Demo'}
+                                    {selectedPurchase.payment_provider || 'Tarjeta de crédito'}
+                                </span>
+                            </div>
+                            <div style={styles.detailRow}>
+                                <span style={styles.detailLabel}>ID de transacción:</span>
+                                <span style={styles.detailValue}>
+                                    {selectedPurchase.transaction_id || 'TRX-' + selectedPurchase.id}
                                 </span>
                             </div>
                         </div>
 
                         <div style={styles.detailSection}>
                             <div style={styles.sectionTitle}>
-                                <FiDollarSign /> Resumen
+                                <FiDollarSign /> Resumen financiero
                             </div>
                             <div style={styles.detailRow}>
                                 <span style={styles.detailLabel}>Subtotal:</span>
@@ -596,9 +817,15 @@ const MyPurchases = () => {
                                 </span>
                             </div>
                             <div style={styles.detailRow}>
-                                <span style={styles.detailLabel}>Impuestos:</span>
+                                <span style={styles.detailLabel}>Impuestos (16%):</span>
                                 <span style={styles.detailValue}>
                                     ${(selectedPurchase.total * 0.16).toFixed(2)}
+                                </span>
+                            </div>
+                            <div style={styles.detailRow}>
+                                <span style={styles.detailLabel}>Envío:</span>
+                                <span style={{ ...styles.detailValue, color: colors.success }}>
+                                    Gratis
                                 </span>
                             </div>
                             <div style={styles.detailRow}>
@@ -615,38 +842,53 @@ const MyPurchases = () => {
                     </div>
 
                     <div style={styles.sectionTitle}>
-                        <FiPackage /> Modelos adquiridos
+                        <FiPackage /> Modelos adquiridos ({selectedPurchase.models?.length || 0})
                     </div>
                     <div style={styles.itemsList}>
                         {selectedPurchase.models?.map(model => (
-                            <div key={model.id} style={styles.detailItem}>
+                            <motion.div
+                                key={model.id}
+                                style={styles.detailItem}
+                                whileHover={{ y: -2, boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }}
+                            >
                                 <div style={styles.itemInfo}>
                                     <div style={styles.itemTitle}>{model.name}</div>
-                                    <div style={styles.itemSubtitle}>
-                                        Formato: {model.format} | Tamaño: {model.size_mb} MB
-                                    </div>
-                                    <div style={styles.itemSubtitle}>
-                                        Licencia: {model.pivot?.license_type || 'Personal'}
+                                    <div style={styles.itemMeta}>
+                                        <span><FiBox /> {model.format}</span>
+                                        <span><FiDownload /> {model.size_mb} MB</span>
+                                        <span><FiTag /> {model.pivot?.license_type || 'Personal'}</span>
                                     </div>
                                 </div>
-                                <div style={{ display: 'flex', alignItems: 'center' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                                     <div style={styles.itemPrice}>
                                         ${model.pivot?.unit_price || model.price}
                                     </div>
                                     {selectedPurchase.status === 'completed' && (
-                                        <button 
+                                        <motion.button
                                             style={styles.downloadBtn}
-                                            onClick={() => navigate(`/download/${model.id}`)}
+                                            whileHover={{ scale: 1.02, backgroundColor: colors.success, color: 'white' }}
+                                            whileTap={{ scale: 0.98 }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigate(`/downloads`);
+                                            }}
                                         >
                                             <FiDownload /> Descargar
-                                        </button>
+                                        </motion.button>
                                     )}
                                 </div>
-                            </div>
+                            </motion.div>
                         ))}
                     </div>
                 </motion.div>
             )}
+
+            <style>{`
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
 };

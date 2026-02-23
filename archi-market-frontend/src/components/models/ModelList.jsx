@@ -14,7 +14,11 @@ import {
     FiStar,
     FiFilter,
     FiX,
-    FiHeart
+    FiHeart,
+    FiBox,
+    FiTrendingUp,
+    FiClock,
+    FiUser
 } from 'react-icons/fi';
 import { HiOutlineCube, HiOutlineOfficeBuilding, HiOutlineHome, HiOutlineLightBulb } from 'react-icons/hi';
 import { BsGrid3X3GapFill } from 'react-icons/bs';
@@ -48,7 +52,7 @@ const ModelImage = ({ src, alt, modelId }) => {
                 width: '100%',
                 height: '100%',
                 objectFit: 'cover',
-                transition: 'transform 0.5s'
+                transition: 'transform 0.5s ease'
             }}
             onError={() => setError(true)}
         />
@@ -63,6 +67,8 @@ const ModelList = () => {
     const [view, setView] = useState('grid');
     const [selectedCategory, setSelectedCategory] = useState('todos');
     const [showFilters, setShowFilters] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
+    const [sortBy, setSortBy] = useState('recent');
     const [pagination, setPagination] = useState({
         current_page: 1,
         last_page: 1,
@@ -70,18 +76,28 @@ const ModelList = () => {
         per_page: 12
     });
 
-    // Categorías disponibles (basadas en tu BD)
+    // Detectar móvil
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    // Categorías disponibles
     const categories = [
-        { id: 'todos', name: 'Todos', icon: <BsGrid3X3GapFill /> },
-        { id: 'estructuras', name: 'Estructuras', icon: <HiOutlineOfficeBuilding />, count: 850 },
-        { id: 'arquitectura', name: 'Arquitectura', icon: <HiOutlineHome />, count: 1200 },
-        { id: 'instalaciones', name: 'Instalaciones', icon: <HiOutlineLightBulb />, count: 450 },
-        { id: 'mobiliario', name: 'Mobiliario', icon: <HiOutlineCube />, count: 600 }
+        { id: 'todos', name: 'Todos', icon: <BsGrid3X3GapFill />, color: '#64748b' },
+        { id: 'estructuras', name: 'Estructuras', icon: <HiOutlineOfficeBuilding />, count: 850, color: '#3b82f6' },
+        { id: 'arquitectura', name: 'Arquitectura', icon: <HiOutlineHome />, count: 1200, color: '#10b981' },
+        { id: 'instalaciones', name: 'Instalaciones', icon: <HiOutlineLightBulb />, count: 450, color: '#f59e0b' },
+        { id: 'mobiliario', name: 'Mobiliario', icon: <HiOutlineCube />, count: 600, color: '#8b5cf6' }
     ];
 
     useEffect(() => {
         fetchModels(pagination.current_page);
-    }, [pagination.current_page, selectedCategory]);
+    }, [pagination.current_page, selectedCategory, sortBy]);
 
     const fetchModels = async (page = 1) => {
         setLoading(true);
@@ -109,7 +125,6 @@ const ModelList = () => {
     };
 
     const handleSearch = () => {
-        // Implementar búsqueda después
         console.log('Buscando:', search);
     };
 
@@ -130,7 +145,6 @@ const ModelList = () => {
         return null;
     };
 
-    // Función para renderizar números de página
     const renderPageNumbers = () => {
         const pages = [];
         const maxVisible = 5;
@@ -180,68 +194,92 @@ const ModelList = () => {
         });
     };
 
+    const getCategoryColor = (categoryId) => {
+        const cat = categories.find(c => c.id === categoryId);
+        return cat?.color || colors.primary;
+    };
+
     const styles = {
         container: {
             maxWidth: '1400px',
             margin: '0 auto',
-            padding: '2rem'
+            padding: isMobile ? '5rem 1rem 2rem' : '6rem 2rem 2rem',
+            minHeight: '100vh',
+            width: '100%',
+            boxSizing: 'border-box'
         },
         header: {
             display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
             justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '1.5rem'
+            alignItems: isMobile ? 'stretch' : 'center',
+            gap: isMobile ? '1rem' : '0',
+            marginBottom: '2rem',
+            width: '100%'
         },
         titleSection: {
             display: 'flex',
             flexDirection: 'column',
-            gap: '0.25rem'
+            gap: '0.5rem'
         },
         title: {
-            fontSize: '2.2rem',
+            fontSize: isMobile ? '2rem' : '2.5rem',
             fontWeight: '700',
             color: colors.dark,
-            margin: 0
+            margin: 0,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            lineHeight: '1.2'
+        },
+        titleIcon: {
+            color: colors.primary,
+            fontSize: isMobile ? '2rem' : '2.5rem'
         },
         subtitle: {
             color: '#64748b',
-            fontSize: '1rem'
+            fontSize: isMobile ? '0.9rem' : '1rem',
+            lineHeight: '1.5'
         },
         controls: {
             display: 'flex',
-            gap: '1rem',
-            alignItems: 'center'
+            gap: '0.8rem',
+            alignItems: 'center',
+            width: isMobile ? '100%' : 'auto',
+            justifyContent: isMobile ? 'space-between' : 'flex-end'
         },
         filterBtn: {
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem',
-            padding: '0.75rem 1.5rem',
+            padding: isMobile ? '0.7rem 1.2rem' : '0.8rem 1.5rem',
             border: `2px solid #e2e8f0`,
-            borderRadius: '12px',
+            borderRadius: '30px',
             background: colors.white,
             color: colors.dark,
             cursor: 'pointer',
-            transition: 'all 0.2s',
-            fontWeight: '500'
+            transition: 'all 0.2s ease',
+            fontWeight: '500',
+            fontSize: isMobile ? '0.9rem' : '1rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
         },
         viewToggle: {
             display: 'flex',
             gap: '0.5rem',
             background: '#f8fafc',
             padding: '0.25rem',
-            borderRadius: '12px',
+            borderRadius: '30px',
             border: `1px solid #e2e8f0`
         },
         viewButton: {
-            padding: '0.75rem',
+            padding: isMobile ? '0.6rem' : '0.75rem',
             border: 'none',
-            borderRadius: '8px',
+            borderRadius: '30px',
             background: 'transparent',
             cursor: 'pointer',
-            transition: 'all 0.2s',
+            transition: 'all 0.2s ease',
             color: '#64748b',
-            fontSize: '1.2rem'
+            fontSize: isMobile ? '1.1rem' : '1.2rem'
         },
         viewButtonActive: {
             background: colors.white,
@@ -252,253 +290,332 @@ const ModelList = () => {
             display: 'flex',
             gap: '1rem',
             marginBottom: '2rem',
-            position: 'relative'
+            position: 'relative',
+            width: '100%'
         },
         searchInput: {
             flex: 1,
-            padding: '1rem 1rem 1rem 3rem',
+            padding: isMobile ? '1rem 1rem 1rem 3rem' : '1.2rem 1.5rem 1.2rem 3.5rem',
             border: `2px solid #e2e8f0`,
-            borderRadius: '16px',
-            fontSize: '1rem',
+            borderRadius: '40px',
+            fontSize: isMobile ? '0.95rem' : '1rem',
             outline: 'none',
-            transition: 'all 0.3s',
-            background: '#f8fafc'
+            transition: 'all 0.3s ease',
+            background: '#ffffff',
+            width: '100%',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.02)'
         },
         searchIcon: {
             position: 'absolute',
-            left: '1rem',
+            left: isMobile ? '1.2rem' : '1.5rem',
             top: '50%',
             transform: 'translateY(-50%)',
             color: '#94a3b8',
-            fontSize: '1.2rem'
+            fontSize: isMobile ? '1.2rem' : '1.3rem',
+            zIndex: 1
         },
-        // Filtros
         filtersPanel: {
-            background: '#f8fafc',
-            borderRadius: '16px',
-            padding: '1.5rem',
+            background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '30px',
+            padding: isMobile ? '1.5rem' : '2rem',
             marginBottom: '2rem',
-            border: `1px solid #e2e8f0`
+            border: '1px solid #f0f0f0',
+            width: '100%',
+            boxSizing: 'border-box',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.03)'
+        },
+        filtersHeader: {
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1.5rem',
+            paddingBottom: '1rem',
+            borderBottom: `2px solid ${colors.primary}10`
+        },
+        filtersTitle: {
+            fontSize: isMobile ? '1.1rem' : '1.2rem',
+            fontWeight: '600',
+            color: colors.dark,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
         },
         categoriesGrid: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))',
-            gap: '1rem',
-            marginTop: '1rem'
+            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '0.8rem',
+            marginTop: '0.5rem'
         },
         categoryChip: {
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            padding: '0.75rem 1rem',
+            gap: '0.75rem',
+            padding: isMobile ? '1rem' : '1rem 1.2rem',
             background: colors.white,
-            border: `2px solid #e2e8f0`,
-            borderRadius: '12px',
+            border: '2px solid #e2e8f0',
+            borderRadius: '20px',
             cursor: 'pointer',
-            transition: 'all 0.2s',
-            color: colors.dark
+            transition: 'all 0.2s ease',
+            color: colors.dark,
+            fontSize: isMobile ? '0.95rem' : '1rem',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
         },
         categoryChipActive: {
             background: colors.primary,
             borderColor: colors.primary,
-            color: colors.white
+            color: colors.white,
+            transform: 'scale(1.02)',
+            boxShadow: `0 8px 20px ${colors.primary}30`
         },
         categoryIcon: {
-            fontSize: '1.2rem',
+            fontSize: '1.3rem',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center'
         },
         categoryCount: {
             marginLeft: 'auto',
-            fontSize: '0.8rem',
-            color: '#64748b'
+            fontSize: '0.85rem',
+            color: '#64748b',
+            fontWeight: '500',
+            background: '#f1f5f9',
+            padding: '0.2rem 0.6rem',
+            borderRadius: '20px'
         },
-        // Grid de modelos
+        categoryCountActive: {
+            background: 'rgba(255,255,255,0.2)',
+            color: 'white'
+        },
         grid: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: '2rem',
-            marginBottom: '3rem'
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: isMobile ? '1.5rem' : '2rem',
+            marginBottom: '3rem',
+            width: '100%'
         },
         card: {
             backgroundColor: colors.white,
-            borderRadius: '20px',
+            borderRadius: '24px',
             overflow: 'hidden',
-            boxShadow: '0 10px 30px rgba(0,0,0,0.05)',
-            transition: 'all 0.3s',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.03)',
+            transition: 'all 0.3s ease',
             cursor: 'pointer',
             border: '1px solid #f0f0f0',
-            position: 'relative'
+            position: 'relative',
+            width: '100%',
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column'
         },
         cardImage: {
-            height: '220px',
+            height: isMobile ? '200px' : '220px',
             background: 'linear-gradient(145deg, ' + colors.primary + '10 0%, ' + colors.primary + '05 100%)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             position: 'relative',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            flexShrink: 0
         },
         cardBadge: {
             position: 'absolute',
             top: '1rem',
             right: '1rem',
-            background: 'rgba(255,255,255,0.9)',
+            background: 'rgba(255,255,255,0.95)',
             backdropFilter: 'blur(5px)',
-            padding: '0.4rem 0.8rem',
+            padding: '0.4rem 1rem',
             borderRadius: '30px',
-            fontSize: '0.75rem',
+            fontSize: isMobile ? '0.7rem' : '0.75rem',
             fontWeight: '600',
             color: colors.primary,
             display: 'flex',
             alignItems: 'center',
             gap: '0.3rem',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)',
+            border: '1px solid rgba(255,255,255,0.5)'
         },
         cardFavorite: {
             position: 'absolute',
             top: '1rem',
             left: '1rem',
-            background: 'rgba(255,255,255,0.9)',
+            background: 'rgba(255,255,255,0.95)',
             backdropFilter: 'blur(5px)',
-            width: '32px',
-            height: '32px',
+            width: '36px',
+            height: '36px',
             borderRadius: '50%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            transition: 'all 0.2s',
+            transition: 'all 0.2s ease',
             border: 'none',
             color: '#94a3b8',
-            zIndex: 10
+            zIndex: 10,
+            fontSize: isMobile ? '1rem' : '1.1rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
         },
         cardContent: {
-            padding: '1.5rem'
+            padding: isMobile ? '1.2rem' : '1.5rem',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column'
         },
         cardCategory: {
+            display: 'inline-block',
             color: colors.primary,
-            fontSize: '0.8rem',
+            fontSize: isMobile ? '0.7rem' : '0.75rem',
             fontWeight: '600',
             textTransform: 'uppercase',
             letterSpacing: '0.5px',
-            marginBottom: '0.5rem'
+            marginBottom: '0.5rem',
+            background: colors.primary + '10',
+            padding: '0.2rem 1rem',
+            borderRadius: '30px',
+            width: 'fit-content'
         },
         cardTitle: {
-            fontSize: '1.2rem',
+            fontSize: isMobile ? '1.1rem' : '1.2rem',
             fontWeight: '600',
             color: colors.dark,
-            marginBottom: '0.5rem',
-            lineHeight: '1.4'
+            marginBottom: '0.75rem',
+            lineHeight: '1.4',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
         },
         cardMeta: {
             display: 'flex',
-            gap: '1rem',
+            gap: isMobile ? '0.8rem' : '1rem',
             color: '#64748b',
-            fontSize: '0.85rem',
-            marginBottom: '1rem'
+            fontSize: isMobile ? '0.8rem' : '0.85rem',
+            marginBottom: '1rem',
+            flexWrap: 'wrap'
         },
         metaItem: {
             display: 'flex',
             alignItems: 'center',
-            gap: '0.3rem'
+            gap: '0.3rem',
+            background: '#f8fafc',
+            padding: '0.2rem 0.8rem',
+            borderRadius: '30px'
         },
         cardFooter: {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginTop: '1rem',
+            marginTop: 'auto',
             paddingTop: '1rem',
             borderTop: '1px solid #f0f0f0'
         },
         cardPrice: {
-            fontSize: '1.4rem',
+            fontSize: isMobile ? '1.3rem' : '1.5rem',
             fontWeight: '700',
-            color: colors.primary
+            color: colors.primary,
+            lineHeight: '1.2'
+        },
+        cardStats: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.3rem',
+            color: '#94a3b8',
+            fontSize: '0.8rem',
+            background: '#f8fafc',
+            padding: '0.2rem 0.8rem',
+            borderRadius: '30px'
         },
         cardActions: {
             display: 'flex',
             gap: '0.5rem'
         },
         actionBtn: {
-            width: '36px',
-            height: '36px',
-            borderRadius: '10px',
+            width: isMobile ? '36px' : '40px',
+            height: isMobile ? '36px' : '40px',
+            borderRadius: '12px',
             border: `1px solid #e2e8f0`,
             background: colors.white,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             cursor: 'pointer',
-            transition: 'all 0.2s',
-            color: '#64748b'
+            transition: 'all 0.2s ease',
+            color: '#64748b',
+            fontSize: isMobile ? '1rem' : '1.1rem'
         },
-        // Paginación profesional
         paginationContainer: {
             display: 'flex',
             justifyContent: 'center',
             alignItems: 'center',
             gap: '0.5rem',
             marginTop: '3rem',
-            flexWrap: 'wrap'
+            flexWrap: 'wrap',
+            padding: '1rem 0'
         },
         pageButton: {
-            padding: '0.6rem 1rem',
-            border: `2px solid #e2e8f0`,
-            borderRadius: '10px',
+            padding: isMobile ? '0.6rem 1rem' : '0.8rem 1.2rem',
+            border: '2px solid #e2e8f0',
+            borderRadius: '12px',
             background: colors.white,
             color: colors.dark,
             cursor: 'pointer',
-            transition: 'all 0.2s',
-            minWidth: '45px',
+            transition: 'all 0.2s ease',
+            minWidth: isMobile ? '40px' : '48px',
             textAlign: 'center',
-            fontSize: '0.9rem',
-            fontWeight: '500'
+            fontSize: isMobile ? '0.9rem' : '1rem',
+            fontWeight: '500',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
         },
         pageButtonActive: {
             backgroundColor: colors.primary,
             color: 'white',
-            borderColor: colors.primary
+            borderColor: colors.primary,
+            boxShadow: `0 8px 16px ${colors.primary}30`
         },
         pageButtonDisabled: {
             opacity: 0.5,
-            cursor: 'not-allowed'
+            cursor: 'not-allowed',
+            pointerEvents: 'none'
         },
         pageEllipsis: {
             padding: '0.5rem',
-            color: '#64748b'
+            color: '#64748b',
+            fontSize: isMobile ? '1rem' : '1.1rem'
         },
         pageInfo: {
             textAlign: 'center',
-            marginTop: '1rem',
+            marginTop: '1.5rem',
             color: '#64748b',
-            fontSize: '0.9rem',
-            fontWeight: '500'
+            fontSize: isMobile ? '0.9rem' : '0.95rem',
+            padding: '0 1rem'
         },
         loading: {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '4rem',
-            color: colors.primary,
-            fontSize: '1.2rem',
-            gap: '1rem'
+            minHeight: '60vh',
+            gap: '1.5rem'
         },
         emptyState: {
             textAlign: 'center',
-            padding: '4rem',
+            padding: isMobile ? '4rem 1.5rem' : '5rem',
             color: '#64748b',
-            fontSize: '1.2rem',
-            background: '#f8fafc',
-            borderRadius: '20px'
+            fontSize: isMobile ? '1rem' : '1.2rem',
+            background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '40px',
+            border: '1px solid #f0f0f0',
+            minHeight: '400px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center'
         },
         spinner: {
-            width: '50px',
-            height: '50px',
-            border: `3px solid ${colors.primary}20`,
-            borderTop: `3px solid ${colors.primary}`,
+            width: '60px',
+            height: '60px',
+            border: `4px solid ${colors.primary}20`,
+            borderTop: `4px solid ${colors.primary}`,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
         }
@@ -515,47 +632,55 @@ const ModelList = () => {
 
     return (
         <div style={styles.container}>
-            {/* Header con título y controles */}
+            {/* Header mejorado */}
             <div style={styles.header}>
                 <div style={styles.titleSection}>
-                    <h1 style={styles.title}>Modelos 3D</h1>
+                    <h1 style={styles.title}>
+                        <FiBox style={styles.titleIcon} />
+                        Modelos 3D
+                    </h1>
                     <p style={styles.subtitle}>
-                        {pagination.total} modelos disponibles para tu proyecto
+                        {pagination.total} modelos profesionales disponibles para tu proyecto
                     </p>
                 </div>
                 <div style={styles.controls}>
                     <motion.button
                         style={styles.filterBtn}
                         onClick={() => setShowFilters(!showFilters)}
-                        whileHover={{ scale: 1.02 }}
+                        whileHover={{ scale: 1.02, backgroundColor: colors.primary + '05' }}
                         whileTap={{ scale: 0.98 }}
                     >
-                        <FiFilter /> Filtros
+                        <FiFilter color={colors.primary} />
+                        {!isMobile && 'Filtros'}
                     </motion.button>
                     <div style={styles.viewToggle}>
-                        <button
+                        <motion.button
                             style={{
                                 ...styles.viewButton,
                                 ...(view === 'grid' ? styles.viewButtonActive : {})
                             }}
                             onClick={() => setView('grid')}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                         >
                             <FiGrid />
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
                             style={{
                                 ...styles.viewButton,
                                 ...(view === 'list' ? styles.viewButtonActive : {})
                             }}
                             onClick={() => setView('list')}
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
                         >
                             <FiList />
-                        </button>
+                        </motion.button>
                     </div>
                 </div>
             </div>
 
-            {/* Barra de búsqueda profesional */}
+            {/* Barra de búsqueda mejorada */}
             <div style={styles.searchBar}>
                 <FiSearch style={styles.searchIcon} />
                 <input
@@ -565,10 +690,12 @@ const ModelList = () => {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                    onFocus={(e) => e.target.style.borderColor = colors.primary}
+                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
                 />
             </div>
 
-            {/* Panel de filtros (expandible) */}
+            {/* Panel de filtros mejorado */}
             <AnimatePresence>
                 {showFilters && (
                     <motion.div
@@ -578,49 +705,74 @@ const ModelList = () => {
                         transition={{ duration: 0.2 }}
                         style={styles.filtersPanel}
                     >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                            <h3 style={{ fontWeight: '600', color: colors.dark }}>Categorías</h3>
-                            <button
+                        <div style={styles.filtersHeader}>
+                            <h3 style={styles.filtersTitle}>
+                                <FiFilter /> Categorías
+                            </h3>
+                            <motion.button
                                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
                                 onClick={() => setShowFilters(false)}
+                                whileHover={{ scale: 1.1 }}
+                                whileTap={{ scale: 0.9 }}
                             >
                                 <FiX size={20} />
-                            </button>
+                            </motion.button>
                         </div>
                         <div style={styles.categoriesGrid}>
-                            {categories.map((cat) => (
-                                <motion.div
-                                    key={cat.id}
-                                    style={{
-                                        ...styles.categoryChip,
-                                        ...(selectedCategory === cat.id ? styles.categoryChipActive : {})
-                                    }}
-                                    onClick={() => setSelectedCategory(cat.id)}
-                                    whileHover={{ y: -2 }}
-                                    whileTap={{ scale: 0.98 }}
-                                >
-                                    {cat.icon}
-                                    <span>{cat.name}</span>
-                                    {cat.count && (
-                                        <span style={styles.categoryCount}>{cat.count}</span>
-                                    )}
-                                </motion.div>
-                            ))}
+                            {categories.map((cat) => {
+                                const isActive = selectedCategory === cat.id;
+                                return (
+                                    <motion.div
+                                        key={cat.id}
+                                        style={{
+                                            ...styles.categoryChip,
+                                            ...(isActive ? styles.categoryChipActive : {})
+                                        }}
+                                        onClick={() => setSelectedCategory(cat.id)}
+                                        whileHover={{ y: -2, boxShadow: '0 8px 20px rgba(0,0,0,0.05)' }}
+                                        whileTap={{ scale: 0.98 }}
+                                    >
+                                        <span style={{
+                                            ...styles.categoryIcon,
+                                            color: isActive ? colors.white : cat.color
+                                        }}>
+                                            {cat.icon}
+                                        </span>
+                                        <span>{cat.name}</span>
+                                        {cat.count && (
+                                            <span style={{
+                                                ...styles.categoryCount,
+                                                ...(isActive ? styles.categoryCountActive : {})
+                                            }}>
+                                                {cat.count}
+                                            </span>
+                                        )}
+                                    </motion.div>
+                                );
+                            })}
                         </div>
                     </motion.div>
                 )}
             </AnimatePresence>
 
-            {/* Grid de modelos */}
+            {/* Grid de modelos mejorado */}
             {models.length === 0 ? (
-                <div style={styles.emptyState}>
-                    <HiOutlineCube size={60} color={colors.primary + '40'} />
-                    <p style={{ marginTop: '1rem' }}>No hay modelos disponibles</p>
-                </div>
+                <motion.div
+                    style={styles.emptyState}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                >
+                    <HiOutlineCube size={80} color={colors.primary + '40'} />
+                    <p style={{ marginTop: '1.5rem' }}>No hay modelos disponibles</p>
+                </motion.div>
             ) : (
                 <>
-                    <div style={view === 'grid' ? styles.grid : {}}>
-                        {models.map((model) => {
+                    <motion.div
+                        style={view === 'grid' ? styles.grid : {}}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                    >
+                        {models.map((model, index) => {
                             const previewImage = getPreviewImage(model);
 
                             // Extraer valores asegurando que sean strings/números
@@ -629,23 +781,25 @@ const ModelList = () => {
                                 : model.category || 'Modelo 3D';
 
                             const format = typeof model.format === 'object'
-                                ? model.format?.name || 'OBJ/FBX'
-                                : model.format || 'OBJ/FBX';
+                                ? model.format?.name || 'GLTF'
+                                : model.format || 'GLTF';
 
                             const size = typeof model.size_mb === 'object'
-                                ? model.size_mb?.value || '45'
-                                : model.size_mb || '45';
+                                ? model.size_mb?.value || '0'
+                                : model.size_mb || '0';
 
                             const price = typeof model.price === 'object'
-                                ? model.price?.value || 99.99
-                                : model.price || 99.99;
+                                ? model.price?.value || 0
+                                : model.price || 0;
 
                             return (
                                 <motion.div
                                     key={model.id}
                                     style={styles.card}
-                                    whileHover={{ y: -8 }}
-                                    transition={{ type: 'spring', stiffness: 300 }}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    transition={{ delay: index * 0.05 }}
+                                    whileHover={{ y: -8, boxShadow: '0 20px 40px rgba(0,0,0,0.08)' }}
                                     onClick={() => navigate(`/models/${model.id}`)}
                                 >
                                     <div style={styles.cardImage}>
@@ -657,15 +811,17 @@ const ModelList = () => {
                                         <div style={styles.cardBadge}>
                                             <FiEye size={12} /> Vista previa 3D
                                         </div>
-                                        <button
+                                        <motion.button
                                             style={styles.cardFavorite}
+                                            whileHover={{ scale: 1.1, backgroundColor: colors.primary, color: 'white' }}
+                                            whileTap={{ scale: 0.9 }}
                                             onClick={(e) => {
                                                 e.stopPropagation();
                                                 console.log('Favorito:', model.id);
                                             }}
                                         >
                                             <FiHeart />
-                                        </button>
+                                        </motion.button>
                                     </div>
                                     <div style={styles.cardContent}>
                                         <div style={styles.cardCategory}>
@@ -674,16 +830,19 @@ const ModelList = () => {
                                         <h3 style={styles.cardTitle}>{model.name}</h3>
                                         <div style={styles.cardMeta}>
                                             <span style={styles.metaItem}>
-                                                <HiOutlineCube size={14} /> {format}
+                                                <HiOutlineCube size={14} color={colors.primary} /> {format}
                                             </span>
                                             <span style={styles.metaItem}>
-                                                <FiDownload size={14} /> {size} MB
+                                                <FiDownload size={14} color={colors.primary} /> {size} MB
                                             </span>
                                         </div>
                                         <div style={styles.cardFooter}>
                                             <span style={styles.cardPrice}>
-                                                ${typeof price === 'number' ? price.toFixed(2) : '99.99'}
+                                                ${typeof price === 'number' ? price.toFixed(2) : '0.00'}
                                             </span>
+                                            <div style={styles.cardStats}>
+                                                <FiStar color="#fbbf24" /> 4.5 · 128
+                                            </div>
                                             <div style={styles.cardActions}>
                                                 <motion.button
                                                     style={styles.actionBtn}
@@ -702,9 +861,9 @@ const ModelList = () => {
                                 </motion.div>
                             );
                         })}
-                    </div>
+                    </motion.div>
 
-                    {/* Paginación profesional */}
+                    {/* Paginación mejorada */}
                     {pagination.last_page > 1 && (
                         <>
                             <div style={styles.paginationContainer}>
@@ -715,8 +874,8 @@ const ModelList = () => {
                                     }}
                                     onClick={() => handlePageChange(1)}
                                     disabled={pagination.current_page === 1}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
+                                    whileHover={pagination.current_page !== 1 ? { scale: 1.05 } : {}}
+                                    whileTap={pagination.current_page !== 1 ? { scale: 0.95 } : {}}
                                 >
                                     <FiChevronsLeft />
                                 </motion.button>
@@ -728,8 +887,8 @@ const ModelList = () => {
                                     }}
                                     onClick={() => handlePageChange(pagination.current_page - 1)}
                                     disabled={pagination.current_page === 1}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
+                                    whileHover={pagination.current_page !== 1 ? { scale: 1.05 } : {}}
+                                    whileTap={pagination.current_page !== 1 ? { scale: 0.95 } : {}}
                                 >
                                     <FiChevronLeft />
                                 </motion.button>
@@ -743,8 +902,8 @@ const ModelList = () => {
                                     }}
                                     onClick={() => handlePageChange(pagination.current_page + 1)}
                                     disabled={pagination.current_page === pagination.last_page}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
+                                    whileHover={pagination.current_page !== pagination.last_page ? { scale: 1.05 } : {}}
+                                    whileTap={pagination.current_page !== pagination.last_page ? { scale: 0.95 } : {}}
                                 >
                                     <FiChevronRight />
                                 </motion.button>
@@ -756,8 +915,8 @@ const ModelList = () => {
                                     }}
                                     onClick={() => handlePageChange(pagination.last_page)}
                                     disabled={pagination.current_page === pagination.last_page}
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
+                                    whileHover={pagination.current_page !== pagination.last_page ? { scale: 1.05 } : {}}
+                                    whileTap={pagination.current_page !== pagination.last_page ? { scale: 0.95 } : {}}
                                 >
                                     <FiChevronsRight />
                                 </motion.button>

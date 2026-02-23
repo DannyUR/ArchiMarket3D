@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiDownload,
     FiEye,
@@ -8,24 +8,32 @@ import {
     FiShoppingCart,
     FiArrowLeft,
     FiCheckCircle,
-    FiInfo
+    FiInfo,
+    FiUser,
+    FiCalendar,
+    FiTag,
+    FiBox,
+    FiTrendingUp,
+    FiThumbsUp,
+    FiMessageCircle,
+    FiShare2,
+    FiHeart
 } from 'react-icons/fi';
 import { HiOutlineCube } from 'react-icons/hi';
 import { useCart } from '../../context/CartContext';
 import API from '../../services/api';
 import { colors } from '../../styles/theme';
 
-// Componente visor de Sketchfab
+// Componente visor de Sketchfab mejorado
 const SketchfabViewer = ({ model }) => {
     const [viewerError, setViewerError] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Estilos locales para el spinner
     const spinnerStyle = {
-        width: '40px',
-        height: '40px',
-        border: `3px solid ${colors.primary}20`,
-        borderTop: `3px solid ${colors.primary}`,
+        width: '50px',
+        height: '50px',
+        border: `4px solid ${colors.primary}20`,
+        borderTop: `4px solid ${colors.primary}`,
         borderRadius: '50%',
         animation: 'spin 1s linear infinite'
     };
@@ -34,16 +42,17 @@ const SketchfabViewer = ({ model }) => {
         return (
             <div style={{
                 width: '100%',
-                height: '400px',
-                backgroundColor: '#f1f5f9',
+                height: '100%',
+                minHeight: '400px',
+                background: 'linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%)',
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: '1rem',
-                borderRadius: '10px'
+                borderRadius: '24px'
             }}>
-                <HiOutlineCube size={60} color={colors.primary + '40'} />
+                <HiOutlineCube size={80} color={colors.primary + '40'} />
                 <p style={{ color: '#64748b' }}>No se pudo cargar el visor 3D</p>
             </div>
         );
@@ -55,40 +64,40 @@ const SketchfabViewer = ({ model }) => {
         return (
             <div style={{
                 width: '100%',
-                height: '400px',
-                backgroundColor: '#f1f5f9',
+                height: '100%',
+                minHeight: '400px',
+                background: 'linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center'
             }}>
-                <HiOutlineCube size={60} color={colors.primary + '40'} />
+                <HiOutlineCube size={80} color={colors.primary + '40'} />
             </div>
         );
     }
 
-    // URL con parámetros para ocultar la UI de Sketchfab
     const embedUrl = `https://sketchfab.com/models/${sketchfabId}/embed?` + new URLSearchParams({
         autospin: '0.2',
         autostart: '1',
         preload: '1',
         ui_controls: '1',
-        ui_infos: '0',           // ← Oculta información del modelo
+        ui_infos: '0',
         ui_stop: '1',
-        ui_watermark: '0',        // ← Oculta watermark de Sketchfab
-        ui_watermark_link: '0',   // ← Oculta link
-        ui_inspector: '0',        // ← Oculta inspector
-        ui_annotations: '0',      // ← Oculta anotaciones
-        ui_color: '0',            // ← Oculta selector de color
-        ui_ar: '0',               // ← Oculta botón AR
-        ui_help: '0',             // ← Oculta ayuda
-        ui_settings: '0',         // ← Oculta configuraciones
-        ui_fullscreen: '1',       // ← Mantiene fullscreen
-        ui_gyzmo: '1',            // ← Mantiene controles de rotación
+        ui_watermark: '0',
+        ui_watermark_link: '0',
+        ui_inspector: '0',
+        ui_annotations: '0',
+        ui_color: '0',
+        ui_ar: '0',
+        ui_help: '0',
+        ui_settings: '0',
+        ui_fullscreen: '1',
+        ui_gyzmo: '1',
         camera: '0'
     });
 
     return (
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+        <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '400px' }}>
             {isLoading && (
                 <div style={{
                     position: 'absolute',
@@ -99,8 +108,9 @@ const SketchfabViewer = ({ model }) => {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    backgroundColor: '#f1f5f9',
-                    zIndex: 1
+                    background: 'linear-gradient(145deg, #f8fafc 0%, #f1f5f9 100%)',
+                    zIndex: 1,
+                    borderRadius: '24px'
                 }}>
                     <div style={spinnerStyle} />
                 </div>
@@ -111,7 +121,9 @@ const SketchfabViewer = ({ model }) => {
                 style={{
                     width: '100%',
                     height: '100%',
-                    border: 'none'
+                    minHeight: '400px',
+                    border: 'none',
+                    borderRadius: '24px'
                 }}
                 allow="autoplay; fullscreen; xr-spatial-tracking"
                 allowFullScreen
@@ -132,7 +144,24 @@ const ModelDetail = () => {
     const [activeTab, setActiveTab] = useState('description');
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [selectedImage, setSelectedImage] = useState(null);
+    const [isMobile, setIsMobile] = useState(false);
+    const [isFavorite, setIsFavorite] = useState(false);
     const { addToCart } = useCart();
+
+    // Multiplicadores de licencia (coinciden con PublicLicenses)
+    const multipliers = {
+        personal: 1.0,
+        business: 2.5,
+        unlimited: 5.0
+    };
+
+    // Detectar móvil
+    useEffect(() => {
+        const checkMobile = () => setIsMobile(window.innerWidth <= 768);
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     useEffect(() => {
         fetchModel();
@@ -145,14 +174,18 @@ const ModelDetail = () => {
             const response = await API.get(`/models/${id}`);
             console.log('📦 Modelo recibido:', response.data);
             const modelData = response.data.data?.model || response.data;
-            console.log('👤 Datos del autor:', {
-                author_name: modelData.author_name,
-                author_bio: modelData.author_bio,
-                author_avatar: modelData.author_avatar
-            });
+            
+            // Estructurar datos de autor si vienen en formato diferente
+            if (!modelData.author && (modelData.author_name || modelData.author)) {
+                modelData.author = {
+                    name: modelData.author_name || modelData.author?.name,
+                    bio: modelData.author_bio || modelData.author?.bio,
+                    avatar: modelData.author_avatar || modelData.author?.avatar
+                };
+            }
+            
             setModel(modelData);
 
-            // Seleccionar primera imagen como principal
             if (modelData.files && modelData.files.length > 0) {
                 const preview = modelData.files.find(f => f.file_type === 'preview');
                 setSelectedImage(preview?.file_url || null);
@@ -183,11 +216,6 @@ const ModelDetail = () => {
     };
 
     const getLicensePrice = (basePrice, license) => {
-        const multipliers = {
-            personal: 1.0,
-            business: 2.5,
-            unlimited: 5.0
-        };
         return basePrice * (multipliers[license] || 1.0);
     };
 
@@ -196,11 +224,21 @@ const ModelDetail = () => {
         return fileUrl.startsWith('http') ? fileUrl : 'http://127.0.0.1:8000' + fileUrl;
     };
 
+    const formatDate = (dateString) => {
+        if (!dateString) return 'N/A';
+        return new Date(dateString).toLocaleDateString('es-MX', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+    };
+
     const styles = {
         container: {
             maxWidth: '1400px',
             margin: '0 auto',
-            padding: '2rem'
+            padding: isMobile ? '5rem 1rem 2rem' : '6rem 2rem 2rem',
+            minHeight: '100vh'
         },
         backButton: {
             display: 'flex',
@@ -211,51 +249,57 @@ const ModelDetail = () => {
             marginBottom: '2rem',
             fontSize: '1rem',
             border: 'none',
-            background: 'none'
+            background: 'none',
+            padding: '0.5rem 1rem',
+            borderRadius: '30px',
+            transition: 'all 0.2s',
+            ':hover': {
+                backgroundColor: colors.primary + '10'
+            }
         },
         grid: {
             display: 'grid',
-            gridTemplateColumns: '1fr 1fr',
-            gap: '3rem',
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+            gap: isMobile ? '2rem' : '3rem',
             marginBottom: '3rem'
         },
-        // Panel izquierdo - Vista previa
+        // Panel izquierdo - Visor 3D
         previewSection: {
-            backgroundColor: '#f8fafc',
-            borderRadius: '15px',
-            padding: '2rem',
-            position: 'relative'
+            backgroundColor: 'white',
+            borderRadius: '32px',
+            padding: isMobile ? '1rem' : '1.5rem',
+            position: 'relative',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.03)',
+            border: '1px solid #f0f0f0'
         },
         mainImage: {
             width: '100%',
-            height: '400px',
-            backgroundColor: '#e2e8f0',
-            borderRadius: '10px',
+            height: isMobile ? '350px' : '450px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '24px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: colors.primary,
-            fontSize: '1.2rem',
-            marginBottom: '1rem',
-            overflow: 'hidden'
-        },
-        mainImageTag: {
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain'
+            overflow: 'hidden',
+            marginBottom: '1rem'
         },
         thumbnailGrid: {
             display: 'grid',
             gridTemplateColumns: 'repeat(4, 1fr)',
-            gap: '1rem'
+            gap: '0.8rem'
         },
         thumbnail: {
             height: '80px',
-            backgroundColor: '#e2e8f0',
-            borderRadius: '5px',
+            backgroundColor: '#f8fafc',
+            borderRadius: '12px',
             cursor: 'pointer',
-            transition: 'opacity 0.3s',
-            overflow: 'hidden'
+            transition: 'all 0.2s',
+            overflow: 'hidden',
+            border: '2px solid transparent',
+            ':hover': {
+                transform: 'scale(1.05)',
+                borderColor: colors.primary
+            }
         },
         thumbnailImage: {
             width: '100%',
@@ -264,98 +308,184 @@ const ModelDetail = () => {
         },
         watermark: {
             position: 'absolute',
-            top: '1rem',
-            right: '1rem',
-            backgroundColor: 'rgba(0,0,0,0.7)',
-            color: 'white',
-            padding: '0.5rem 1rem',
-            borderRadius: '5px',
+            top: '2rem',
+            right: '2rem',
+            background: 'rgba(255,255,255,0.95)',
+            backdropFilter: 'blur(5px)',
+            color: colors.dark,
+            padding: '0.6rem 1.2rem',
+            borderRadius: '30px',
             fontSize: '0.9rem',
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem'
+            gap: '0.5rem',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.05)',
+            border: '1px solid rgba(255,255,255,0.5)'
         },
         // Panel derecho - Información
         infoSection: {
-            padding: '1rem'
+            padding: isMobile ? '0' : '1rem'
         },
         title: {
-            fontSize: '2.5rem',
+            fontSize: isMobile ? '2rem' : '2.8rem',
             fontWeight: '700',
             color: colors.dark,
-            marginBottom: '1rem'
+            marginBottom: '1rem',
+            lineHeight: '1.2'
         },
-        meta: {
+        // Autor mejorado
+        authorCard: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            marginBottom: '2rem',
+            padding: '1rem',
+            background: `linear-gradient(135deg, ${colors.primary}08 0%, ${colors.primary}03 100%)`,
+            borderRadius: '20px',
+            border: `1px solid ${colors.primary}10`
+        },
+        authorAvatar: {
+            width: '60px',
+            height: '60px',
+            borderRadius: '50%',
+            background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.dark} 100%)`,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'white',
+            fontWeight: '600',
+            fontSize: '1.5rem'
+        },
+        authorInfo: {
+            flex: 1
+        },
+        authorName: {
+            fontWeight: '600',
+            color: colors.dark,
+            fontSize: '1.1rem',
+            marginBottom: '0.25rem'
+        },
+        authorBio: {
+            fontSize: '0.9rem',
+            color: '#64748b'
+        },
+        // Métricas
+        metrics: {
             display: 'flex',
             gap: '2rem',
             marginBottom: '2rem',
-            color: '#64748b'
+            flexWrap: 'wrap'
         },
-        metaItem: {
+        metricItem: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            color: '#64748b',
+            background: '#f8fafc',
+            padding: '0.5rem 1rem',
+            borderRadius: '30px'
+        },
+        // Rating mejorado
+        ratingContainer: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            marginBottom: '2rem',
+            padding: '1rem',
+            backgroundColor: '#f8fafc',
+            borderRadius: '20px'
+        },
+        ratingScore: {
+            fontSize: '2.5rem',
+            fontWeight: '700',
+            color: colors.primary
+        },
+        ratingStars: {
+            display: 'flex',
+            gap: '0.2rem'
+        },
+        // Precios y licencias
+        priceCard: {
+            background: `linear-gradient(135deg, ${colors.primary}08 0%, ${colors.primary}03 100%)`,
+            borderRadius: '24px',
+            padding: '2rem',
+            marginBottom: '2rem',
+            border: `1px solid ${colors.primary}20`
+        },
+        priceHeader: {
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: '1rem'
+        },
+        priceLabel: {
+            fontSize: '0.9rem',
+            color: '#64748b',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px'
+        },
+        priceAmount: {
+            fontSize: '3rem',
+            fontWeight: '700',
+            color: colors.primary,
+            lineHeight: '1'
+        },
+        priceNote: {
+            fontSize: '0.85rem',
+            color: '#94a3b8',
+            marginTop: '0.5rem',
             display: 'flex',
             alignItems: 'center',
             gap: '0.5rem'
         },
-        rating: {
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            marginBottom: '2rem'
-        },
-        stars: {
-            display: 'flex',
-            gap: '0.25rem',
-            color: '#fbbf24'
-        },
-        priceCard: {
-            backgroundColor: '#f8fafc',
-            borderRadius: '10px',
-            padding: '1.5rem',
-            marginBottom: '2rem'
-        },
-        price: {
-            fontSize: '2rem',
-            fontWeight: '700',
-            color: colors.primary,
-            marginBottom: '0.5rem'
-        },
         licenseSelector: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(3, 1fr)',
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
             gap: '1rem',
             marginBottom: '2rem'
         },
         licenseOption: {
             border: `2px solid #e2e8f0`,
-            borderRadius: '10px',
-            padding: '1rem',
+            borderRadius: '20px',
+            padding: '1.2rem',
             textAlign: 'center',
             cursor: 'pointer',
-            transition: 'all 0.3s'
+            transition: 'all 0.3s',
+            backgroundColor: 'white'
         },
         licenseSelected: {
             borderColor: colors.primary,
-            backgroundColor: colors.primary + '10'
+            backgroundColor: colors.primary + '05',
+            boxShadow: `0 10px 20px ${colors.primary}20`
         },
         licenseName: {
             fontWeight: '600',
-            marginBottom: '0.5rem'
+            fontSize: '1.1rem',
+            marginBottom: '0.5rem',
+            color: colors.dark
         },
         licensePrice: {
+            fontSize: '1.3rem',
+            fontWeight: '700',
             color: colors.primary,
-            fontWeight: '700'
+            marginBottom: '0.5rem'
+        },
+        licenseMultiplier: {
+            fontSize: '0.8rem',
+            color: '#94a3b8'
         },
         actions: {
             display: 'flex',
             gap: '1rem',
-            marginTop: '2rem'
+            marginTop: '2rem',
+            flexDirection: isMobile ? 'column' : 'row'
         },
         primaryButton: {
             flex: 1,
             backgroundColor: colors.primary,
             color: 'white',
             border: 'none',
-            borderRadius: '8px',
+            borderRadius: '20px',
             padding: '1rem',
             fontSize: '1rem',
             fontWeight: '600',
@@ -364,14 +494,15 @@ const ModelDetail = () => {
             alignItems: 'center',
             justifyContent: 'center',
             gap: '0.5rem',
-            transition: 'background-color 0.3s'
+            transition: 'all 0.3s',
+            boxShadow: `0 10px 20px ${colors.primary}30`
         },
         secondaryButton: {
             flex: 1,
             backgroundColor: 'white',
             color: colors.primary,
             border: `2px solid ${colors.primary}`,
-            borderRadius: '8px',
+            borderRadius: '20px',
             padding: '1rem',
             fontSize: '1rem',
             fontWeight: '600',
@@ -379,19 +510,44 @@ const ModelDetail = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            gap: '0.5rem'
+            gap: '0.5rem',
+            transition: 'all 0.3s'
         },
+        favoriteButton: {
+            position: 'absolute',
+            top: '2rem',
+            left: '2rem',
+            background: 'white',
+            border: 'none',
+            width: '45px',
+            height: '45px',
+            borderRadius: '50%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            boxShadow: '0 4px 15px rgba(0,0,0,0.1)',
+            color: '#94a3b8',
+            zIndex: 10,
+            transition: 'all 0.2s'
+        },
+        // Tabs mejorados
         tabs: {
             display: 'flex',
             gap: '2rem',
             borderBottom: `2px solid #e2e8f0`,
-            marginBottom: '2rem'
+            marginBottom: '2rem',
+            overflowX: 'auto',
+            paddingBottom: '0.5rem'
         },
         tab: {
             padding: '1rem 0',
             cursor: 'pointer',
-            borderBottom: '2px solid transparent',
-            transition: 'all 0.3s'
+            borderBottom: '3px solid transparent',
+            transition: 'all 0.3s',
+            color: '#64748b',
+            fontWeight: '500',
+            whiteSpace: 'nowrap'
         },
         tabActive: {
             borderBottomColor: colors.primary,
@@ -399,46 +555,130 @@ const ModelDetail = () => {
             fontWeight: '600'
         },
         tabContent: {
-            padding: '2rem',
+            padding: isMobile ? '1.5rem' : '2rem',
             backgroundColor: '#f8fafc',
-            borderRadius: '10px',
-            lineHeight: '1.8'
+            borderRadius: '24px',
+            lineHeight: '1.8',
+            minHeight: '300px'
         },
-        features: {
+        // Características
+        featuresGrid: {
             display: 'grid',
-            gridTemplateColumns: 'repeat(2, 1fr)',
-            gap: '1rem',
-            marginTop: '1rem'
+            gridTemplateColumns: isMobile ? '1fr' : 'repeat(2, 1fr)',
+            gap: '1rem'
         },
         featureItem: {
             display: 'flex',
             alignItems: 'center',
-            gap: '0.5rem',
-            color: colors.dark
+            gap: '1rem',
+            padding: '1rem',
+            backgroundColor: 'white',
+            borderRadius: '16px',
+            border: '1px solid #e2e8f0'
         },
-        reviews: {
-            marginTop: '2rem'
-        },
-        // En tu objeto styles, agrega o modifica:
-        reviewCard: {
-            backgroundColor: colors.white,
-            padding: '1.5rem',
+        featureIcon: {
+            width: '40px',
+            height: '40px',
             borderRadius: '12px',
-            marginBottom: '1rem',
-            boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
-            border: '1px solid #e2e8f0',
-            transition: 'all 0.2s',
-            '&:hover': {
-                boxShadow: '0 4px 8px rgba(0,0,0,0.1)'
-            }
+            backgroundColor: colors.primary + '10',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: colors.primary,
+            fontSize: '1.2rem'
         },
+        // Reseñas mejoradas
+        reviewsSummary: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '2rem',
+            marginBottom: '2rem',
+            padding: '2rem',
+            backgroundColor: 'white',
+            borderRadius: '20px',
+            flexWrap: 'wrap'
+        },
+        reviewCard: {
+            backgroundColor: 'white',
+            padding: '1.5rem',
+            borderRadius: '20px',
+            marginBottom: '1rem',
+            border: '1px solid #e2e8f0',
+            transition: 'all 0.2s'
+        },
+        reviewHeader: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1rem',
+            marginBottom: '1rem'
+        },
+        reviewAvatar: {
+            width: '50px',
+            height: '50px',
+            borderRadius: '50%',
+            backgroundColor: colors.primary + '20',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: colors.primary,
+            fontWeight: '600',
+            fontSize: '1.2rem'
+        },
+        reviewRating: {
+            display: 'flex',
+            gap: '0.2rem',
+            marginBottom: '0.25rem'
+        },
+        reviewDate: {
+            fontSize: '0.85rem',
+            color: '#94a3b8'
+        },
+        reviewComment: {
+            color: '#334155',
+            lineHeight: '1.6',
+            padding: '1rem',
+            backgroundColor: '#f8fafc',
+            borderRadius: '12px',
+            marginTop: '0.5rem'
+        },
+        reviewActions: {
+            display: 'flex',
+            justifyContent: 'flex-end',
+            gap: '1rem',
+            marginTop: '1rem',
+            fontSize: '0.85rem',
+            color: '#94a3b8'
+        },
+        emptyReviews: {
+            textAlign: 'center',
+            padding: '3rem',
+            backgroundColor: 'white',
+            borderRadius: '20px'
+        },
+        loading: {
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '4rem',
+            gap: '1.5rem'
+        },
+        spinner: {
+            width: '60px',
+            height: '60px',
+            border: `4px solid ${colors.primary}20`,
+            borderTop: `4px solid ${colors.primary}`,
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite'
+        }
     };
 
     if (loading) {
         return (
             <div style={styles.container}>
-                <div style={{ textAlign: 'center', padding: '3rem' }}>
-                    Cargando modelo...
+                <div style={styles.loading}>
+                    <div style={styles.spinner} />
+                    <p>Cargando modelo...</p>
                 </div>
             </div>
         );
@@ -447,8 +687,9 @@ const ModelDetail = () => {
     if (!model) {
         return (
             <div style={styles.container}>
-                <div style={{ textAlign: 'center', padding: '3rem' }}>
-                    Modelo no encontrado
+                <div style={{ textAlign: 'center', padding: '4rem' }}>
+                    <HiOutlineCube size={80} color={colors.primary + '40'} />
+                    <p style={{ marginTop: '1rem', color: '#64748b' }}>Modelo no encontrado</p>
                 </div>
             </div>
         );
@@ -458,16 +699,32 @@ const ModelDetail = () => {
 
     return (
         <div style={styles.container}>
-            <button
+            {/* Botón volver */}
+            <motion.button
                 style={styles.backButton}
                 onClick={() => navigate(-1)}
+                whileHover={{ x: -5, backgroundColor: colors.primary + '10' }}
+                whileTap={{ scale: 0.95 }}
             >
                 <FiArrowLeft /> Volver a modelos
-            </button>
+            </motion.button>
 
+            {/* Grid principal */}
             <div style={styles.grid}>
-                {/* Panel izquierdo - Visor Sketchfab */}
-                <div style={styles.previewSection}>
+                {/* Panel izquierdo - Visor 3D */}
+                <motion.div
+                    style={styles.previewSection}
+                    initial={{ opacity: 0, x: -30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5 }}
+                >
+                    <button
+                        style={styles.favoriteButton}
+                        onClick={() => setIsFavorite(!isFavorite)}
+                    >
+                        <FiHeart color={isFavorite ? colors.primary : '#94a3b8'} fill={isFavorite ? colors.primary : 'none'} />
+                    </button>
+                    
                     <div style={styles.mainImage}>
                         <SketchfabViewer model={model} />
                     </div>
@@ -476,10 +733,12 @@ const ModelDetail = () => {
                         <div style={styles.thumbnailGrid}>
                             {model.files
                                 .filter(f => f.file_type === 'preview')
+                                .slice(0, 4)
                                 .map((file, index) => (
-                                    <div
+                                    <motion.div
                                         key={index}
                                         style={styles.thumbnail}
+                                        whileHover={{ scale: 1.05 }}
                                         onClick={() => setSelectedImage(file.file_url)}
                                     >
                                         <img
@@ -487,7 +746,7 @@ const ModelDetail = () => {
                                             alt={`Vista previa ${index + 1}`}
                                             style={styles.thumbnailImage}
                                         />
-                                    </div>
+                                    </motion.div>
                                 ))}
                         </div>
                     )}
@@ -495,90 +754,100 @@ const ModelDetail = () => {
                     <div style={styles.watermark}>
                         <FiEye /> Vista 3D interactiva
                     </div>
-                </div>
+                </motion.div>
 
                 {/* Panel derecho - Información */}
-                <div style={styles.infoSection}>
+                <motion.div
+                    style={styles.infoSection}
+                    initial={{ opacity: 0, x: 30 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ duration: 0.5 }}
+                >
                     <h1 style={styles.title}>{model.name}</h1>
 
-                    {/* Autor del modelo */}
+                    {/* Autor */}
                     {model.author && model.author.name && (
-                        <div style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '1rem',
-                            marginBottom: '1.5rem',
-                            padding: '1rem',
-                            backgroundColor: '#f8fafc',
-                            borderRadius: '12px'
-                        }}>
+                        <div style={styles.authorCard}>
                             {model.author.avatar ? (
                                 <img
                                     src={model.author.avatar}
                                     alt={model.author.name}
                                     style={{
-                                        width: '48px',
-                                        height: '48px',
+                                        width: '60px',
+                                        height: '60px',
                                         borderRadius: '50%',
                                         objectFit: 'cover'
                                     }}
                                 />
                             ) : (
-                                <div style={{
-                                    width: '48px',
-                                    height: '48px',
-                                    borderRadius: '50%',
-                                    backgroundColor: colors.primary + '20',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    color: colors.primary,
-                                    fontWeight: '600',
-                                    fontSize: '1.2rem'
-                                }}>
-                                    {model.author.name?.charAt(0) || 'A'}
+                                <div style={styles.authorAvatar}>
+                                    {model.author.name.charAt(0)}
                                 </div>
                             )}
-                            <div>
-                                <div style={{ fontWeight: '600', color: colors.dark }}>
-                                    {model.author.name}
-                                </div>
-                                <div style={{ fontSize: '0.9rem', color: '#64748b' }}>
-                                    {model.author.bio || 'Creador profesional'}
-                                </div>
+                            <div style={styles.authorInfo}>
+                                <div style={styles.authorName}>{model.author.name}</div>
+                                <div style={styles.authorBio}>{model.author.bio || 'Creador profesional'}</div>
                             </div>
                         </div>
                     )}
 
-                    <div style={styles.meta}>
-                        <div style={styles.metaItem}>
-                            <FiDownload /> {model.format}
+                    {/* Métricas */}
+                    <div style={styles.metrics}>
+                        <div style={styles.metricItem}>
+                            <FiBox /> {model.format || 'GLTF'}
                         </div>
-                        <div style={styles.metaItem}>
-                            {model.size_mb} MB
+                        <div style={styles.metricItem}>
+                            <FiDownload /> {model.size_mb || '0'} MB
+                        </div>
+                        <div style={styles.metricItem}>
+                            <FiCalendar /> {formatDate(model.publication_date)}
                         </div>
                     </div>
 
-                    <div style={styles.rating}>
-                        <div style={styles.stars}>
-                            {[1, 2, 3, 4, 5].map(i => (
-                                <FiStar key={i} />
-                            ))}
+                    {/* Rating */}
+                    <div style={styles.ratingContainer}>
+                        <span style={styles.ratingScore}>
+                            {model.stats?.average_rating?.toFixed(1) || '0.0'}
+                        </span>
+                        <div>
+                            <div style={styles.ratingStars}>
+                                {[1, 2, 3, 4, 5].map(i => (
+                                    <FiStar
+                                        key={i}
+                                        size={20}
+                                        fill={i <= (model.stats?.average_rating || 0) ? '#fbbf24' : 'none'}
+                                        color={i <= (model.stats?.average_rating || 0) ? '#fbbf24' : '#d1d5db'}
+                                    />
+                                ))}
+                            </div>
+                            <div style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                                {model.stats?.total_reviews || 0} reseñas
+                            </div>
                         </div>
-                        <span>({model.reviews_count || 0} reseñas)</span>
                     </div>
 
+                    {/* Precios */}
                     <div style={styles.priceCard}>
-                        <div style={styles.price}>
-                            ${getLicensePrice(basePrice, selectedLicense).toFixed(2)}
+                        <div style={styles.priceHeader}>
+                            <span style={styles.priceLabel}>Precio base</span>
+                            <span style={styles.priceLabel}>Licencia seleccionada</span>
                         </div>
-                        <div style={{ color: '#64748b', fontSize: '0.9rem' }}>
-                            {selectedLicense === 'personal' && 'Licencia Personal - Uso individual'}
-                            {selectedLicense === 'business' && 'Licencia Empresarial - Múltiples proyectos'}
-                            {selectedLicense === 'unlimited' && 'Licencia Ilimitada - Sin restricciones'}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div>
+                                <span style={styles.priceAmount}>${basePrice.toFixed(2)}</span>
+                            </div>
+                            <div>
+                                <span style={{ ...styles.priceAmount, color: colors.primary }}>
+                                    ${getLicensePrice(basePrice, selectedLicense).toFixed(2)}
+                                </span>
+                            </div>
+                        </div>
+                        <div style={styles.priceNote}>
+                            <FiInfo /> El precio varía según la licencia seleccionada
                         </div>
                     </div>
 
+                    {/* Selector de licencias */}
                     <div style={styles.licenseSelector}>
                         {['personal', 'business', 'unlimited'].map(license => (
                             <motion.div
@@ -587,7 +856,8 @@ const ModelDetail = () => {
                                     ...styles.licenseOption,
                                     ...(selectedLicense === license ? styles.licenseSelected : {})
                                 }}
-                                whileHover={{ scale: 1.02 }}
+                                whileHover={{ scale: 1.02, y: -2 }}
+                                whileTap={{ scale: 0.98 }}
                                 onClick={() => setSelectedLicense(license)}
                             >
                                 <div style={styles.licenseName}>
@@ -598,276 +868,237 @@ const ModelDetail = () => {
                                 <div style={styles.licensePrice}>
                                     ${getLicensePrice(basePrice, license).toFixed(2)}
                                 </div>
+                                <div style={styles.licenseMultiplier}>
+                                    {multipliers[license]}x del precio base
+                                </div>
                             </motion.div>
                         ))}
                     </div>
 
+                    {/* Acciones */}
                     <div style={styles.actions}>
-                        <button
+                        <motion.button
                             style={styles.primaryButton}
                             onClick={handleBuyNow}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                         >
                             <FiShoppingCart /> Comprar ahora
-                        </button>
-                        <button
+                        </motion.button>
+                        <motion.button
                             style={styles.secondaryButton}
                             onClick={handleAddToCart}
+                            whileHover={{ scale: 1.02, backgroundColor: colors.primary + '05' }}
+                            whileTap={{ scale: 0.98 }}
                         >
                             Agregar al carrito
-                        </button>
+                        </motion.button>
                     </div>
-                </div>
+                </motion.div>
             </div>
 
             {/* Tabs de información */}
-            <div>
+            <div style={{ marginTop: '3rem' }}>
                 <div style={styles.tabs}>
-                    <div
-                        style={{
-                            ...styles.tab,
-                            ...(activeTab === 'description' ? styles.tabActive : {})
-                        }}
-                        onClick={() => setActiveTab('description')}
-                    >
-                        Descripción
-                    </div>
-                    <div
-                        style={{
-                            ...styles.tab,
-                            ...(activeTab === 'features' ? styles.tabActive : {})
-                        }}
-                        onClick={() => setActiveTab('features')}
-                    >
-                        Características
-                    </div>
-                    <div
-                        style={{
-                            ...styles.tab,
-                            ...(activeTab === 'reviews' ? styles.tabActive : {})
-                        }}
-                        onClick={() => setActiveTab('reviews')}
-                    >
-                        Reseñas
-                    </div>
+                    {['description', 'features', 'reviews'].map(tab => (
+                        <div
+                            key={tab}
+                            style={{
+                                ...styles.tab,
+                                ...(activeTab === tab ? styles.tabActive : {})
+                            }}
+                            onClick={() => setActiveTab(tab)}
+                        >
+                            {tab === 'description' && 'Descripción'}
+                            {tab === 'features' && 'Características'}
+                            {tab === 'reviews' && `Reseñas (${model.stats?.total_reviews || 0})`}
+                        </div>
+                    ))}
                 </div>
 
-                <div style={styles.tabContent}>
-                    {activeTab === 'description' && (
-                        <div>
-                            {model.description ? (
-                                <div style={{ lineHeight: '1.8' }}>
-                                    {model.description.split('\n').map((paragraph, idx) => (
-                                        <p key={idx} style={{ marginBottom: '1rem', color: '#334155' }}>
-                                            {paragraph}
-                                        </p>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>
-                                    No hay descripción disponible para este modelo
-                                </div>
-                            )}
-
-                            {/* Información adicional del modelo */}
-                            <div style={{
-                                marginTop: '2rem',
-                                padding: '1.5rem',
-                                backgroundColor: colors.white,
-                                borderRadius: '10px',
-                                border: '1px solid #e2e8f0'
-                            }}>
-                                <h4 style={{ fontWeight: '600', marginBottom: '1rem', color: colors.dark }}>
-                                    Detalles del modelo
-                                </h4>
-                                <div style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: 'repeat(2, 1fr)',
-                                    gap: '1rem'
-                                }}>
-                                    <div>
-                                        <div style={{ color: '#64748b', fontSize: '0.9rem' }}>Formato</div>
-                                        <div style={{ fontWeight: '500' }}>{model.format}</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ color: '#64748b', fontSize: '0.9rem' }}>Tamaño</div>
-                                        <div style={{ fontWeight: '500' }}>{model.size_mb} MB</div>
-                                    </div>
-                                    <div>
-                                        <div style={{ color: '#64748b', fontSize: '0.9rem' }}>Publicado</div>
-                                        <div style={{ fontWeight: '500' }}>
-                                            {model.publication_date ? new Date(model.publication_date).toLocaleDateString() : 'N/A'}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div style={{ color: '#64748b', fontSize: '0.9rem' }}>ID Sketchfab</div>
-                                        <div style={{ fontWeight: '500', fontSize: '0.8rem' }}>{model.sketchfab_id || 'N/A'}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'features' && (
-                        <div>
-                            <h3 style={{ fontWeight: '600', marginBottom: '1.5rem', color: colors.dark }}>
-                                Características técnicas
-                            </h3>
-                            <div style={styles.features}>
-                                <div style={styles.featureItem}>
-                                    <FiCheckCircle color={colors.success} />
-                                    <span><strong>Formato:</strong> {model.format}</span>
-                                </div>
-                                <div style={styles.featureItem}>
-                                    <FiCheckCircle color={colors.success} />
-                                    <span><strong>Tamaño de archivo:</strong> {model.size_mb} MB</span>
-                                </div>
-                                <div style={styles.featureItem}>
-                                    <FiCheckCircle color={colors.success} />
-                                    <span><strong>Texturas:</strong> Incluidas (resolución 4K)</span>
-                                </div>
-                                <div style={styles.featureItem}>
-                                    <FiCheckCircle color={colors.success} />
-                                    <span><strong>Optimizado para:</strong> BIM, Revit, ArchiCAD</span>
-                                </div>
-                                <div style={styles.featureItem}>
-                                    <FiCheckCircle color={colors.success} />
-                                    <span><strong>Polígonos:</strong> {model.polygon_count || '45,000'}</span>
-                                </div>
-                                <div style={styles.featureItem}>
-                                    <FiCheckCircle color={colors.success} />
-                                    <span><strong>Materiales:</strong> {model.material_count || '5'}</span>
-                                </div>
-                                <div style={styles.featureItem}>
-                                    <FiCheckCircle color={colors.success} />
-                                    <span><strong>Animaciones:</strong> {model.has_animations ? 'Sí' : 'No'}</span>
-                                </div>
-                                <div style={styles.featureItem}>
-                                    <FiCheckCircle color={colors.success} />
-                                    <span><strong>Rigging:</strong> {model.has_rigging ? 'Sí' : 'No'}</span>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {activeTab === 'reviews' && (
-                        <div style={styles.reviews}>
-                            {/* Resumen de reseñas - MEJORADO */}
-                            <div style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3rem',
-                                marginBottom: '2.5rem',
-                                padding: '2rem',
-                                backgroundColor: colors.white,
-                                borderRadius: '15px',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-                            }}>
-                                {/* Rating promedio grande */}
-                                <div style={{ textAlign: 'center', minWidth: '120px' }}>
-                                    <div style={{
-                                        fontSize: '3.5rem',
-                                        fontWeight: '700',
-                                        color: colors.primary,
-                                        lineHeight: '1'
-                                    }}>
-                                        {model.stats?.average_rating?.toFixed(1) || '0.0'}
-                                    </div>
-                                    <div style={{ color: '#64748b', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-                                        de 5.0
-                                    </div>
-                                </div>
-
-                                {/* Estrellas y contador */}
-                                <div>
-                                    <div style={{
-                                        display: 'flex',
-                                        gap: '0.25rem',
-                                        marginBottom: '0.5rem'
-                                    }}>
-                                        {[1, 2, 3, 4, 5].map(i => (
-                                            <FiStar
-                                                key={i}
-                                                size={24}
-                                                fill={i <= (model.stats?.average_rating || 0) ? '#fbbf24' : 'none'}
-                                                color={i <= (model.stats?.average_rating || 0) ? '#fbbf24' : '#d1d5db'}
-                                            />
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={activeTab}
+                        style={styles.tabContent}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.2 }}
+                    >
+                        {/* Descripción */}
+                        {activeTab === 'description' && (
+                            <div>
+                                {model.description ? (
+                                    <div style={{ lineHeight: '1.8' }}>
+                                        {model.description.split('\n').map((paragraph, idx) => (
+                                            <p key={idx} style={{ marginBottom: '1rem', color: '#334155' }}>
+                                                {paragraph}
+                                            </p>
                                         ))}
                                     </div>
-                                    <div style={{ color: '#64748b', fontSize: '1rem' }}>
-                                        <strong>{model.stats?.total_reviews || 0}</strong> {model.stats?.total_reviews === 1 ? 'reseña' : 'reseñas'}
+                                ) : (
+                                    <div style={{ textAlign: 'center', color: '#64748b', padding: '2rem' }}>
+                                        No hay descripción disponible para este modelo
+                                    </div>
+                                )}
+
+                                {/* Detalles adicionales */}
+                                <div style={{
+                                    marginTop: '2rem',
+                                    padding: '1.5rem',
+                                    backgroundColor: 'white',
+                                    borderRadius: '16px',
+                                    border: '1px solid #e2e8f0'
+                                }}>
+                                    <h4 style={{ fontWeight: '600', marginBottom: '1rem', color: colors.dark }}>
+                                        Detalles del modelo
+                                    </h4>
+                                    <div style={{
+                                        display: 'grid',
+                                        gridTemplateColumns: 'repeat(2, 1fr)',
+                                        gap: '1rem'
+                                    }}>
+                                        <div>
+                                            <div style={{ color: '#64748b', fontSize: '0.9rem' }}>Formato</div>
+                                            <div style={{ fontWeight: '500' }}>{model.format}</div>
+                                        </div>
+                                        <div>
+                                            <div style={{ color: '#64748b', fontSize: '0.9rem' }}>Tamaño</div>
+                                            <div style={{ fontWeight: '500' }}>{model.size_mb} MB</div>
+                                        </div>
+                                        <div>
+                                            <div style={{ color: '#64748b', fontSize: '0.9rem' }}>Publicado</div>
+                                            <div style={{ fontWeight: '500' }}>{formatDate(model.publication_date)}</div>
+                                        </div>
+                                        <div>
+                                            <div style={{ color: '#64748b', fontSize: '0.9rem' }}>ID Sketchfab</div>
+                                            <div style={{ fontWeight: '500', fontSize: '0.8rem' }}>{model.sketchfab_id || 'N/A'}</div>
+                                        </div>
                                     </div>
                                 </div>
-
-                                {/* Botón para escribir reseña (solo si está logueado) */}
-                                {isLoggedIn && (
-                                    <button style={{
-                                        marginLeft: 'auto',
-                                        padding: '0.75rem 1.5rem',
-                                        backgroundColor: colors.primary,
-                                        color: 'white',
-                                        border: 'none',
-                                        borderRadius: '8px',
-                                        fontWeight: '600',
-                                        cursor: 'pointer',
-                                        fontSize: '0.9rem'
-                                    }}>
-                                        Escribir reseña
-                                    </button>
-                                )}
                             </div>
+                        )}
 
-                            {/* Lista de reseñas - MEJORADA */}
-                            {model.reviews && model.reviews.length > 0 ? (
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    {model.reviews.map(review => (
-                                        <div key={review.id} style={{
-                                            ...styles.reviewCard,
-                                            padding: '1.5rem',
-                                            backgroundColor: colors.white,
-                                            borderRadius: '12px',
-                                            border: '1px solid #e2e8f0',
-                                            transition: 'all 0.2s'
-                                        }}>
-                                            {/* Cabecera de la reseña */}
-                                            <div style={{
+                        {/* Características */}
+                        {activeTab === 'features' && (
+                            <div>
+                                <h3 style={{ fontWeight: '600', marginBottom: '1.5rem', color: colors.dark }}>
+                                    Características técnicas
+                                </h3>
+                                <div style={styles.featuresGrid}>
+                                    <div style={styles.featureItem}>
+                                        <div style={styles.featureIcon}><FiBox /></div>
+                                        <div>
+                                            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Formato</div>
+                                            <div style={{ fontWeight: '600' }}>{model.format}</div>
+                                        </div>
+                                    </div>
+                                    <div style={styles.featureItem}>
+                                        <div style={styles.featureIcon}><FiDownload /></div>
+                                        <div>
+                                            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Tamaño</div>
+                                            <div style={{ fontWeight: '600' }}>{model.size_mb} MB</div>
+                                        </div>
+                                    </div>
+                                    <div style={styles.featureItem}>
+                                        <div style={styles.featureIcon}><FiTag /></div>
+                                        <div>
+                                            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Texturas</div>
+                                            <div style={{ fontWeight: '600' }}>Incluidas (4K)</div>
+                                        </div>
+                                    </div>
+                                    <div style={styles.featureItem}>
+                                        <div style={styles.featureIcon}><FiTrendingUp /></div>
+                                        <div>
+                                            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Polígonos</div>
+                                            <div style={{ fontWeight: '600' }}>{model.polygon_count || '45,000'}</div>
+                                        </div>
+                                    </div>
+                                    <div style={styles.featureItem}>
+                                        <div style={styles.featureIcon}><FiStar /></div>
+                                        <div>
+                                            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Materiales</div>
+                                            <div style={{ fontWeight: '600' }}>{model.material_count || '5'}</div>
+                                        </div>
+                                    </div>
+                                    <div style={styles.featureItem}>
+                                        <div style={styles.featureIcon}><FiEye /></div>
+                                        <div>
+                                            <div style={{ fontSize: '0.85rem', color: '#64748b' }}>Animaciones</div>
+                                            <div style={{ fontWeight: '600' }}>{model.has_animations ? 'Sí' : 'No'}</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Reseñas */}
+                        {activeTab === 'reviews' && (
+                            <div>
+                                {/* Resumen de reseñas */}
+                                <div style={styles.reviewsSummary}>
+                                    <div style={{ textAlign: 'center' }}>
+                                        <div style={{ fontSize: '4rem', fontWeight: '700', color: colors.primary }}>
+                                            {model.stats?.average_rating?.toFixed(1) || '0.0'}
+                                        </div>
+                                        <div style={{ color: '#64748b' }}>de 5.0</div>
+                                    </div>
+                                    <div>
+                                        <div style={styles.ratingStars}>
+                                            {[1, 2, 3, 4, 5].map(i => (
+                                                <FiStar
+                                                    key={i}
+                                                    size={28}
+                                                    fill={i <= (model.stats?.average_rating || 0) ? '#fbbf24' : 'none'}
+                                                    color={i <= (model.stats?.average_rating || 0) ? '#fbbf24' : '#d1d5db'}
+                                                />
+                                            ))}
+                                        </div>
+                                        <div style={{ color: '#64748b', marginTop: '0.5rem' }}>
+                                            <strong>{model.stats?.total_reviews || 0}</strong> reseñas
+                                        </div>
+                                    </div>
+                                    {isLoggedIn && (
+                                        <motion.button
+                                            style={{
+                                                marginLeft: 'auto',
+                                                padding: '0.75rem 1.5rem',
+                                                backgroundColor: colors.primary,
+                                                color: 'white',
+                                                border: 'none',
+                                                borderRadius: '30px',
+                                                fontWeight: '600',
+                                                cursor: 'pointer',
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                gap: '1rem',
-                                                marginBottom: '1rem'
-                                            }}>
-                                                {/* Avatar */}
-                                                <div style={{
-                                                    width: '48px',
-                                                    height: '48px',
-                                                    borderRadius: '50%',
-                                                    backgroundColor: colors.primary + '20',
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'center',
-                                                    color: colors.primary,
-                                                    fontWeight: '600',
-                                                    fontSize: '1.2rem'
-                                                }}>
-                                                    {review.user?.name?.charAt(0) || 'U'}
-                                                </div>
+                                                gap: '0.5rem'
+                                            }}
+                                            whileHover={{ scale: 1.02 }}
+                                            whileTap={{ scale: 0.98 }}
+                                        >
+                                            <FiMessageCircle /> Escribir reseña
+                                        </motion.button>
+                                    )}
+                                </div>
 
-                                                {/* Info del usuario */}
-                                                <div style={{ flex: 1 }}>
-                                                    <div style={{
-                                                        fontWeight: '600',
-                                                        color: colors.dark,
-                                                        marginBottom: '0.25rem'
-                                                    }}>
-                                                        {review.user?.name || 'Usuario'}
+                                {/* Lista de reseñas */}
+                                {model.reviews && model.reviews.length > 0 ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                        {model.reviews.map(review => (
+                                            <motion.div
+                                                key={review.id}
+                                                style={styles.reviewCard}
+                                                whileHover={{ y: -2, boxShadow: '0 10px 20px rgba(0,0,0,0.05)' }}
+                                            >
+                                                <div style={styles.reviewHeader}>
+                                                    <div style={styles.reviewAvatar}>
+                                                        {review.user?.name?.charAt(0) || 'U'}
                                                     </div>
-
-                                                    {/* Rating de la reseña */}
-                                                    <div style={{
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        gap: '0.5rem'
-                                                    }}>
-                                                        <div style={{ display: 'flex', gap: '0.15rem' }}>
+                                                    <div style={{ flex: 1 }}>
+                                                        <div style={{ fontWeight: '600', marginBottom: '0.25rem' }}>
+                                                            {review.user?.name || 'Usuario'}
+                                                        </div>
+                                                        <div style={styles.reviewRating}>
                                                             {[1, 2, 3, 4, 5].map(i => (
                                                                 <FiStar
                                                                     key={i}
@@ -877,111 +1108,71 @@ const ModelDetail = () => {
                                                                 />
                                                             ))}
                                                         </div>
-                                                        <span style={{ fontSize: '0.85rem', color: '#94a3b8' }}>
-                                                            {new Date(review.created_at).toLocaleDateString('es-MX', {
-                                                                year: 'numeric',
-                                                                month: 'long',
-                                                                day: 'numeric'
-                                                            })}
-                                                        </span>
+                                                        <div style={styles.reviewDate}>
+                                                            {formatDate(review.created_at)}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-
-                                            {/* Comentario */}
-                                            <div style={{
-                                                color: '#334155',
-                                                lineHeight: '1.6',
-                                                fontSize: '0.95rem',
-                                                paddingLeft: '0.5rem',
-                                                borderLeft: `3px solid ${colors.primary}40`
-                                            }}>
-                                                {review.comment}
-                                            </div>
-
-                                            {/* Acciones de la reseña (opcional) */}
-                                            <div style={{
-                                                display: 'flex',
-                                                justifyContent: 'flex-end',
-                                                gap: '1rem',
-                                                marginTop: '1rem',
-                                                fontSize: '0.85rem',
-                                                color: '#94a3b8'
-                                            }}>
-                                                <button style={{
-                                                    background: 'none',
+                                                <div style={styles.reviewComment}>
+                                                    {review.comment}
+                                                </div>
+                                                <div style={styles.reviewActions}>
+                                                    <button style={{ cursor: 'pointer' }}>
+                                                        <FiThumbsUp /> Útil
+                                                    </button>
+                                                    <button style={{ cursor: 'pointer' }}>
+                                                        <FiMessageCircle /> Responder
+                                                    </button>
+                                                    <button style={{ cursor: 'pointer' }}>
+                                                        <FiShare2 /> Compartir
+                                                    </button>
+                                                </div>
+                                            </motion.div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div style={styles.emptyReviews}>
+                                        <FiStar size={60} color={colors.primary + '30'} />
+                                        <h4 style={{ marginTop: '1rem', color: colors.dark }}>
+                                            No hay reseñas aún
+                                        </h4>
+                                        <p style={{ color: '#64748b', marginTop: '0.5rem' }}>
+                                            ¿Compraste este modelo? ¡Comparte tu experiencia!
+                                        </p>
+                                        {isLoggedIn && (
+                                            <motion.button
+                                                style={{
+                                                    marginTop: '1.5rem',
+                                                    padding: '0.75rem 2rem',
+                                                    backgroundColor: colors.primary,
+                                                    color: 'white',
                                                     border: 'none',
-                                                    cursor: 'pointer',
-                                                    color: '#64748b'
-                                                }}>
-                                                    👍 Útil
-                                                </button>
-                                                <button style={{
-                                                    background: 'none',
-                                                    border: 'none',
-                                                    cursor: 'pointer',
-                                                    color: '#64748b'
-                                                }}>
-                                                    💬 Responder
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                /* Empty state mejorado */
-                                <div style={{
-                                    textAlign: 'center',
-                                    padding: '4rem 2rem',
-                                    backgroundColor: colors.white,
-                                    borderRadius: '15px',
-                                    border: '1px solid #e2e8f0'
-                                }}>
-                                    <FiStar size={60} color={colors.primary + '30'} style={{ marginBottom: '1rem' }} />
-                                    <h4 style={{
-                                        fontSize: '1.2rem',
-                                        fontWeight: '600',
-                                        color: colors.dark,
-                                        marginBottom: '0.5rem'
-                                    }}>
-                                        No hay reseñas aún
-                                    </h4>
-                                    <p style={{
-                                        color: '#64748b',
-                                        marginBottom: '1.5rem',
-                                        maxWidth: '400px',
-                                        margin: '0 auto 1.5rem auto'
-                                    }}>
-                                        ¿Compraste este modelo? ¡Comparte tu experiencia con la comunidad!
-                                    </p>
-                                    {isLoggedIn && (
-                                        <button style={{
-                                            padding: '0.75rem 2rem',
-                                            backgroundColor: colors.primary,
-                                            color: 'white',
-                                            border: 'none',
-                                            borderRadius: '8px',
-                                            fontWeight: '600',
-                                            cursor: 'pointer'
-                                        }}>
-                                            Escribir primera reseña
-                                        </button>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
+                                                    borderRadius: '30px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer'
+                                                }}
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                            >
+                                                Escribir primera reseña
+                                            </motion.button>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </motion.div>
+                </AnimatePresence>
             </div>
+
+            <style>{`
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            `}</style>
         </div>
     );
-    // Agrega esto ANTES del export default
-    <style>{`
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    `}</style>
 };
 
 export default ModelDetail;
