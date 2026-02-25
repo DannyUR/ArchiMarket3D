@@ -82,8 +82,10 @@ const Categories = () => {
         try {
             if (!model.files || model.files.length === 0) return null;
             const file = model.files[0];
+            const preview = model.files.find(f => f.file_type === 'preview') || file;
             if (!file || !file.file_url) return null;
-            return 'http://127.0.0.1:8000' + file.file_url;
+            //return 'http://127.0.0.1:8000' + file.file_url;
+            return `/api/storage/${preview.file_url.replace('/storage/', '')}`;
         } catch (error) {
             return null;
         }

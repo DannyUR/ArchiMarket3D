@@ -21,17 +21,15 @@ export const NotificationProvider = ({ children }) => {
 
     // ✅ FUNCIÓN PARA OBTENER CONTADOR INICIAL (SOLO SI HAY TOKEN)
     const fetchUnreadCount = async () => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            console.log('👤 No hay token, omitiendo notificaciones');
-            return;
-        }
-
         try {
-            const response = await API.get('/admin/notifications/unread-count');
-            setUnreadCount(response.data.data?.unread_count || 0);
+            const user = JSON.parse(localStorage.getItem('user'));
+            // Solo llamar si es admin
+            if (user?.user_type === 'admin') {
+                const response = await API.get('/admin/notifications/unread-count');
+                setUnreadCount(response.data.count);
+            }
         } catch (error) {
-            console.error('Error obteniendo contador:', error);
+            console.log('Error obteniendo contador (ignorar si no es admin)');
         }
     };
 
@@ -97,7 +95,7 @@ export const NotificationProvider = ({ children }) => {
     // ✅ CONFIGURAR ECHO (SOLO SI HAY TOKEN)
     useEffect(() => {
         const token = localStorage.getItem('token');
-        
+
         if (token) {
             fetchUnreadCount();
 

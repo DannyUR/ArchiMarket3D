@@ -139,7 +139,9 @@ const ModelList = () => {
         if (model.files && model.files.length > 0) {
             const preview = model.files.find(f => f.file_type === 'preview');
             if (preview?.file_url) {
-                return 'http://127.0.0.1:8000' + preview.file_url;
+                //return 'http://127.0.0.1:8000' + preview.file_url;
+                const path = preview.file_url.replace('/storage/', '');
+                return `/api/storage/${path}`;
             }
         }
         return null;

@@ -256,6 +256,67 @@ Route::prefix('webhooks')->withoutMiddleware([\App\Http\Middleware\VerifyCsrfTok
 
 /*
 |--------------------------------------------------------------------------
+| Archivos Estáticos (con CORS)
+|--------------------------------------------------------------------------
+*/
+Route::get('/storage/{path}', function ($path) {
+    try {
+        // Limpiar la ruta
+        $cleanPath = ltrim($path, '/');
+        
+        // Construir la ruta completa
+        $fullPath = storage_path('app/public/' . $cleanPath);
+        
+        // LOGS para depuración
+        \Log::info('=== SOLICITUD DE ARCHIVO ===');
+        \Log::info('Path recibido: ' . $path);
+        \Log::info('Path limpio: ' . $cleanPath);
+        \Log::info('Ruta completa: ' . $fullPath);
+        \Log::info('¿Archivo existe?: ' . (file_exists($fullPath) ? 'SÍ' : 'NO'));
+        
+        if (!file_exists($fullPath)) {
+            \Log::error('ARCHIVO NO ENCONTRADO: ' . $fullPath);
+            return response()->json([
+                'success' => false,
+                'message' => 'Archivo no encontrado'
+            ], 404);
+        }
+        
+        // Verificar permisos de lectura
+        if (!is_readable($fullPath)) {
+            \Log::error('ARCHIVO NO LEGIBLE: ' . $fullPath);
+            return response()->json([
+                'success' => false,
+                'message' => 'Archivo no accesible'
+            ], 500);
+        }
+        
+        // Obtener el tipo MIME
+        $mime = mime_content_type($fullPath);
+        \Log::info('Tipo MIME: ' . $mime);
+        
+        return response()->file($fullPath, [
+            'Access-Control-Allow-Origin' => 'https://housewifely-quadrophonics-audrianna.ngrok-free.dev',
+            'Access-Control-Allow-Credentials' => 'true',
+            'Content-Type' => $mime,
+            'Cache-Control' => 'public, max-age=86400'
+        ]);
+        
+    } catch (\Exception $e) {
+        \Log::error('EXCEPCIÓN: ' . $e->getMessage());
+        \Log::error($e->getTraceAsString());
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Error interno del servidor',
+            'error' => $e->getMessage()
+        ], 500);
+    }
+})->where('path', '.*');
+
+
+/*
+|--------------------------------------------------------------------------
 | Fallback
 |--------------------------------------------------------------------------
 */

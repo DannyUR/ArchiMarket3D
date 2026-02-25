@@ -1,15 +1,16 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use App\Models\Model3D;
 
-Route::get('/test', function () {
-    return Model3D::with([
-        'category',
-        'licenses',
-        'mixedReality',
-        'files',
-        'reviews'
-    ])->get();
-});
+// =============================================
+// RUTAS DEL FRONTEND (React)
+// =============================================
+// Todas las rutas que NO empiecen con /api van al frontend
+Route::get('/{any?}', function () {
+    return File::get(public_path('index.html'));
+})->where('any', '^(?!api).*$');
 
+// =============================================
+// RUTAS DE LA API (ya están en routes/api.php)
+// =============================================
+// No tocar nada de api aquí
