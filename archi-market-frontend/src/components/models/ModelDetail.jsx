@@ -146,7 +146,27 @@ const ModelDetail = () => {
     const [selectedImage, setSelectedImage] = useState(null);
     const [isMobile, setIsMobile] = useState(false);
     const [isFavorite, setIsFavorite] = useState(false);
+    const [currentUser, setCurrentUser] = useState(null);
+    const [editingReviewId, setEditingReviewId] = useState(null);
+    const [editingComment, setEditingComment] = useState('');
+    const [editingRating, setEditingRating] = useState(5);
+    const [reviewLikes, setReviewLikes] = useState({}); // {reviewId: {count: num, isLiked: bool, likes: []}}
+    const [replyingTo, setReplyingTo] = useState(null);
+    const [replyText, setReplyText] = useState('');
+    const [reviewReplies, setReviewReplies] = useState({}); // {reviewId: [replies]}
+    const [replyLikes, setReplyLikes] = useState({}); // {replyId: {count: num, isLiked: bool}}
+    const [replyingToReply, setReplyingToReply] = useState(null);
+    const [nestedReplyText, setNestedReplyText] = useState('');
+    const [nestedReplies, setNestedReplies] = useState({}); // {replyId: [replies]}
+    const [editingReplyId, setEditingReplyId] = useState(null);
+    const [editingReplyComment, setEditingReplyComment] = useState('');
     const { addToCart } = useCart();
+    const [showReviewForm, setShowReviewForm] = useState(false);
+    const [newReview, setNewReview] = useState({
+        rating: 5,
+        comment: ''
+    });
+    const [submittingReview, setSubmittingReview] = useState(false);
 
     // Multiplicadores de licencia (coinciden con PublicLicenses)
     const multipliers = {
@@ -167,14 +187,105 @@ const ModelDetail = () => {
         fetchModel();
         const token = localStorage.getItem('token');
         setIsLoggedIn(!!token);
+        console.log('👤 Usuario logueado:', !!token, 'Token:', token ? token.substring(0, 10) + '...' : 'No token');
+        
+        // Obtener datos del usuario actual
+        if (token) {
+            fetchCurrentUser();
+        }
     }, [id]);
+
+    // Cargar likes y respuestas cuando cambia el modelo
+    useEffect(() => {
+        if (model && model.reviews && isLoggedIn) {
+            loadRepliesAndLikes();
+        }
+    }, [model?.reviews?.length, isLoggedIn]);
+
+    const loadRepliesAndLikes = async () => {
+        if (!model?.reviews) return;
+        
+        for (const review of model.reviews) {
+            try {
+                // Cargar respuestas del review
+                const repliesResponse = await API.get(`/reviews/${review.id}/replies`);
+                const replies = repliesResponse.data.replies || [];
+                setReviewReplies(prev => ({
+                    ...prev,
+                    [review.id]: replies
+                }));
+
+                // Cargar likes del review
+                const likesResponse = await API.get(`/reviews/${review.id}/likes`);
+                const isLiked = likesResponse.data.likes?.some(like => like.user_id === currentUser?.id) || false;
+                setReviewLikes(prev => ({
+                    ...prev,
+                    [review.id]: {
+                        count: likesResponse.data.likes_count,
+                        isLiked: isLiked,
+                        likes: likesResponse.data.likes
+                    }
+                }));
+
+                // Cargar likes de cada respuesta
+                for (const reply of replies) {
+                    try {
+                        const replyLikesResponse = await API.get(`/reviews/replies/${reply.id}/likes`);
+                        const isReplyLiked = replyLikesResponse.data.likes?.some(like => like.user_id === currentUser?.id) || false;
+                        setReplyLikes(prev => ({
+                            ...prev,
+                            [reply.id]: {
+                                count: replyLikesResponse.data.likes_count,
+                                isLiked: isReplyLiked
+                            }
+                        }));
+                    } catch (error) {
+                        console.error('Error cargando likes de respuesta:', error);
+                    }
+                }
+            } catch (error) {
+                console.error('Error cargando likes/respuestas:', error);
+            }
+        }
+    };
+    
+    const fetchCurrentUser = async () => {
+        try {
+            const response = await API.get('/auth/me');
+            // El usuario puede venir en response.data.data.user o response.data.user
+            let userData = response.data.data?.user || response.data.user || response.data.data || response.data;
+            
+            // Si userData es un objeto con la propiedad 'user', extraerla
+            if (userData && userData.user && !userData.id) {
+                userData = userData.user;
+            }
+            
+            setCurrentUser(userData);
+            console.log('👤 Usuario actual obtenido:', userData);
+            console.log('👤 ID del usuario:', userData?.id, '(Tipo:', typeof userData?.id + ')');
+        } catch (error) {
+            console.error('Error obteniendo usuario:', error);
+        }
+    };
 
     const fetchModel = async () => {
         try {
             const response = await API.get(`/models/${id}`);
             console.log('📦 Modelo recibido:', response.data);
-            const modelData = response.data.data?.model || response.data;
+            const responseData = response.data.data || response.data;
+            const modelData = responseData?.model || responseData;
             
+            // 🔑 IMPORTANTE: Incluir el objeto access directamente en modelData
+            if (responseData?.access) {
+                modelData.access = responseData.access;
+            }
+            
+            // 📊 IMPORTANTE: Incluir los stats
+            if (responseData?.stats) {
+                modelData.stats = responseData.stats;
+                console.log('📊 Stats actualizado:', responseData.stats);
+            }
+
             // Estructurar datos de autor si vienen en formato diferente
             if (!modelData.author && (modelData.author_name || modelData.author)) {
                 modelData.author = {
@@ -183,8 +294,11 @@ const ModelDetail = () => {
                     avatar: modelData.author_avatar || modelData.author?.avatar
                 };
             }
-            
+
             setModel(modelData);
+            console.log('🔍 ESTRUCTURA COMPLETA DE MODEL:', JSON.stringify(modelData, null, 2));
+            console.log('✅ access.can_review:', modelData.access?.can_review);
+            console.log('📊 Total reviews:', modelData.stats?.total_reviews);
 
             if (modelData.files && modelData.files.length > 0) {
                 const preview = modelData.files.find(f => f.file_type === 'preview');
@@ -231,6 +345,256 @@ const ModelDetail = () => {
             month: 'long',
             day: 'numeric'
         });
+    };
+
+    // Agrega esta función para enviar la reseña
+    const handleSubmitReview = async () => {
+        if (!isLoggedIn) {
+            navigate('/login');
+            return;
+        }
+
+        setSubmittingReview(true);
+        try {
+            await API.post(`/reviews/models/${model.id}`, newReview);
+            // Recargar el modelo para mostrar la nueva reseña
+            await fetchModel();
+            setShowReviewForm(false);
+            setNewReview({ rating: 5, comment: '' });
+        } catch (error) {
+            console.error('Error al enviar reseña:', error);
+            // Aquí puedes mostrar el error específico
+            alert(error.response?.data?.message || 'Error al enviar reseña');
+        } finally {
+            setSubmittingReview(false);
+        }
+    };
+
+    const handleDeleteReview = async (reviewId) => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar esta reseña?')) {
+            return;
+        }
+
+        try {
+            await API.delete(`/reviews/${reviewId}`);
+            await fetchModel();
+            alert('Reseña eliminada correctamente');
+        } catch (error) {
+            console.error('Error al eliminar reseña:', error);
+            alert(error.response?.data?.message || 'Error al eliminar reseña');
+        }
+    };
+
+    const handleEditReview = (review) => {
+        setEditingReviewId(review.id);
+        setEditingComment(review.comment);
+        setEditingRating(review.rating);
+    };
+
+    const handleSaveEditReview = async (reviewId) => {
+        try {
+            await API.put(`/reviews/${reviewId}`, {
+                rating: editingRating,
+                comment: editingComment
+            });
+            await fetchModel();
+            setEditingReviewId(null);
+            setEditingComment('');
+            setEditingRating(5);
+            alert('Reseña actualizada correctamente');
+        } catch (error) {
+            console.error('Error al actualizar reseña:', error);
+            alert(error.response?.data?.message || 'Error al actualizar reseña');
+        }
+    };
+
+    const handleEditReply = (reply) => {
+        setEditingReplyId(reply.id);
+        setEditingReplyComment(reply.comment);
+    };
+
+    const handleSaveEditReply = async (replyId, reviewId) => {
+        try {
+            await API.put(`/reviews/replies/${replyId}`, {
+                comment: editingReplyComment
+            });
+            // Actualizar respuestas
+            const response = await API.get(`/reviews/${reviewId}/replies`);
+            setReviewReplies(prev => ({
+                ...prev,
+                [reviewId]: response.data.replies
+            }));
+            setEditingReplyId(null);
+            setEditingReplyComment('');
+            alert('Respuesta actualizada correctamente');
+        } catch (error) {
+            console.error('Error al actualizar respuesta:', error);
+            alert(error.response?.data?.message || 'Error al actualizar respuesta');
+        }
+    };
+
+    const handleToggleLike = async (reviewId) => {
+        // No permitir dar like a la propia reseña
+        const review = model.reviews.find(r => r.id === reviewId);
+        if (review && review.user_id === currentUser?.id) {
+            alert('No puedes dar like a tu propio comentario');
+            return;
+        }
+
+        try {
+            const response = await API.post(`/reviews/${reviewId}/like`);
+            // Actualizar el estado local
+            const isLiked = response.data.liked;
+            setReviewLikes(prev => ({
+                ...prev,
+                [reviewId]: {
+                    count: response.data.likes_count,
+                    isLiked: isLiked,
+                    likes: prev[reviewId]?.likes || []
+                }
+            }));
+        } catch (error) {
+            console.error('Error al dar like:', error);
+            alert(error.response?.data?.message || 'Error al dar like');
+        }
+    };
+
+    const handleToggleReplyLike = async (replyId) => {
+        try {
+            const response = await API.post(`/reviews/replies/${replyId}/like`);
+            const isLiked = response.data.liked;
+            setReplyLikes(prev => ({
+                ...prev,
+                [replyId]: {
+                    count: response.data.likes_count,
+                    isLiked: isLiked
+                }
+            }));
+        } catch (error) {
+            console.error('Error al dar like a respuesta:', error);
+        }
+    };
+
+    const handleReply = (reviewId) => {
+        setReplyingTo(reviewId);
+        setReplyText('');
+    };
+
+    const handleSendReply = async (reviewId) => {
+        if (!replyText.trim()) {
+            alert('Escribe una respuesta');
+            return;
+        }
+
+        try {
+            await API.post(`/reviews/${reviewId}/replies`, {
+                comment: replyText
+            });
+            
+            // Actualizar respuestas
+            const response = await API.get(`/reviews/${reviewId}/replies`);
+            setReviewReplies(prev => ({
+                ...prev,
+                [reviewId]: response.data.replies
+            }));
+
+            setReplyingTo(null);
+            setReplyText('');
+            alert('Respuesta enviada correctamente');
+        } catch (error) {
+            console.error('Error al enviar respuesta:', error);
+            alert(error.response?.data?.message || 'Error al enviar respuesta');
+        }
+    };
+
+    const handleSendNestedReply = async (parentReplyId, reviewId) => {
+        if (!isLoggedIn) {
+            alert('Debes estar logueado para responder');
+            return;
+        }
+
+        if (!nestedReplyText.trim()) {
+            alert('Escribe una respuesta');
+            return;
+        }
+
+        try {
+            await API.post(`/reviews/${reviewId}/replies`, {
+                comment: nestedReplyText,
+                parent_reply_id: parentReplyId
+            });
+            
+            // Actualizar respuestas
+            const response = await API.get(`/reviews/${reviewId}/replies`);
+            setReviewReplies(prev => ({
+                ...prev,
+                [reviewId]: response.data.replies
+            }));
+
+            setReplyingToReply(null);
+            setNestedReplyText('');
+            alert('Respuesta enviada correctamente');
+        } catch (error) {
+            console.error('Error al enviar respuesta:', error);
+            alert(error.response?.data?.message || 'Error al enviar respuesta');
+        }
+    };
+
+    const handleShare = (reviewId) => {
+        const review = model.reviews.find(r => r.id === reviewId);
+        const text = `Reseña de ${review.user.name}: "${review.comment}" (${review.rating} ⭐) - ${window.location.href}`;
+        
+        if (navigator.share) {
+            navigator.share({
+                title: 'Reseña en ArchiMarket3D',
+                text: text
+            });
+        } else {
+            // Copiar al portapapeles
+            navigator.clipboard.writeText(text).then(() => {
+                alert('✅ Reseña copiada al portapapeles');
+            });
+        }
+    };
+
+    const handleDeleteReply = async (replyId, reviewId) => {
+        if (!window.confirm('¿Estás seguro de que deseas eliminar esta respuesta?')) {
+            return;
+        }
+
+        try {
+            await API.delete(`/reviews/replies/${replyId}`);
+            // Actualizar respuestas
+            const response = await API.get(`/reviews/${reviewId}/replies`);
+            setReviewReplies(prev => ({
+                ...prev,
+                [reviewId]: response.data.replies
+            }));
+            alert('Respuesta eliminada correctamente');
+        } catch (error) {
+            console.error('Error al eliminar respuesta:', error);
+            alert(error.response?.data?.message || 'Error al eliminar respuesta');
+        }
+    };
+
+    const getLikeCount = (reviewId) => {
+        return reviewLikes[reviewId]?.count || 0;
+    };
+
+    const isLikedByUser = (reviewId) => {
+        return reviewLikes[reviewId]?.isLiked || false;
+    };
+
+    const getReplyLikeCount = (replyId) => {
+        return replyLikes[replyId]?.count || 0;
+    };
+
+    const isReplyLikedByUser = (replyId) => {
+        return replyLikes[replyId]?.isLiked || false;
+    };
+
+    const getReplies = (reviewId) => {
+        return reviewReplies[reviewId] || [];
     };
 
     const styles = {
@@ -643,11 +1007,34 @@ const ModelDetail = () => {
         },
         reviewActions: {
             display: 'flex',
-            justifyContent: 'flex-end',
+            justifyContent: 'space-between',
+            alignItems: 'center',
             gap: '1rem',
             marginTop: '1rem',
+            borderTop: '1px solid #e2e8f0',
+            paddingTop: '1rem'
+        },
+        reviewActionButton: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            padding: '0.6rem 1rem',
+            backgroundColor: 'transparent',
+            border: '1px solid #e2e8f0',
+            borderRadius: '8px',
             fontSize: '0.85rem',
-            color: '#94a3b8'
+            color: '#64748b',
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            '&:hover': {
+                backgroundColor: '#f8fafc',
+                borderColor: colors.primary,
+                color: colors.primary
+            }
+        },
+        reviewActionButtonDanger: {
+            borderColor: '#ef4444',
+            color: '#ef4444'
         },
         emptyReviews: {
             textAlign: 'center',
@@ -724,7 +1111,7 @@ const ModelDetail = () => {
                     >
                         <FiHeart color={isFavorite ? colors.primary : '#94a3b8'} fill={isFavorite ? colors.primary : 'none'} />
                     </button>
-                    
+
                     <div style={styles.mainImage}>
                         <SketchfabViewer model={model} />
                     </div>
@@ -1058,7 +1445,7 @@ const ModelDetail = () => {
                                             <strong>{model.stats?.total_reviews || 0}</strong> reseñas
                                         </div>
                                     </div>
-                                    {isLoggedIn && (
+                                    {model?.access?.can_review && (
                                         <motion.button
                                             style={{
                                                 marginLeft: 'auto',
@@ -1075,11 +1462,116 @@ const ModelDetail = () => {
                                             }}
                                             whileHover={{ scale: 1.02 }}
                                             whileTap={{ scale: 0.98 }}
+                                            onClick={() => setShowReviewForm(!showReviewForm)}
                                         >
-                                            <FiMessageCircle /> Escribir reseña
+                                            <FiMessageCircle />
+                                            {showReviewForm ? 'Cancelar' : 'Escribir reseña'}
                                         </motion.button>
                                     )}
                                 </div>
+
+                                {/* Formulario de reseña */}
+                                {showReviewForm && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 20 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -20 }}
+                                        style={{
+                                            backgroundColor: 'white',
+                                            padding: '2rem',
+                                            borderRadius: '20px',
+                                            marginBottom: '2rem',
+                                            border: '1px solid #e2e8f0'
+                                        }}
+                                    >
+                                        <h4 style={{ marginBottom: '1rem', color: colors.dark }}>Escribe tu reseña</h4>
+
+                                        {/* Selector de estrellas */}
+                                        <div style={{ marginBottom: '1.5rem' }}>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', color: '#64748b' }}>
+                                                Calificación
+                                            </label>
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                {[1, 2, 3, 4, 5].map(star => (
+                                                    <button
+                                                        key={star}
+                                                        onClick={() => setNewReview({ ...newReview, rating: star })}
+                                                        style={{
+                                                            background: 'none',
+                                                            border: 'none',
+                                                            cursor: 'pointer',
+                                                            fontSize: '2rem',
+                                                            color: star <= newReview.rating ? '#fbbf24' : '#d1d5db'
+                                                        }}
+                                                    >
+                                                        ★
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+
+                                        {/* Comentario */}
+                                        <div style={{ marginBottom: '1.5rem' }}>
+                                            <label style={{ display: 'block', marginBottom: '0.5rem', color: '#64748b' }}>
+                                                Comentario (opcional)
+                                            </label>
+                                            <textarea
+                                                rows="4"
+                                                value={newReview.comment}
+                                                onChange={(e) => setNewReview({ ...newReview, comment: e.target.value })}
+                                                placeholder="Comparte tu experiencia con este modelo..."
+                                                style={{
+                                                    width: '100%',
+                                                    padding: '1rem',
+                                                    border: '2px solid #e2e8f0',
+                                                    borderRadius: '12px',
+                                                    fontSize: '1rem',
+                                                    outline: 'none',
+                                                    transition: 'border-color 0.2s'
+                                                }}
+                                                onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                            />
+                                        </div>
+
+                                        {/* Botones */}
+                                        <div style={{ display: 'flex', gap: '1rem' }}>
+                                            <motion.button
+                                                style={{
+                                                    padding: '0.8rem 2rem',
+                                                    backgroundColor: colors.primary,
+                                                    color: 'white',
+                                                    border: 'none',
+                                                    borderRadius: '30px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer'
+                                                }}
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={handleSubmitReview}
+                                                disabled={submittingReview}
+                                            >
+                                                {submittingReview ? 'Enviando...' : 'Enviar reseña'}
+                                            </motion.button>
+                                            <motion.button
+                                                style={{
+                                                    padding: '0.8rem 2rem',
+                                                    backgroundColor: 'white',
+                                                    color: colors.dark,
+                                                    border: '2px solid #e2e8f0',
+                                                    borderRadius: '30px',
+                                                    fontWeight: '600',
+                                                    cursor: 'pointer'
+                                                }}
+                                                whileHover={{ scale: 1.02 }}
+                                                whileTap={{ scale: 0.98 }}
+                                                onClick={() => setShowReviewForm(false)}
+                                            >
+                                                Cancelar
+                                            </motion.button>
+                                        </div>
+                                    </motion.div>
+                                )}
 
                                 {/* Lista de reseñas */}
                                 {model.reviews && model.reviews.length > 0 ? (
@@ -1114,18 +1606,476 @@ const ModelDetail = () => {
                                                     </div>
                                                 </div>
                                                 <div style={styles.reviewComment}>
-                                                    {review.comment}
+                                                    {editingReviewId === review.id ? (
+                                                        <div style={{ marginBottom: '1rem' }}>
+                                                            <div style={{ marginBottom: '1rem' }}>
+                                                                <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#64748b' }}>
+                                                                    Calificación
+                                                                </label>
+                                                                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                    {[1, 2, 3, 4, 5].map(star => (
+                                                                        <button
+                                                                            key={star}
+                                                                            onClick={() => setEditingRating(star)}
+                                                                            style={{
+                                                                                background: 'none',
+                                                                                border: 'none',
+                                                                                cursor: 'pointer',
+                                                                                fontSize: '1.5rem',
+                                                                                color: star <= editingRating ? '#fbbf24' : '#d1d5db'
+                                                                            }}
+                                                                        >
+                                                                            ★
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                            <textarea
+                                                                value={editingComment}
+                                                                onChange={(e) => setEditingComment(e.target.value)}
+                                                                rows="3"
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '0.75rem',
+                                                                    border: '2px solid #e2e8f0',
+                                                                    borderRadius: '8px',
+                                                                    fontSize: '0.95rem',
+                                                                    fontFamily: 'inherit'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    ) : (
+                                                        review.comment
+                                                    )}
                                                 </div>
+
+                                                {/* Sección de respuestas */}
+                                                {getReplies(review.id).length > 0 && (
+                                                    <div style={{ marginTop: '1.5rem', paddingLeft: '2rem', borderLeft: `2px solid ${colors.primary}20` }}>
+                                                        <div style={{ fontSize: '0.9rem', fontWeight: '600', color: colors.primary, marginBottom: '1rem' }}>
+                                                            💬 Respuestas ({getReplies(review.id).length})
+                                                        </div>
+                                                        {getReplies(review.id).map((reply) => (
+                                                            <div key={reply.id} style={{ marginBottom: '1rem', padding: '1rem', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+                                                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                                                                    <div>
+                                                                        <div style={{ fontWeight: '600', color: colors.dark }}>
+                                                                            {reply.user?.name || 'Usuario'}
+                                                                        </div>
+                                                                        <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                                                                            {new Date(reply.created_at).toLocaleDateString('es-MX')}
+                                                                        </div>
+                                                                    </div>
+                                                                    {/* Botones editar/eliminar solo para el propietario */}
+                                                                    {currentUser?.id === reply.user_id && (
+                                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                            {editingReplyId === reply.id ? (
+                                                                                <>
+                                                                                    <button
+                                                                                        onClick={() => handleSaveEditReply(reply.id, review.id)}
+                                                                                        style={{
+                                                                                            padding: '0.3rem 0.6rem',
+                                                                                            backgroundColor: colors.primary,
+                                                                                            color: 'white',
+                                                                                            border: `1px solid ${colors.primary}`,
+                                                                                            borderRadius: '4px',
+                                                                                            cursor: 'pointer',
+                                                                                            fontSize: '0.8rem'
+                                                                                        }}
+                                                                                    >
+                                                                                        💾
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => setEditingReplyId(null)}
+                                                                                        style={{
+                                                                                            padding: '0.3rem 0.6rem',
+                                                                                            backgroundColor: 'transparent',
+                                                                                            color: '#64748b',
+                                                                                            border: '1px solid #d1d5db',
+                                                                                            borderRadius: '4px',
+                                                                                            cursor: 'pointer',
+                                                                                            fontSize: '0.8rem'
+                                                                                        }}
+                                                                                    >
+                                                                                        ✕
+                                                                                    </button>
+                                                                                </>
+                                                                            ) : (
+                                                                                <>
+                                                                                    <button
+                                                                                        onClick={() => handleEditReply(reply)}
+                                                                                        style={{
+                                                                                            padding: '0.3rem 0.6rem',
+                                                                                            backgroundColor: 'transparent',
+                                                                                            color: colors.primary,
+                                                                                            border: `1px solid ${colors.primary}`,
+                                                                                            borderRadius: '4px',
+                                                                                            cursor: 'pointer',
+                                                                                            fontSize: '0.8rem'
+                                                                                        }}
+                                                                                    >
+                                                                                        ✏️
+                                                                                    </button>
+                                                                                    <button
+                                                                                        onClick={() => handleDeleteReply(reply.id, review.id)}
+                                                                                        style={{
+                                                                                            padding: '0.3rem 0.6rem',
+                                                                                            backgroundColor: 'transparent',
+                                                                                            color: '#ef4444',
+                                                                                            border: '1px solid #ef4444',
+                                                                                            borderRadius: '4px',
+                                                                                            cursor: 'pointer',
+                                                                                            fontSize: '0.8rem'
+                                                                                        }}
+                                                                                    >
+                                                                                        🗑️
+                                                                                    </button>
+                                                                                </>
+                                                                            )}
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div style={{ color: colors.dark, lineHeight: '1.5', marginBottom: '0.75rem' }}>
+                                                                    {editingReplyId === reply.id ? (
+                                                                        <textarea
+                                                                            value={editingReplyComment}
+                                                                            onChange={(e) => setEditingReplyComment(e.target.value)}
+                                                                            rows="3"
+                                                                            style={{
+                                                                                width: '100%',
+                                                                                padding: '0.75rem',
+                                                                                border: '2px solid #e2e8f0',
+                                                                                borderRadius: '8px',
+                                                                                fontSize: '0.95rem',
+                                                                                fontFamily: 'inherit'
+                                                                            }}
+                                                                        />
+                                                                    ) : (
+                                                                        reply.comment
+                                                                    )}
+                                                                </div>
+                                                                <div style={{ display: 'flex', gap: '1rem' }}>
+                                                                    <button
+                                                                        onClick={() => handleToggleReplyLike(reply.id)}
+                                                                        style={{
+                                                                            display: 'flex',
+                                                                            alignItems: 'center',
+                                                                            gap: '0.3rem',
+                                                                            padding: '0.4rem 0.8rem',
+                                                                            backgroundColor: isReplyLikedByUser(reply.id) ? colors.primary + '20' : 'transparent',
+                                                                            borderColor: isReplyLikedByUser(reply.id) ? colors.primary : '#d1d5db',
+                                                                            border: '1px solid',
+                                                                            borderRadius: '4px',
+                                                                            cursor: 'pointer',
+                                                                            fontSize: '0.8rem',
+                                                                            color: isReplyLikedByUser(reply.id) ? colors.primary : '#64748b',
+                                                                            fontWeight: '500'
+                                                                        }}
+                                                                        onMouseEnter={(e) => {
+                                                                            if (!isReplyLikedByUser(reply.id)) {
+                                                                                e.target.style.backgroundColor = '#f8fafc';
+                                                                                e.target.style.borderColor = colors.primary;
+                                                                                e.target.style.color = colors.primary;
+                                                                            }
+                                                                        }}
+                                                                        onMouseLeave={(e) => {
+                                                                            if (!isReplyLikedByUser(reply.id)) {
+                                                                                e.target.style.backgroundColor = 'transparent';
+                                                                                e.target.style.borderColor = '#d1d5db';
+                                                                                e.target.style.color = '#64748b';
+                                                                            }
+                                                                        }}
+                                                                        title={reply.user_id === currentUser?.id ? 'No puedes dar like a tu propia respuesta' : ''}
+                                                                    >
+                                                                        <FiThumbsUp size={14} /> {getReplyLikeCount(reply.id)}
+                                                                    </button>
+                                                                    {isLoggedIn && (
+                                                                        <button
+                                                                            onClick={() => setReplyingToReply(replyingToReply === reply.id ? null : reply.id)}
+                                                                            style={{
+                                                                                display: 'flex',
+                                                                                alignItems: 'center',
+                                                                                gap: '0.3rem',
+                                                                                padding: '0.4rem 0.8rem',
+                                                                                backgroundColor: replyingToReply === reply.id ? colors.primary + '20' : 'transparent',
+                                                                                borderColor: replyingToReply === reply.id ? colors.primary : '#d1d5db',
+                                                                                border: '1px solid',
+                                                                                borderRadius: '4px',
+                                                                                cursor: 'pointer',
+                                                                                fontSize: '0.8rem',
+                                                                                color: replyingToReply === reply.id ? colors.primary : '#64748b',
+                                                                                fontWeight: '500'
+                                                                            }}
+                                                                            onMouseEnter={(e) => {
+                                                                                if (replyingToReply !== reply.id) {
+                                                                                    e.target.style.backgroundColor = '#f8fafc';
+                                                                                    e.target.style.borderColor = colors.primary;
+                                                                                    e.target.style.color = colors.primary;
+                                                                                }
+                                                                            }}
+                                                                            onMouseLeave={(e) => {
+                                                                                if (replyingToReply !== reply.id) {
+                                                                                    e.target.style.backgroundColor = 'transparent';
+                                                                                    e.target.style.borderColor = '#d1d5db';
+                                                                                    e.target.style.color = '#64748b';
+                                                                                }
+                                                                            }}
+                                                                        >
+                                                                            <FiMessageCircle size={14} /> Responder
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                                {replyingToReply === reply.id && isLoggedIn && (
+                                                                    <div style={{ marginTop: '0.75rem', padding: '0.75rem', backgroundColor: colors.primary + '08', borderRadius: '6px' }}>
+                                                                        <textarea
+                                                                            value={nestedReplyText}
+                                                                            onChange={(e) => setNestedReplyText(e.target.value)}
+                                                                            placeholder={`Responder a ${reply.user?.name}...`}
+                                                                            rows="2"
+                                                                            style={{
+                                                                                width: '100%',
+                                                                                padding: '0.5rem',
+                                                                                border: '1px solid #e2e8f0',
+                                                                                borderRadius: '4px',
+                                                                                fontSize: '0.85rem',
+                                                                                fontFamily: 'inherit',
+                                                                                marginBottom: '0.5rem'
+                                                                            }}
+                                                                        />
+                                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                            <button
+                                                                                onClick={() => handleSendNestedReply(reply.id, review.id)}
+                                                                                style={{
+                                                                                    padding: '0.4rem 0.8rem',
+                                                                                    backgroundColor: colors.primary,
+                                                                                    color: 'white',
+                                                                                    border: 'none',
+                                                                                    borderRadius: '4px',
+                                                                                    cursor: 'pointer',
+                                                                                    fontSize: '0.8rem',
+                                                                                    fontWeight: '600'
+                                                                                }}
+                                                                            >
+                                                                                Enviar
+                                                                            </button>
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    setReplyingToReply(null);
+                                                                                    setNestedReplyText('');
+                                                                                }}
+                                                                                style={{
+                                                                                    padding: '0.4rem 0.8rem',
+                                                                                    backgroundColor: 'transparent',
+                                                                                    color: colors.dark,
+                                                                                    border: '1px solid #e2e8f0',
+                                                                                    borderRadius: '4px',
+                                                                                    cursor: 'pointer',
+                                                                                    fontSize: '0.8rem'
+                                                                                }}
+                                                                            >
+                                                                                Cancelar
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+
+                                                {/* Formulario de respuesta */}
+                                                {replyingTo === review.id && (
+                                                    <div style={{ marginTop: '1rem', padding: '1rem', backgroundColor: colors.primary + '05', borderRadius: '8px' }}>
+                                                        <div style={{ marginBottom: '1rem' }}>
+                                                            <label style={{ display: 'block', marginBottom: '0.5rem', fontSize: '0.9rem', fontWeight: '600', color: colors.dark }}>
+                                                                Tu respuesta
+                                                            </label>
+                                                            <textarea
+                                                                value={replyText}
+                                                                onChange={(e) => setReplyText(e.target.value)}
+                                                                placeholder="Escribe una respuesta..."
+                                                                rows="3"
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '0.75rem',
+                                                                    border: '1px solid #e2e8f0',
+                                                                    borderRadius: '8px',
+                                                                    fontSize: '0.95rem',
+                                                                    fontFamily: 'inherit'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                            <button
+                                                                onClick={() => handleSendReply(review.id)}
+                                                                style={{
+                                                                    padding: '0.6rem 1.5rem',
+                                                                    backgroundColor: colors.primary,
+                                                                    color: 'white',
+                                                                    border: 'none',
+                                                                    borderRadius: '8px',
+                                                                    cursor: 'pointer',
+                                                                    fontWeight: '600'
+                                                                }}
+                                                            >
+                                                                Enviar respuesta
+                                                            </button>
+                                                            <button
+                                                                onClick={() => setReplyingTo(null)}
+                                                                style={{
+                                                                    padding: '0.6rem 1.5rem',
+                                                                    backgroundColor: 'white',
+                                                                    color: colors.dark,
+                                                                    border: '1px solid #e2e8f0',
+                                                                    borderRadius: '8px',
+                                                                    cursor: 'pointer',
+                                                                    fontWeight: '600'
+                                                                }}
+                                                            >
+                                                                Cancelar
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )}
+
                                                 <div style={styles.reviewActions}>
-                                                    <button style={{ cursor: 'pointer' }}>
-                                                        <FiThumbsUp /> Útil
-                                                    </button>
-                                                    <button style={{ cursor: 'pointer' }}>
-                                                        <FiMessageCircle /> Responder
-                                                    </button>
-                                                    <button style={{ cursor: 'pointer' }}>
-                                                        <FiShare2 /> Compartir
-                                                    </button>
+                                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                        <button
+                                                            onClick={() => handleToggleLike(review.id)}
+                                                            style={{
+                                                                ...styles.reviewActionButton,
+                                                                backgroundColor: isLikedByUser(review.id) ? colors.primary + '20' : 'transparent',
+                                                                borderColor: isLikedByUser(review.id) ? colors.primary : '#e2e8f0',
+                                                                color: isLikedByUser(review.id) ? colors.primary : '#64748b'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                if (!isLikedByUser(review.id)) {
+                                                                    e.target.style.backgroundColor = '#f8fafc';
+                                                                    e.target.style.borderColor = colors.primary;
+                                                                    e.target.style.color = colors.primary;
+                                                                }
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                if (!isLikedByUser(review.id)) {
+                                                                    e.target.style.backgroundColor = 'transparent';
+                                                                    e.target.style.borderColor = '#e2e8f0';
+                                                                    e.target.style.color = '#64748b';
+                                                                }
+                                                            }}
+                                                            title={review.user_id === currentUser?.id ? "No puedes dar like a tu propio comentario" : ""}
+                                                        >
+                                                            <FiThumbsUp size={16} /> Útil ({getLikeCount(review.id)})
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleReply(review.id)}
+                                                            style={{
+                                                                ...styles.reviewActionButton,
+                                                                backgroundColor: replyingTo === review.id ? colors.primary + '20' : 'transparent',
+                                                                borderColor: replyingTo === review.id ? colors.primary : '#e2e8f0',
+                                                                color: replyingTo === review.id ? colors.primary : '#64748b'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                if (replyingTo !== review.id) {
+                                                                    e.target.style.backgroundColor = '#f8fafc';
+                                                                    e.target.style.borderColor = colors.primary;
+                                                                    e.target.style.color = colors.primary;
+                                                                }
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                if (replyingTo !== review.id) {
+                                                                    e.target.style.backgroundColor = 'transparent';
+                                                                    e.target.style.borderColor = '#e2e8f0';
+                                                                    e.target.style.color = '#64748b';
+                                                                }
+                                                            }}
+                                                        >
+                                                            <FiMessageCircle size={16} /> Responder ({getReplies(review.id).length})
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleShare(review.id)}
+                                                            style={{
+                                                                ...styles.reviewActionButton,
+                                                                backgroundColor: 'transparent',
+                                                                borderColor: '#e2e8f0',
+                                                                color: '#64748b'
+                                                            }}
+                                                            onMouseEnter={(e) => {
+                                                                e.target.style.backgroundColor = '#f8fafc';
+                                                                e.target.style.borderColor = colors.primary;
+                                                                e.target.style.color = colors.primary;
+                                                            }}
+                                                            onMouseLeave={(e) => {
+                                                                e.target.style.backgroundColor = 'transparent';
+                                                                e.target.style.borderColor = '#e2e8f0';
+                                                                e.target.style.color = '#64748b';
+                                                            }}
+                                                        >
+                                                            <FiShare2 size={16} /> Compartir
+                                                        </button>
+                                                    </div>
+
+                                                    {/* Botones de editar/eliminar solo si es el propietario */}
+                                                    {(() => {
+                                                        console.log('🔐 Verificación de propietario:');
+                                                        console.log('  - currentUser?.id:', currentUser?.id);
+                                                        console.log('  - review.user_id:', review.user_id);
+                                                        console.log('  - ¿Es propietario?:', currentUser?.id === review.user_id);
+                                                        return currentUser?.id === review.user_id;
+                                                    })() && (
+                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                            {editingReviewId === review.id ? (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleSaveEditReview(review.id)}
+                                                                        style={{
+                                                                            ...styles.reviewActionButton,
+                                                                            backgroundColor: colors.primary,
+                                                                            borderColor: colors.primary,
+                                                                            color: 'white'
+                                                                        }}
+                                                                    >
+                                                                        Guardar
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => setEditingReviewId(null)}
+                                                                        style={{
+                                                                            ...styles.reviewActionButton,
+                                                                            backgroundColor: 'transparent',
+                                                                            borderColor: '#e2e8f0',
+                                                                            color: '#64748b'
+                                                                        }}
+                                                                    >
+                                                                        Cancelar
+                                                                    </button>
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <button
+                                                                        onClick={() => handleEditReview(review)}
+                                                                        style={{
+                                                                            ...styles.reviewActionButton,
+                                                                            backgroundColor: 'transparent',
+                                                                            borderColor: colors.primary,
+                                                                            color: colors.primary
+                                                                        }}
+                                                                    >
+                                                                        ✏️ Editar
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={() => handleDeleteReview(review.id)}
+                                                                        style={{
+                                                                            ...styles.reviewActionButton,
+                                                                            backgroundColor: 'transparent',
+                                                                            borderColor: '#ef4444',
+                                                                            color: '#ef4444'
+                                                                        }}
+                                                                    >
+                                                                        🗑️ Eliminar
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </motion.div>
                                         ))}
@@ -1139,7 +2089,7 @@ const ModelDetail = () => {
                                         <p style={{ color: '#64748b', marginTop: '0.5rem' }}>
                                             ¿Compraste este modelo? ¡Comparte tu experiencia!
                                         </p>
-                                        {isLoggedIn && (
+                                        {model?.access?.can_review && (
                                             <motion.button
                                                 style={{
                                                     marginTop: '1.5rem',
@@ -1153,6 +2103,7 @@ const ModelDetail = () => {
                                                 }}
                                                 whileHover={{ scale: 1.02 }}
                                                 whileTap={{ scale: 0.98 }}
+                                                onClick={() => setShowReviewForm(true)}
                                             >
                                                 Escribir primera reseña
                                             </motion.button>
@@ -1174,5 +2125,6 @@ const ModelDetail = () => {
         </div>
     );
 };
+
 
 export default ModelDetail;

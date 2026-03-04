@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 
+
 class ModelController extends Controller
 {
     /**
@@ -115,7 +116,7 @@ class ModelController extends Controller
                 }
             ])
             ->where('featured', true)
-            ->select('id', 'name', 'price', 'format', 'category_id', 'sketchfab_id') // ← AGREGAR
+            ->select('id', 'name', 'price', 'format', 'category_id', 'sketchfab_id')
             ->latest()
             ->limit(8)
             ->get();
@@ -151,18 +152,17 @@ class ModelController extends Controller
     /**
      * Mostrar detalle completo de un modelo
      */
-// En el método show() de ModelController
     public function show($id)
     {
         $model = Model3D::with([
-        'category:id,name',
-        'licenses:id,model_id,type,description',
-        'files:id,model_id,file_url,file_type',
-        'mixedReality:id,model_id,compatible,platform,notes',
-        'reviews' => function($q) {
-            $q->with('user:id,name')
-              ->latest()
-              ->limit(5);
+            'category:id,name',
+            'licenses:id,model_id,type,description',
+            'files:id,model_id,file_url,file_type',
+            'mixedReality:id,model_id,compatible,platform,notes',
+            'reviews' => function($q) {
+                $q->with('user:id,name')
+                ->latest()
+                ->limit(5);
             }   
         ])
         ->select(
@@ -170,7 +170,7 @@ class ModelController extends Controller
             'size_mb', 'publication_date', 'category_id', 'featured', 
             'sketchfab_id', 'author_name', 'author_avatar', 'author_bio',
             'polygon_count', 'material_count', 'has_animations', 
-            'has_rigging', 'technical_specs'  // ← NUEVOS CAMPOS
+            'has_rigging', 'technical_specs'
         )
         ->withAvg('reviews as average_rating', 'rating')
         ->withCount('reviews')
@@ -184,20 +184,77 @@ class ModelController extends Controller
         }
 
         $user = auth()->user();
+        
+        // 🔑 Si no hay usuario autenticado, intentar autenticar manualmente con el token del header
+        if (!$user) {
+            $token = request()->bearerToken();
+            if ($token) {
+                // Intentar autenticar con Sanctum
+                $user = \Laravel\Sanctum\PersonalAccessToken::findToken($token)?->tokenable;
+                \Log::info('Token encontrado en header. Usuario obtenido: ' . ($user ? 'SÍ (ID: ' . $user->id . ')' : 'NO'));
+            }
+        }
+        
         $isPurchased = false;
+        $hasReviewed = false;
+        
+        // 🔍 LOGS DE DEPURACIÓN
+        \Log::info('=== DEPURACIÓN MODEL DETAIL ===');
+        \Log::info('Usuario autenticado: ' . ($user ? 'SÍ (ID: ' . $user->id . ')' : 'NO'));
         
         if ($user) {
-            $isPurchased = $user->shopping()
-                ->whereHas('models', function($q) use ($id) {
-                    $q->where('model_id', $id);
-                })->exists();
+            // 📊 LOG: Ver todas las compras del usuario
+            $userShoppings = DB::table('shopping')->where('user_id', $user->id)->get();
+            \Log::info('Compras del usuario: ' . $userShoppings->count());
+            foreach ($userShoppings as $shop) {
+                \Log::info('  - Shopping ID: ' . $shop->id . ', Status: ' . $shop->status);
+            }
+            
+            // 📊 LOG: Ver todos los shopping_details con este modelo
+            $modelDetails = DB::table('shopping_details')->where('model_id', $id)->get();
+            \Log::info('Shopping_details para modelo ' . $id . ': ' . $modelDetails->count());
+            foreach ($modelDetails as $detail) {
+                \Log::info('  - Shopping_id: ' . $detail->shopping_id . ', Model_id: ' . $detail->model_id);
+            }
+            
+            // Consulta SQL directa
+            $result = DB::table('shopping')
+                ->join('shopping_details', 'shopping.id', '=', 'shopping_details.shopping_id')
+                ->where('shopping.user_id', $user->id)
+                ->where('shopping_details.model_id', $id)
+                ->where('shopping.status', 'completed')
+                ->exists();
+                
+            \Log::info('Resultado consulta compra: ' . ($result ? 'SÍ' : 'NO'));
+            
+            // Log de la consulta SQL con completas
+            $query = DB::table('shopping')
+                ->join('shopping_details', 'shopping.id', '=', 'shopping_details.shopping_id')
+                ->where('shopping.user_id', $user->id)
+                ->where('shopping_details.model_id', $id)
+                ->where('shopping.status', 'completed');
+            
+            \Log::info('Query para esta compra específica:');
+            \Log::info('  - User ID: ' . $user->id);
+            \Log::info('  - Model ID: ' . $id);
+            \Log::info('  - Expected Status: completed');
+            \Log::info('  - Rows found: ' . $query->count());
+            
+            $isPurchased = $result;
+            $hasReviewed = $model->reviews()
+                ->where('user_id', $user->id)
+                ->exists();
+                
+            \Log::info('¿Ya reseñó?: ' . ($hasReviewed ? 'SÍ' : 'NO'));
         }
+        
+        \Log::info('can_review final: ' . (($isPurchased && !$hasReviewed) ? 'SÍ' : 'NO'));
 
         return response()->json([
             'success' => true,
             'data' => [
                 'model' => $model,
-                'author' => [  // ← NUEVO: Información del autor
+                'author' => [
                     'name' => $model->author_name ?? 'ArchiMarket3D',
                     'avatar' => $model->author_avatar ?? null,
                     'bio' => $model->author_bio ?? 'Creador profesional de modelos 3D'
@@ -210,7 +267,7 @@ class ModelController extends Controller
                 'access' => [
                     'can_download' => $isPurchased,
                     'can_preview' => true,
-                    'can_review' => $user && !$isPurchased ? false : true
+                    'can_review' => $isPurchased && !$hasReviewed
                 ]
             ]
         ]);
@@ -227,6 +284,7 @@ class ModelController extends Controller
             'data' => $models
         ]);
     }
+
     /**
      * Crear nuevo modelo (admin)
      */
@@ -240,7 +298,7 @@ class ModelController extends Controller
             'size_mb' => 'required|numeric|min:0',
             'category_id' => 'required|exists:categories,id',
             'featured' => 'sometimes|boolean',
-            'sketchfab_id' => 'nullable|string|max:255' // ← AGREGAR VALIDACIÓN
+            'sketchfab_id' => 'nullable|string|max:255'
         ]);
 
         if ($validator->fails()) {
@@ -262,7 +320,7 @@ class ModelController extends Controller
                 'category_id' => $request->category_id,
                 'featured' => $request->featured ?? false,
                 'publication_date' => now(),
-                'sketchfab_id' => $request->sketchfab_id // ← AGREGAR ESTO
+                'sketchfab_id' => $request->sketchfab_id
             ]);
 
             DB::commit();
@@ -282,10 +340,11 @@ class ModelController extends Controller
             ], 500);
         }
     }
+
     /**
      * Actualizar modelo (admin)
      */
- public function update(Request $request, $id)
+    public function update(Request $request, $id)
     {
         $model = Model3D::find($id);
 
@@ -304,7 +363,7 @@ class ModelController extends Controller
             'size_mb' => 'sometimes|numeric|min:0',
             'category_id' => 'sometimes|exists:categories,id',
             'featured' => 'sometimes|boolean',
-            'sketchfab_id' => 'nullable|string|max:255' // ← AGREGAR VALIDACIÓN
+            'sketchfab_id' => 'nullable|string|max:255'
         ]);
 
         if ($validator->fails()) {
@@ -317,7 +376,7 @@ class ModelController extends Controller
         $model->update($request->only([
             'name', 'description', 'price', 'format', 
             'size_mb', 'category_id', 'featured',
-            'sketchfab_id' // ← AGREGAR ESTO
+            'sketchfab_id'
         ]));
 
         return response()->json([

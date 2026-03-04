@@ -6,6 +6,9 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ShoppingController;
 use App\Http\Controllers\Api\ReviewController;
+use App\Http\Controllers\Api\ReviewLikeController;
+use App\Http\Controllers\Api\ReviewReplyController;
+use App\Http\Controllers\Api\ReviewReplyLikeController;
 use App\Http\Controllers\Api\ModelFileController;
 use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\MixedRealityController;
@@ -88,6 +91,22 @@ Route::middleware('auth:sanctum')->group(function () {
     // Reseñas
     Route::prefix('reviews')->group(function () {
         Route::post('/models/{modelId}', [ReviewController::class, 'store']);
+        
+        // Likes en reseñas (ANTES de las rutas genéricas)
+        Route::post('/{reviewId}/like', [ReviewLikeController::class, 'toggle']);
+        Route::get('/{reviewId}/likes', [ReviewLikeController::class, 'getLikes']);
+        
+        // Respuestas a reseñas (ANTES de las rutas genéricas)
+        Route::post('/{reviewId}/replies', [ReviewReplyController::class, 'store']);
+        Route::get('/{reviewId}/replies', [ReviewReplyController::class, 'getReplies']);
+        Route::put('/replies/{replyId}', [ReviewReplyController::class, 'update']);
+        Route::delete('/replies/{replyId}', [ReviewReplyController::class, 'destroy']);
+        
+        // Likes en respuestas
+        Route::post('/replies/{replyId}/like', [ReviewReplyLikeController::class, 'toggle']);
+        Route::get('/replies/{replyId}/likes', [ReviewReplyLikeController::class, 'getLikes']);
+        
+        // Rutas genéricas (AL FINAL)
         Route::put('/{id}', [ReviewController::class, 'update']);
         Route::delete('/{id}', [ReviewController::class, 'destroy']);
     });

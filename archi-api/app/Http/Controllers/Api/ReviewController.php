@@ -7,6 +7,7 @@ use App\Models\Review;
 use App\Models\Model3D;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
 use App\Events\NewReview;
 use App\Events\NewUserRegistered;
 use App\Helpers\NotificationHelper;
@@ -91,17 +92,19 @@ class ReviewController extends Controller
         }
 
         // Verificar si compró el modelo (opcional - política de negocio)
-        $hasPurchased = $user->shopping()
-            ->whereHas('models', function($q) use ($modelId) {
-                $q->where('model_id', $modelId);
-            })->exists();
+        $hasPurchased = DB::table('shopping')
+            ->join('shopping_details', 'shopping.id', '=', 'shopping_details.shopping_id')
+            ->where('shopping.user_id', $user->id)
+            ->where('shopping_details.model_id', $modelId)
+            ->where('shopping.status', 'completed')
+            ->exists();
 
         // Puedes requerir compra para reseñar
-        // if (!$hasPurchased) {
-        //     return response()->json([
-        //         'message' => 'Debes comprar el modelo para poder reseñarlo'
-        //     ], 403);
-        // }
+        if (!$hasPurchased) {
+            return response()->json([
+                 'message' => 'Debes comprar el modelo para poder reseñarlo'
+             ], 403);
+      }
 
         $review = Review::create([
             'user_id' => $user->id,

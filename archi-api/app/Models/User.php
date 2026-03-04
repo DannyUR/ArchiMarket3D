@@ -8,6 +8,12 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\Shopping;
+use App\Models\Model3D;
+use App\Models\Review;
+use App\Models\UserLicense;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
@@ -52,6 +58,18 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(Shopping::class);
     }
 
+    public function models()
+    {
+        return $this->hasManyThrough(
+            Model3D::class,
+            Shopping::class,
+            'user_id', // Clave foránea en shopping (user_id)
+            'id',      // Clave local en models (id)
+            'id',      // Clave local en users (id)
+            'model_id' // Clave foránea en shopping_model (model_id) ??? Esto es complicado...
+        );
+    }
+
     public function reviews()
     {
         return $this->hasMany(Review::class);
@@ -68,5 +86,22 @@ class User extends Authenticatable implements MustVerifyEmail
             $q->whereNull('expires_at')
             ->orWhere('expires_at', '>=', now());
         })->get();
+    }
+
+    public function purchasedModels()
+    {
+        return $this->belongsToMany(
+            Model3D::class,
+            'shopping_model',
+            'shopping_id',
+            'model_id'
+        )
+        ->whereIn('shopping_id', function($query) {
+            $query->select('id')
+                ->from('shopping')
+                ->where('shopping.user_id', $this->id);
+        })
+        ->withPivot('license_type', 'unit_price', 'quantity')
+        ->withTimestamps();
     }
 }
