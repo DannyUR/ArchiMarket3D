@@ -122,10 +122,19 @@ class ModelFileController extends Controller
             $fileName = time() . '_' . uniqid() . '.' . $uploadedFile->getClientOriginalExtension();
             $filePath = $uploadedFile->storeAs('models/' . $model->id, $fileName, 'public');
 
+            // Si es preview manual, eliminar previews automáticos previos
+            if ($request->file_type === 'preview') {
+                ModelFile::where('model_id', $model->id)
+                    ->where('file_type', 'preview')
+                    ->where(function($q){ $q->whereNull('origin')->orWhere('origin', 'sketchfab'); })
+                    ->delete();
+            }
+
             $modelFile = ModelFile::create([
                 'model_id' => $model->id,
                 'file_url' => Storage::url($filePath),
-                'file_type' => $request->file_type
+                'file_type' => $request->file_type,
+                'origin' => $request->file_type === 'preview' ? 'manual' : null
             ]);
 
             return response()->json([

@@ -11,7 +11,8 @@ class ModelFile extends Model
     protected $fillable = [
         'model_id',
         'file_url',
-        'file_type'
+        'file_type',
+        'origin'
     ];
 
     protected $casts = [

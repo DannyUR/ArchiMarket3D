@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Image Loading</title>
+</head>
+<body>
+    <h1>Test Image Loading from API</h1>
+    
+    <h2>Test 1: Direct Image Tag</h2>
+    <img src="/api/models/1393/preview-image" alt="Model 1393" style="width: 300px; height: 300px; border: 1px solid red;">
+    
+    <h2>Test 2: Full URL</h2>
+    <img src="http://127.0.0.1:8000/api/models/1393/preview-image" alt="Model 1393" style="width: 300px; height: 300px; border: 1px solid blue;">
+    
+    <h2>Test 3: Using Fetch</h2>
+    <img id="imgFetch" style="width: 300px; height: 300px; border: 1px solid green;">
+    
+    <h2>Console Output</h2>
+    <pre id="output"></pre>
+    
+    <script>
+        const output = document.getElementById('output');
+        
+        // Test 1: Direct
+        output.textContent += 'Test 1: Loaded\n';
+        
+        // Test 3: Fetch
+        fetch('/api/models/1393/preview-image')
+            .then(r => {
+                output.textContent += `Fetch Status: ${r.status}\n`;
+                output.textContent += `Content-Type: ${r.headers.get('content-type')}\n`;
+                return r.blob();
+            })
+            .then(blob => {
+                const url = URL.createObjectURL(blob);
+                document.getElementById('imgFetch').src = url;
+                output.textContent += `Blob created: ${url}\n`;
+            })
+            .catch(e => {
+                output.textContent += `Error: ${e.message}\n`;
+            });
+    </script>
+</body>
+</html>

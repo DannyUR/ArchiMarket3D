@@ -10,6 +10,7 @@ class Model3D extends Model
     protected $casts = [
         'price' => 'float',
         'size_mb' => 'float',
+        'metadata' => 'array'
     ];
     protected $fillable = [
         'name',
@@ -18,8 +19,19 @@ class Model3D extends Model
         'format',
         'size_mb',
         'category_id',
+        'category_type',
+        'metadata',
         'featured',
-        'publication_date'
+        'publication_date',
+        'sketchfab_id',
+        'author_name',
+        'author_avatar',
+        'author_bio',
+        'polygon_count',
+        'material_count',
+        'has_animations',
+        'has_rigging',
+        'technical_specs'
     ];
 
 

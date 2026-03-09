@@ -25,43 +25,10 @@ import { BsGrid3X3GapFill } from 'react-icons/bs';
 import API from '../../services/api';
 import { colors } from '../../styles/theme';
 
-// Componente helper para manejar imágenes con fallback
-const ModelImage = ({ src, alt, modelId }) => {
-    const [error, setError] = useState(false);
-
-    if (error || !src) {
-        return (
-            <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                height: '100%',
-                width: '100%',
-                background: `linear-gradient(145deg, ${colors.primary}10 0%, ${colors.primary}05 100%)`
-            }}>
-                <HiOutlineCube size={60} color={colors.primary + '40'} />
-            </div>
-        );
-    }
-
-    return (
-        <img
-            src={src}
-            alt={alt}
-            style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-                transition: 'transform 0.5s ease'
-            }}
-            onError={() => setError(true)}
-        />
-    );
-};
-
 const ModelList = () => {
     const navigate = useNavigate();
     const [models, setModels] = useState([]);
+    const [uniqueCategories, setUniqueCategories] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [view, setView] = useState('grid');
@@ -95,6 +62,47 @@ const ModelList = () => {
         { id: 'mobiliario', name: 'Mobiliario', icon: <HiOutlineCube />, count: 600, color: '#8b5cf6' }
     ];
 
+    // Mapeo de categorías a colores
+    const getCategoryColorHex = (category) => {
+        if (!category) return '#3b82f6';
+        const catId = typeof category === 'object' ? category?.id : category;
+        const colorMap = {
+            1: '#3b82f6', 2: '#10b981', 3: '#f59e0b', 4: '#ef4444', 5: '#8b5cf6',
+            6: '#ec4899', 7: '#06b6d4', 8: '#6366f1', 9: '#14b8a6', 10: '#f97316',
+        };
+        return colorMap[catId] || '#3b82f6';
+    };
+
+    // Función para obtener icono por categoría (NUEVA)
+    const getIconByCategory = (categoryName) => {
+        const icons = {
+            'Estructuras de Acero': '🏗️',
+            'Estructuras de Concreto': '🏗️',
+            'Cimentaciones': '🏗️',
+            'Elementos Portantes': '🏗️',
+            'Arquitectura Residencial': '🏠',
+            'Arquitectura Comercial': '🏢',
+            'Fachadas y Cerramientos': '🏛️',
+            'Cubiertas y Azoteas': '🏠',
+            'Sistemas Eléctricos': '⚡',
+            'Fontanería y Tuberías': '🔧',
+            'HVAC (Climatización)': '❄️',
+            'Protección Contra Incendios': '🔥',
+            'Mobiliario de Oficina': '🪑',
+            'Mobiliario Residencial': '🛋️',
+            'Mobiliario Urbano': '🚏',
+            'Equipamiento': '⚙️',
+            'Equipo Pesado': '🏗️',
+            'Maquinaria Industrial': '🏭',
+            'Equipo de Construcción': '🚜',
+            'Infraestructura Vial': '🛣️',
+            'Espacios Públicos': '🏞️',
+            'Paisajismo': '🌳',
+            'Redes de Servicio': '🔌'
+        };
+        return icons[categoryName] || '📦';
+    };
+
     useEffect(() => {
         fetchModels(pagination.current_page);
     }, [pagination.current_page, selectedCategory, sortBy]);
@@ -106,7 +114,43 @@ const ModelList = () => {
             console.log('📦 API Response - Página:', page, response.data);
 
             if (response.data?.success && response.data?.data) {
-                setModels(response.data.data.data || []);
+                const models = response.data.data.data || [];
+                console.log(`📊 Models count: ${models.length}`);
+
+                setModels(models);
+
+                // Extraer categorías únicas con contador
+                const categoriesMap = new Map();
+                models.forEach(model => {
+                    if (model.category) {
+                        const catName = typeof model.category === 'object'
+                            ? model.category?.name
+                            : String(model.category);
+
+                        if (catName) {
+                            const key = catName.trim();
+                            if (categoriesMap.has(key)) {
+                                categoriesMap.get(key).count++;
+                            } else {
+                                categoriesMap.set(key, {
+                                    name: key,
+                                    color: getCategoryColorHex(model.category),
+                                    count: 1
+                                });
+                            }
+                        }
+                    }
+                });
+
+                // Filtrar solo categorías principales (más de 3 modelos)
+                const mainCategories = Array.from(categoriesMap.values())
+                    .filter(cat => cat.count > 3)
+                    .sort((a, b) => b.count - a.count);
+
+                console.log('📊 Categorías encontradas:', categoriesMap.size);
+                console.log('📋 Categorías principales (>3 modelos):', mainCategories);
+                setUniqueCategories(mainCategories);
+
                 setPagination({
                     current_page: response.data.data.current_page || 1,
                     last_page: response.data.data.last_page || 1,
@@ -114,10 +158,11 @@ const ModelList = () => {
                     per_page: response.data.data.per_page || 12
                 });
             } else {
+                console.warn('⚠️ API response estructura inesperada');
                 setModels([]);
             }
         } catch (error) {
-            console.error('Error cargando modelos:', error);
+            console.error('❌ Error cargando modelos:', error);
             setModels([]);
         } finally {
             setLoading(false);
@@ -135,18 +180,13 @@ const ModelList = () => {
         }
     };
 
+    // Función getPreviewImage corregida
     const getPreviewImage = (model) => {
-        if (model.files && model.files.length > 0) {
-            const preview = model.files.find(f => f.file_type === 'preview');
-            if (preview?.file_url) {
-                //return 'http://127.0.0.1:8000' + preview.file_url;
-                const path = preview.file_url.replace('/storage/', '');
-                return `/api/storage/${path}`;
-            }
-        }
+        // Por ahora, retorna null para usar placeholders
         return null;
     };
 
+    // Renderizado de números de página
     const renderPageNumbers = () => {
         const pages = [];
         const maxVisible = 5;
@@ -620,6 +660,43 @@ const ModelList = () => {
             borderTop: `4px solid ${colors.primary}`,
             borderRadius: '50%',
             animation: 'spin 1s linear infinite'
+        },
+        legend: {
+            display: 'flex',
+            flexWrap: 'wrap',
+            gap: '1.5rem',
+            padding: '2rem',
+            background: 'linear-gradient(145deg, #ffffff 0%, #f8fafc 100%)',
+            borderRadius: '20px',
+            border: '1px solid #f0f0f0',
+            marginBottom: '2rem',
+            alignItems: 'center'
+        },
+        legendTitle: {
+            width: '100%',
+            fontSize: isMobile ? '1.1rem' : '1.3rem',
+            fontWeight: '700',
+            color: colors.dark,
+            marginBottom: '0.5rem'
+        },
+        legendItem: {
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.75rem',
+            padding: '0.75rem 1.25rem',
+            background: 'white',
+            borderRadius: '12px',
+            border: '1px solid #e2e8f0',
+            fontSize: isMobile ? '0.85rem' : '0.95rem',
+            fontWeight: '500',
+            color: colors.dark,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.02)'
+        },
+        legendColor: {
+            width: '24px',
+            height: '24px',
+            borderRadius: '8px',
+            flexShrink: 0
         }
     };
 
@@ -776,12 +853,13 @@ const ModelList = () => {
                     >
                         {models.map((model, index) => {
                             const previewImage = getPreviewImage(model);
-
-                            // Extraer valores asegurando que sean strings/números
+                            const categoryColor = getCategoryColorHex(model.category);
                             const categoryName = typeof model.category === 'object'
                                 ? model.category?.name || 'Modelo 3D'
                                 : model.category || 'Modelo 3D';
+                            const icon = getIconByCategory(categoryName);
 
+                            // Extraer valores asegurando que sean strings/números
                             const format = typeof model.format === 'object'
                                 ? model.format?.name || 'GLTF'
                                 : model.format || 'GLTF';
@@ -804,12 +882,52 @@ const ModelList = () => {
                                     whileHover={{ y: -8, boxShadow: '0 20px 40px rgba(0,0,0,0.08)' }}
                                     onClick={() => navigate(`/models/${model.id}`)}
                                 >
-                                    <div style={styles.cardImage}>
-                                        <ModelImage
-                                            src={previewImage}
-                                            alt={model.name}
-                                            modelId={model.id}
-                                        />
+                                    <motion.div
+                                        style={styles.cardImage}
+                                        whileHover={{ scale: 1.05 }}
+                                        transition={{ duration: 0.4, ease: 'easeOut' }}
+                                    >
+                                        {previewImage ? (
+                                            <img
+                                                src={previewImage}
+                                                alt={model.name}
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'contain',
+                                                    display: 'block'
+                                                }}
+                                                onError={(e) => {
+                                                    console.warn(`⚠️ Usando placeholder para modelo ${model.id}`);
+                                                    e.target.style.display = 'none';
+                                                    const container = e.target.parentElement;
+                                                    if (container) {
+                                                        container.innerHTML = `
+                                                            <div style="display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; background: linear-gradient(135deg, ${categoryColor}10 0%, ${categoryColor}05 100%); flex-direction: column; gap: 0.5rem;">
+                                                                <div style="font-size: 3rem;">${icon}</div>
+                                                                <div style="font-size: 0.9rem; color: ${categoryColor}; font-weight: 500; text-align: center; padding: 0 1rem;">${categoryName}</div>
+                                                            </div>
+                                                        `;
+                                                    }
+                                                }}
+                                            />
+                                        ) : (
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                width: '100%',
+                                                height: '100%',
+                                                background: `linear-gradient(135deg, ${categoryColor}10 0%, ${categoryColor}05 100%)`,
+                                                flexDirection: 'column',
+                                                gap: '0.5rem'
+                                            }}>
+                                                <div style={{ fontSize: '3rem' }}>{icon}</div>
+                                                <div style={{ fontSize: '0.9rem', color: categoryColor, textAlign: 'center', padding: '0 1rem' }}>
+                                                    {categoryName}
+                                                </div>
+                                            </div>
+                                        )}
                                         <div style={styles.cardBadge}>
                                             <FiEye size={12} /> Vista previa 3D
                                         </div>
@@ -824,7 +942,7 @@ const ModelList = () => {
                                         >
                                             <FiHeart />
                                         </motion.button>
-                                    </div>
+                                    </motion.div>
                                     <div style={styles.cardContent}>
                                         <div style={styles.cardCategory}>
                                             {categoryName}

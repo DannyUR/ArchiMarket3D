@@ -25,6 +25,7 @@ import API from '../../services/api';
 import { colors } from '../../styles/theme';
 
 // Componente visor de Sketchfab mejorado
+// Componente visor de Sketchfab mejorado
 const SketchfabViewer = ({ model }) => {
     const [viewerError, setViewerError] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
@@ -58,9 +59,10 @@ const SketchfabViewer = ({ model }) => {
         );
     }
 
-    const sketchfabId = model.sketchfab_id;
+    // ✅ USAR embed_url DIRECTAMENTE
+    const embedUrl = model.embed_url;
 
-    if (!sketchfabId) {
+    if (!embedUrl) {
         return (
             <div style={{
                 width: '100%',
@@ -75,26 +77,6 @@ const SketchfabViewer = ({ model }) => {
             </div>
         );
     }
-
-    const embedUrl = `https://sketchfab.com/models/${sketchfabId}/embed?` + new URLSearchParams({
-        autospin: '0.2',
-        autostart: '1',
-        preload: '1',
-        ui_controls: '1',
-        ui_infos: '0',
-        ui_stop: '1',
-        ui_watermark: '0',
-        ui_watermark_link: '0',
-        ui_inspector: '0',
-        ui_annotations: '0',
-        ui_color: '0',
-        ui_ar: '0',
-        ui_help: '0',
-        ui_settings: '0',
-        ui_fullscreen: '1',
-        ui_gyzmo: '1',
-        camera: '0'
-    });
 
     return (
         <div style={{ position: 'relative', width: '100%', height: '100%', minHeight: '400px' }}>
@@ -188,7 +170,7 @@ const ModelDetail = () => {
         const token = localStorage.getItem('token');
         setIsLoggedIn(!!token);
         console.log('👤 Usuario logueado:', !!token, 'Token:', token ? token.substring(0, 10) + '...' : 'No token');
-        
+
         // Obtener datos del usuario actual
         if (token) {
             fetchCurrentUser();
@@ -204,7 +186,7 @@ const ModelDetail = () => {
 
     const loadRepliesAndLikes = async () => {
         if (!model?.reviews) return;
-        
+
         for (const review of model.reviews) {
             try {
                 // Cargar respuestas del review
@@ -248,18 +230,18 @@ const ModelDetail = () => {
             }
         }
     };
-    
+
     const fetchCurrentUser = async () => {
         try {
             const response = await API.get('/auth/me');
             // El usuario puede venir en response.data.data.user o response.data.user
             let userData = response.data.data?.user || response.data.user || response.data.data || response.data;
-            
+
             // Si userData es un objeto con la propiedad 'user', extraerla
             if (userData && userData.user && !userData.id) {
                 userData = userData.user;
             }
-            
+
             setCurrentUser(userData);
             console.log('👤 Usuario actual obtenido:', userData);
             console.log('👤 ID del usuario:', userData?.id, '(Tipo:', typeof userData?.id + ')');
@@ -274,24 +256,28 @@ const ModelDetail = () => {
             console.log('📦 Modelo recibido:', response.data);
             const responseData = response.data.data || response.data;
             const modelData = responseData?.model || responseData;
-            
+
             // 🔑 IMPORTANTE: Incluir el objeto access directamente en modelData
             if (responseData?.access) {
                 modelData.access = responseData.access;
             }
-            
+
             // 📊 IMPORTANTE: Incluir los stats
             if (responseData?.stats) {
                 modelData.stats = responseData.stats;
                 console.log('📊 Stats actualizado:', responseData.stats);
             }
 
-            // Estructurar datos de autor si vienen en formato diferente
-            if (!modelData.author && (modelData.author_name || modelData.author)) {
+            // 👤 IMPORTANTE: Incluir el autor desde responseData
+            if (responseData?.author) {
+                modelData.author = responseData.author;
+                console.log('👤 Author actualizado:', responseData.author);
+            } else if (!modelData.author && (modelData.author_name || modelData.author_avatar || modelData.author_bio)) {
+                // Fallback: Estructurar datos de autor si vienen en el modelo mismo
                 modelData.author = {
-                    name: modelData.author_name || modelData.author?.name,
-                    bio: modelData.author_bio || modelData.author?.bio,
-                    avatar: modelData.author_avatar || modelData.author?.avatar
+                    name: modelData.author_name || 'ArchiMarket3D',
+                    bio: modelData.author_bio || 'Creador profesional',
+                    avatar: modelData.author_avatar || null
                 };
             }
 
@@ -299,6 +285,7 @@ const ModelDetail = () => {
             console.log('🔍 ESTRUCTURA COMPLETA DE MODEL:', JSON.stringify(modelData, null, 2));
             console.log('✅ access.can_review:', modelData.access?.can_review);
             console.log('📊 Total reviews:', modelData.stats?.total_reviews);
+            console.log('👤 Author:', modelData.author);
 
             if (modelData.files && modelData.files.length > 0) {
                 const preview = modelData.files.find(f => f.file_type === 'preview');
@@ -306,6 +293,7 @@ const ModelDetail = () => {
             }
         } catch (error) {
             console.error('Error cargando modelo:', error);
+            setLoading(false);
         } finally {
             setLoading(false);
         }
@@ -490,7 +478,7 @@ const ModelDetail = () => {
             await API.post(`/reviews/${reviewId}/replies`, {
                 comment: replyText
             });
-            
+
             // Actualizar respuestas
             const response = await API.get(`/reviews/${reviewId}/replies`);
             setReviewReplies(prev => ({
@@ -523,7 +511,7 @@ const ModelDetail = () => {
                 comment: nestedReplyText,
                 parent_reply_id: parentReplyId
             });
-            
+
             // Actualizar respuestas
             const response = await API.get(`/reviews/${reviewId}/replies`);
             setReviewReplies(prev => ({
@@ -543,7 +531,7 @@ const ModelDetail = () => {
     const handleShare = (reviewId) => {
         const review = model.reviews.find(r => r.id === reviewId);
         const text = `Reseña de ${review.user.name}: "${review.comment}" (${review.rating} ⭐) - ${window.location.href}`;
-        
+
         if (navigator.share) {
             navigator.share({
                 title: 'Reseña en ArchiMarket3D',
@@ -2022,60 +2010,60 @@ const ModelDetail = () => {
                                                         console.log('  - ¿Es propietario?:', currentUser?.id === review.user_id);
                                                         return currentUser?.id === review.user_id;
                                                     })() && (
-                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                            {editingReviewId === review.id ? (
-                                                                <>
-                                                                    <button
-                                                                        onClick={() => handleSaveEditReview(review.id)}
-                                                                        style={{
-                                                                            ...styles.reviewActionButton,
-                                                                            backgroundColor: colors.primary,
-                                                                            borderColor: colors.primary,
-                                                                            color: 'white'
-                                                                        }}
-                                                                    >
-                                                                        Guardar
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => setEditingReviewId(null)}
-                                                                        style={{
-                                                                            ...styles.reviewActionButton,
-                                                                            backgroundColor: 'transparent',
-                                                                            borderColor: '#e2e8f0',
-                                                                            color: '#64748b'
-                                                                        }}
-                                                                    >
-                                                                        Cancelar
-                                                                    </button>
-                                                                </>
-                                                            ) : (
-                                                                <>
-                                                                    <button
-                                                                        onClick={() => handleEditReview(review)}
-                                                                        style={{
-                                                                            ...styles.reviewActionButton,
-                                                                            backgroundColor: 'transparent',
-                                                                            borderColor: colors.primary,
-                                                                            color: colors.primary
-                                                                        }}
-                                                                    >
-                                                                        ✏️ Editar
-                                                                    </button>
-                                                                    <button
-                                                                        onClick={() => handleDeleteReview(review.id)}
-                                                                        style={{
-                                                                            ...styles.reviewActionButton,
-                                                                            backgroundColor: 'transparent',
-                                                                            borderColor: '#ef4444',
-                                                                            color: '#ef4444'
-                                                                        }}
-                                                                    >
-                                                                        🗑️ Eliminar
-                                                                    </button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                                {editingReviewId === review.id ? (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => handleSaveEditReview(review.id)}
+                                                                            style={{
+                                                                                ...styles.reviewActionButton,
+                                                                                backgroundColor: colors.primary,
+                                                                                borderColor: colors.primary,
+                                                                                color: 'white'
+                                                                            }}
+                                                                        >
+                                                                            Guardar
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => setEditingReviewId(null)}
+                                                                            style={{
+                                                                                ...styles.reviewActionButton,
+                                                                                backgroundColor: 'transparent',
+                                                                                borderColor: '#e2e8f0',
+                                                                                color: '#64748b'
+                                                                            }}
+                                                                        >
+                                                                            Cancelar
+                                                                        </button>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <button
+                                                                            onClick={() => handleEditReview(review)}
+                                                                            style={{
+                                                                                ...styles.reviewActionButton,
+                                                                                backgroundColor: 'transparent',
+                                                                                borderColor: colors.primary,
+                                                                                color: colors.primary
+                                                                            }}
+                                                                        >
+                                                                            ✏️ Editar
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={() => handleDeleteReview(review.id)}
+                                                                            style={{
+                                                                                ...styles.reviewActionButton,
+                                                                                backgroundColor: 'transparent',
+                                                                                borderColor: '#ef4444',
+                                                                                color: '#ef4444'
+                                                                            }}
+                                                                        >
+                                                                            🗑️ Eliminar
+                                                                        </button>
+                                                                    </>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                 </div>
                                             </motion.div>
                                         ))}

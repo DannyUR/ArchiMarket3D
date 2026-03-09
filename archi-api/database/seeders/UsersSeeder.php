@@ -22,6 +22,8 @@ class UsersSeeder extends Seeder
                 'password'=> Hash::make('1234567890'),
                 'user_type' => 'admin',
                 'company' => 'ArchiMarket3D',
+                'email_verified_at' => now(),
+                'is_active' => true,
                 'created_at'=> now(),
                 'updated_at'=> now()
             ],
@@ -31,6 +33,8 @@ class UsersSeeder extends Seeder
                 'password'=> Hash::make('1234567890'),
                 'user_type' => 'company',
                 'company' => 'Constructora del Norte',
+                'email_verified_at' => now(),
+                'is_active' => true,
                 'created_at'=> now(),
                 'updated_at'=> now()
             ]

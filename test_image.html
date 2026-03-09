@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Image Test</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        img { border: 1px solid #ccc; margin: 10px 0; max-width: 300px; }
+        .status { margin: 10px 0; padding: 10px; border: 1px solid #999; }
+    </style>
+</head>
+<body>
+    <h1>Testing Image Load</h1>
+    
+    <h2>Test 1: Direct SVG Path</h2>
+    <div class="status">Status: <span id="status1">Loading...</span></div>
+    <img id="img1" src="http://127.0.0.1:8000/storage/models/590/preview.svg" alt="Test 1">
+    
+    <h2>Test 2: With full base URL</h2>
+    <div class="status">Status: <span id="status2">Loading...</span></div>
+    <img id="img2" src="http://127.0.0.1:8000/storage/models/590/preview.svg" alt="Test 2">
+    
+    <h2>Browser Console Logs</h2>
+    <div id="logs" style="border: 1px solid #ccc; padding: 10px; background: #f5f5f5; min-height: 100px; font-family: monospace; white-space: pre-wrap;"></div>
+    
+    <script>
+        const logsDiv = document.getElementById('logs');
+        
+        function log(msg) {
+            logsDiv.textContent += msg + '\n';
+            console.log(msg);
+        }
+        
+        log('[Page Load] Starting image tests...');
+        
+        document.getElementById('img1').addEventListener('load', () => {
+            log('[IMG1] onLoad event fired ✓');
+            document.getElementById('status1').textContent = 'Loaded ✓';
+            document.getElementById('status1').style.color = 'green';
+        });
+        
+        document.getElementById('img1').addEventListener('error', (e) => {
+            log('[IMG1] onError event fired ✗');
+            document.getElementById('status1').textContent = 'Error ✗';
+            document.getElementById('status1').style.color = 'red';
+        });
+        
+        document.getElementById('img2').addEventListener('load', () => {
+            log('[IMG2] onLoad event fired ✓');
+            document.getElementById('status2').textContent = 'Loaded ✓';
+            document.getElementById('status2').style.color = 'green';
+        });
+        
+        document.getElementById('img2').addEventListener('error', (e) => {
+            log('[IMG2] onError event fired ✗');
+            document.getElementById('status2').textContent = 'Error ✗';
+            document.getElementById('status2').style.color = 'red';
+        });
+        
+        log('[Pending] Waiting for images to load/fail...');
+        
+        setTimeout(() => {
+            log('[Check] If images are still "Loading..." there might be a CORS or connectivity issue');
+        }, 5000);
+    </script>
+</body>
+</html>

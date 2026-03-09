@@ -75,6 +75,9 @@ class CategoryController extends Controller
     /**
      * Obtener modelos de una categoría (endpoint específico)
      */
+/**
+ * Obtener modelos de una categoría (endpoint específico)
+ */
     public function models($id)
     {
         $category = Category::find($id);
@@ -86,13 +89,14 @@ class CategoryController extends Controller
             ], 404);
         }
 
+        // ✅ TODAS las categorías ahora muestran sus modelos
         $models = $category->models()
-        ->with(['files' => function($q) {
-            $q->where('file_type', 'preview')
-              ->select('id', 'model_id', 'file_url');
-        }])  // 👈 IMPORTANTE: incluir files
-        ->select('id', 'name', 'price', 'format', 'size_mb', 'featured', 'created_at')
-        ->paginate(12);
+            ->with(['files' => function($q) {
+                $q->where('file_type', 'preview')
+                ->select('id', 'model_id', 'file_url');
+            }])
+            ->select('id', 'name', 'price', 'format', 'size_mb', 'featured', 'created_at')
+            ->paginate(12);
 
         return response()->json([
             'success' => true,

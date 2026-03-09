@@ -18,16 +18,20 @@ class SketchfabService
     public function searchArchitecturalModels($query = 'architecture', $limit = 20)
     {
         try {
-            $response = Http::get($this->baseUrl . '/models', [
+            $response = Http::withHeaders([
+                'Accept' => 'application/json',
+            ])->get($this->baseUrl . '/search', [  // ← CAMBIADO: /search en lugar de /models
+                'type' => 'models',
                 'q' => $query,
                 'categories' => 'architecture',
                 'downloadable' => 'true',
                 'sort_by' => '-publishedAt',
-                'limit' => $limit
+                'count' => $limit
             ]);
 
             if ($response->successful()) {
-                return $response->json()['results'] ?? [];
+                $data = $response->json();
+                return $data['results'] ?? [];
             }
 
             Log::error('Sketchfab API error: ' . $response->body());
@@ -42,12 +46,15 @@ class SketchfabService
     public function getModelDetails($modelId)
     {
         try {
-            $response = Http::get($this->baseUrl . "/models/{$modelId}");
+            $response = Http::withHeaders([
+                'Accept' => 'application/json',
+            ])->get($this->baseUrl . "/models/{$modelId}");
 
             if ($response->successful()) {
                 return $response->json();
             }
 
+            Log::error('Error obteniendo detalles: ' . $response->body());
             return null;
 
         } catch (\Exception $e) {

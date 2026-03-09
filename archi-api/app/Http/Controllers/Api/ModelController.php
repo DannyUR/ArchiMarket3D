@@ -16,15 +16,52 @@ class ModelController extends Controller
      */
     public function index(Request $request)
     {
+
+        // IDs de categorías de arquitectura y construcción
+        $allowedCategoryNames = [
+            // ESTRUCTURALES
+            'Estructuras de Acero',
+            'Estructuras de Concreto',
+            'Cimentaciones',
+            'Elementos Portantes',
+            // ARQUITECTURA
+            'Arquitectura Residencial',
+            'Arquitectura Comercial',
+            'Fachadas y Cerramientos',
+            'Cubiertas y Azoteas',
+            // INSTALACIONES MEP
+            'Sistemas Eléctricos',
+            'Fontanería y Tuberías',
+            'HVAC (Climatización)',
+            'Protección Contra Incendios',
+            // MOBILIARIO
+            'Mobiliario de Oficina',
+            'Mobiliario Residencial',
+            'Mobiliario Urbano',
+            'Equipamiento',
+            // MAQUINARIA
+            'Equipo Pesado',
+            'Maquinaria Industrial',
+            'Equipo de Construcción',
+            // URBANISMO
+            'Infraestructura Vial',
+            'Espacios Públicos',
+            'Paisajismo',
+            'Redes de Servicio'
+        ];
+        $allowedCategoryIds = \App\Models\Category::whereIn('name', $allowedCategoryNames)->pluck('id')->toArray();
+
         $query = Model3D::with([
             'category:id,name',
             'files' => function($q) {
                 $q->where('file_type', 'preview');
             }
         ])
+        ->whereIn('category_id', $allowedCategoryIds)
         ->select(
             'id', 'name', 'description', 'price', 'format', 
-            'size_mb', 'publication_date', 'category_id', 'featured', 'sketchfab_id'
+            'size_mb', 'publication_date', 'category_id', 'featured', 
+            'sketchfab_id', 'preview_url', 'embed_url', 'sketchfab_url'
         );
 
         // Filtros
@@ -154,134 +191,174 @@ class ModelController extends Controller
      */
     public function show($id)
     {
-        $model = Model3D::with([
-            'category:id,name',
-            'licenses:id,model_id,type,description',
-            'files:id,model_id,file_url,file_type',
-            'mixedReality:id,model_id,compatible,platform,notes',
-            'reviews' => function($q) {
-                $q->with('user:id,name')
-                ->latest()
-                ->limit(5);
-            }   
-        ])
-        ->select(
-            'id', 'name', 'description', 'price', 'format', 
-            'size_mb', 'publication_date', 'category_id', 'featured', 
-            'sketchfab_id', 'author_name', 'author_avatar', 'author_bio',
-            'polygon_count', 'material_count', 'has_animations', 
-            'has_rigging', 'technical_specs'
-        )
-        ->withAvg('reviews as average_rating', 'rating')
-        ->withCount('reviews')
-        ->find($id);
+        try {
+            $model = Model3D::with([
+                'category:id,name',
+                'files:id,model_id,file_url,file_type',
+                'licenses:id,model_id,type,description',
+                'reviews' => function($q) {
+                    $q->with('user:id,name')
+                    ->latest()
+                    ->limit(5);
+                }
+            ])
+            ->select(
+                'id', 'name', 'description', 'price', 'format', 
+                'size_mb', 'publication_date', 'category_id', 'featured',
+                'metadata', 'preview_url', 'embed_url', 'sketchfab_url',
+                'author_name', 'author_avatar', 'author_bio'  // Estos ya están aquí
+            )
+            ->find($id);
 
-        if (!$model) {
+            if (!$model) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Modelo no encontrado'
+                ], 404);
+            }
+
+            $user = auth()->user();
+            $isPurchased = false;
+            $hasReviewed = false;
+
+            if ($user) {
+                $isPurchased = DB::table('shopping_details')
+                    ->where('model_id', $id)
+                    ->join('shopping', 'shopping.id', '=', 'shopping_details.shopping_id')
+                    ->where('shopping.user_id', $user->id)
+                    ->exists();
+                    
+                $hasReviewed = $model->reviews()
+                    ->where('user_id', $user->id)
+                    ->exists();
+            }
+
+            // Count avg rating manually
+            $reviewsCount = $model->reviews()->count();
+            $avgRating = 0;
+            if ($reviewsCount > 0) {
+                $avgRating = round($model->reviews()->avg('rating') ?? 0, 1);
+            }
+
+            // Count purchases
+            $purchasesCount = DB::table('shopping_details')
+                ->where('model_id', $id)
+                ->join('shopping', 'shopping.id', '=', 'shopping_details.shopping_id')
+                ->distinct('shopping_id')
+                ->count('shopping_id');
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'model' => $model,
+                    'author' => [
+                        'name' => $model->author_name ?? 'ArchiMarket3D',
+                        'avatar' => $model->author_avatar ?? null,
+                        'bio' => $model->author_bio ?? 'Creador profesional de modelos 3D'
+                    ],
+                    'stats' => [
+                        'average_rating' => $avgRating,
+                        'total_reviews' => $reviewsCount,
+                        'purchases_count' => $purchasesCount
+                    ],
+                    'access' => [
+                        'can_download' => $isPurchased,
+                        'can_preview' => true,
+                        'can_review' => $isPurchased && !$hasReviewed
+                    ]
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            \Log::error('Error in ModelController::show - ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => 'Modelo no encontrado'
-            ], 404);
+                'message' => 'Error al cargar el modelo',
+                'error' => $e->getMessage()
+            ], 500);
         }
-
-        $user = auth()->user();
-        
-        // 🔑 Si no hay usuario autenticado, intentar autenticar manualmente con el token del header
-        if (!$user) {
-            $token = request()->bearerToken();
-            if ($token) {
-                // Intentar autenticar con Sanctum
-                $user = \Laravel\Sanctum\PersonalAccessToken::findToken($token)?->tokenable;
-                \Log::info('Token encontrado en header. Usuario obtenido: ' . ($user ? 'SÍ (ID: ' . $user->id . ')' : 'NO'));
-            }
-        }
-        
-        $isPurchased = false;
-        $hasReviewed = false;
-        
-        // 🔍 LOGS DE DEPURACIÓN
-        \Log::info('=== DEPURACIÓN MODEL DETAIL ===');
-        \Log::info('Usuario autenticado: ' . ($user ? 'SÍ (ID: ' . $user->id . ')' : 'NO'));
-        
-        if ($user) {
-            // 📊 LOG: Ver todas las compras del usuario
-            $userShoppings = DB::table('shopping')->where('user_id', $user->id)->get();
-            \Log::info('Compras del usuario: ' . $userShoppings->count());
-            foreach ($userShoppings as $shop) {
-                \Log::info('  - Shopping ID: ' . $shop->id . ', Status: ' . $shop->status);
-            }
-            
-            // 📊 LOG: Ver todos los shopping_details con este modelo
-            $modelDetails = DB::table('shopping_details')->where('model_id', $id)->get();
-            \Log::info('Shopping_details para modelo ' . $id . ': ' . $modelDetails->count());
-            foreach ($modelDetails as $detail) {
-                \Log::info('  - Shopping_id: ' . $detail->shopping_id . ', Model_id: ' . $detail->model_id);
-            }
-            
-            // Consulta SQL directa
-            $result = DB::table('shopping')
-                ->join('shopping_details', 'shopping.id', '=', 'shopping_details.shopping_id')
-                ->where('shopping.user_id', $user->id)
-                ->where('shopping_details.model_id', $id)
-                ->where('shopping.status', 'completed')
-                ->exists();
-                
-            \Log::info('Resultado consulta compra: ' . ($result ? 'SÍ' : 'NO'));
-            
-            // Log de la consulta SQL con completas
-            $query = DB::table('shopping')
-                ->join('shopping_details', 'shopping.id', '=', 'shopping_details.shopping_id')
-                ->where('shopping.user_id', $user->id)
-                ->where('shopping_details.model_id', $id)
-                ->where('shopping.status', 'completed');
-            
-            \Log::info('Query para esta compra específica:');
-            \Log::info('  - User ID: ' . $user->id);
-            \Log::info('  - Model ID: ' . $id);
-            \Log::info('  - Expected Status: completed');
-            \Log::info('  - Rows found: ' . $query->count());
-            
-            $isPurchased = $result;
-            $hasReviewed = $model->reviews()
-                ->where('user_id', $user->id)
-                ->exists();
-                
-            \Log::info('¿Ya reseñó?: ' . ($hasReviewed ? 'SÍ' : 'NO'));
-        }
-        
-        \Log::info('can_review final: ' . (($isPurchased && !$hasReviewed) ? 'SÍ' : 'NO'));
-
-        return response()->json([
-            'success' => true,
-            'data' => [
-                'model' => $model,
-                'author' => [
-                    'name' => $model->author_name ?? 'ArchiMarket3D',
-                    'avatar' => $model->author_avatar ?? null,
-                    'bio' => $model->author_bio ?? 'Creador profesional de modelos 3D'
-                ],
-                'stats' => [
-                    'average_rating' => round($model->average_rating ?? 0, 1),
-                    'total_reviews' => $model->reviews_count,
-                    'purchases_count' => $model->shopping()->count()
-                ],
-                'access' => [
-                    'can_download' => $isPurchased,
-                    'can_preview' => true,
-                    'can_review' => $isPurchased && !$hasReviewed
-                ]
-            ]
-        ]);
     }
 
     public function adminIndex(Request $request)
     {
-        $models = Model3D::with('category')
-            ->orderBy('created_at', 'desc')
-            ->get();
+        // Usar la misma lógica de filtrado que index()
+        $allowedCategoryNames = [
+            // ESTRUCTURALES
+            'Estructuras de Acero',
+            'Estructuras de Concreto',
+            'Cimentaciones',
+            'Elementos Portantes',
+            // ARQUITECTURA
+            'Arquitectura Residencial',
+            'Arquitectura Comercial',
+            'Fachadas y Cerramientos',
+            'Cubiertas y Azoteas',
+            // INSTALACIONES MEP
+            'Sistemas Eléctricos',
+            'Fontanería y Tuberías',
+            'HVAC (Climatización)',
+            'Protección Contra Incendios',
+            // MOBILIARIO
+            'Mobiliario de Oficina',
+            'Mobiliario Residencial',
+            'Mobiliario Urbano',
+            'Equipamiento',
+            // MAQUINARIA
+            'Equipo Pesado',
+            'Maquinaria Industrial',
+            'Equipo de Construcción',
+            // URBANISMO
+            'Infraestructura Vial',
+            'Espacios Públicos',
+            'Paisajismo',
+            'Redes de Servicio'
+        ];
+        $allowedCategoryIds = \App\Models\Category::whereIn('name', $allowedCategoryNames)->pluck('id')->toArray();
+
+        $query = Model3D::with([
+            'category:id,name',
+            'files' => function($q) {
+                $q->where('file_type', 'preview');
+            }
+        ])
+        ->whereIn('category_id', $allowedCategoryIds)
+            ->select(
+            'id', 'name', 'description', 'price', 'format', 
+            'size_mb', 'publication_date', 'category_id', 'featured', 
+            'sketchfab_id', 'preview_url', 'embed_url', 'sketchfab_url'
+        );
+
+        // Filtros opcionales (igual que index)
+        if ($request->has('category')) {
+            $query->where('category_id', $request->category);
+        }
+        if ($request->has('min_price')) {
+            $query->where('price', '>=', $request->min_price);
+        }
+        if ($request->has('max_price')) {
+            $query->where('price', '<=', $request->max_price);
+        }
+        if ($request->has('format')) {
+            $query->whereIn('format', explode(',', $request->format));
+        }
+        if ($request->has('search')) {
+            $search = $request->search;
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'LIKE', "%{$search}%")
+                  ->orWhere('description', 'LIKE', "%{$search}%");
+            });
+        }
+        $sortField = $request->get('sort_by', 'created_at');
+        $sortOrder = $request->get('sort_order', 'desc');
+        $query->orderBy($sortField, $sortOrder);
 
         return response()->json([
             'success' => true,
-            'data' => $models
+            'data' => $query->get(),
+            'filters' => [
+                'applied' => $request->all(),
+                'available_formats' => Model3D::distinct('format')->pluck('format')
+            ]
         ]);
     }
 
@@ -297,6 +374,8 @@ class ModelController extends Controller
             'format' => 'required|in:DWG,DXF,RVT,SKP,3DS,OBJ,FBX,IFC,DAE,GLTF,GLB,STL,3DM,PLN,3MF,BLEND',
             'size_mb' => 'required|numeric|min:0',
             'category_id' => 'required|exists:categories,id',
+            'category_type' => 'nullable|in:estructural,arquitectura,instalaciones,mobiliario,maquinaria,urbanismo',
+            'metadata' => 'nullable|array',
             'featured' => 'sometimes|boolean',
             'sketchfab_id' => 'nullable|string|max:255'
         ]);
@@ -311,6 +390,9 @@ class ModelController extends Controller
         try {
             DB::beginTransaction();
 
+            $metadata = $request->metadata ?? [];
+            $categoryType = $request->category_type ?? $this->determineCategoryType($request->category_id);
+
             $model = Model3D::create([
                 'name' => $request->name,
                 'description' => $request->description,
@@ -318,6 +400,8 @@ class ModelController extends Controller
                 'format' => $request->format,
                 'size_mb' => $request->size_mb,
                 'category_id' => $request->category_id,
+                'category_type' => $categoryType,
+                'metadata' => $metadata,
                 'featured' => $request->featured ?? false,
                 'publication_date' => now(),
                 'sketchfab_id' => $request->sketchfab_id
@@ -450,6 +534,133 @@ class ModelController extends Controller
                 'message' => 'Error al eliminar',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Determinar el tipo de categoría basado en el nombre de la categoría
+     */
+    private function determineCategoryType($categoryId)
+    {
+        $category = \App\Models\Category::find($categoryId);
+        if (!$category) return null;
+
+        $categoryName = strtolower($category->name);
+
+        if (str_contains($categoryName, 'estructura') || str_contains($categoryName, 'acero') || 
+            str_contains($categoryName, 'concreto') || str_contains($categoryName, 'cimentación') ||
+            str_contains($categoryName, 'portante')) {
+            return 'estructural';
+        } elseif (str_contains($categoryName, 'arquitectura') || str_contains($categoryName, 'residencial') ||
+                 str_contains($categoryName, 'comercial') || str_contains($categoryName, 'fachada') ||
+                 str_contains($categoryName, 'cubierta')) {
+            return 'arquitectura';
+        } elseif (str_contains($categoryName, 'instalación') || str_contains($categoryName, 'eléctrico') ||
+                 str_contains($categoryName, 'fontanería') || str_contains($categoryName, 'hvac') ||
+                 str_contains($categoryName, 'incendio')) {
+            return 'instalaciones';
+        } elseif (str_contains($categoryName, 'mobiliario') || str_contains($categoryName, 'equipamiento')) {
+            return 'mobiliario';
+        } elseif (str_contains($categoryName, 'maquinaria') || str_contains($categoryName, 'equipo') ||
+                 str_contains($categoryName, 'industria')) {
+            return 'maquinaria';
+        } elseif (str_contains($categoryName, 'urbanismo') || str_contains($categoryName, 'infraestructura') ||
+                 str_contains($categoryName, 'vial') || str_contains($categoryName, 'espacio') ||
+                 str_contains($categoryName, 'paisaje') || str_contains($categoryName, 'red')) {
+            return 'urbanismo';
+        }
+
+        return null;
+    }
+
+    /**
+     * Obtener metadatos requeridos según tipo de categoría
+     */
+    public function getMetadataSchema($categoryType)
+    {
+        $schemas = [
+            'estructural' => [
+                'material' => 'string',
+                'resistencia' => 'string',
+                'normativa' => 'string',
+                'cargas' => 'string'
+            ],
+            'arquitectura' => [
+                'area' => 'number',
+                'altura' => 'number',
+                'materiales' => 'string',
+                'estilo' => 'string'
+            ],
+            'instalaciones' => [
+                'diametro' => 'string',
+                'presion' => 'string',
+                'flujo' => 'string',
+                'material' => 'string'
+            ],
+            'mobiliario' => [
+                'dimensiones' => 'string',
+                'material' => 'string',
+                'peso' => 'string',
+                'capacidad' => 'string'
+            ],
+            'maquinaria' => [
+                'potencia' => 'string',
+                'capacidad' => 'string',
+                'dimensiones' => 'string',
+                'ruido' => 'string'
+            ]
+        ];
+
+        return $schemas[$categoryType] ?? [];
+    }
+
+        /**
+     * Obtener la imagen preview de un modelo
+     */
+    public function previewImage($id)
+    {
+        try {
+            $model = Model3D::with(['files' => function($q) {
+                $q->where('file_type', 'preview');
+            }])->find($id);
+
+            if (!$model) {
+                return response()->json(['error' => 'Modelo no encontrado'], 404);
+            }
+
+            if (!$model->files || $model->files->isEmpty()) {
+                return response()->json(['error' => 'No hay imagen preview'], 404);
+            }
+
+            $file = $model->files->first();
+            
+            // Construir la ruta completa del archivo
+            $filePath = str_replace('/storage/', '', $file->file_url);
+            $fullPath = storage_path('app/public/' . $filePath);
+
+            if (!file_exists($fullPath)) {
+                \Log::error("Preview image not found: {$fullPath}");
+                return response()->json(['error' => 'Archivo no encontrado'], 404);
+            }
+
+            // Determinar el content type según la extensión
+            $extension = pathinfo($fullPath, PATHINFO_EXTENSION);
+            $contentType = match($extension) {
+                'jpg', 'jpeg' => 'image/jpeg',
+                'png' => 'image/png',
+                'gif' => 'image/gif',
+                'svg' => 'image/svg+xml',
+                default => 'image/jpeg'
+            };
+
+            return response()->file($fullPath, [
+                'Content-Type' => $contentType,
+                'Cache-Control' => 'public, max-age=86400'
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::error("Error en previewImage: " . $e->getMessage());
+            return response()->json(['error' => 'Error al cargar la imagen'], 500);
         }
     }
 }

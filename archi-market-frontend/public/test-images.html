@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Image Loading</title>
+    <style>
+        body { font-family: Arial; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test { border: 1px solid #ccc; padding: 15px; margin: 15px 0; }
+        img { max-width: 300px; border: 2px solid #9c27b0; }
+        .log { background: #f5f5f5; padding: 10px; margin: 10px 0; border-radius: 4px; font-family: monospace; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Test Image Loading from API</h1>
+        
+        <div class="test">
+            <h2>Test 1: Direct Image Load (Model 1393)</h2>
+            <img id="img1393" src="/api/models/1393/preview-image" alt="Test">
+            <div class="log" id="log1"></div>
+        </div>
+        
+        <div class="test">
+            <h2>Test 2: Image with Full URL</h2>
+            <img id="img2" src="http://localhost:3000/api/models/1393/preview-image" alt="Test 2">
+            <div class="log" id="log2"></div>
+        </div>
+        
+        <div class="test">
+            <h2>Network Test</h2>
+            <button onclick="testFetch()">Test Fetch API</button>
+            <div class="log" id="logFetch"></div>
+        </div>
+    </div>
+    
+    <script>
+        function log(id, msg) {
+            document.getElementById(id).innerHTML += msg + '\n';
+        }
+        
+        // Test 1
+        const img1 = document.getElementById('img1393');
+        img1.onload = () => log('log1', '✅ Image loaded via img tag');
+        img1.onerror = () => log('log1', '❌ Image failed to load via img tag');
+        log('log1', '⏳ Loading...');
+        
+        // Test 2
+        const img2 = document.getElementById('img2');
+        img2.onload = () => log('log2', '✅ Image loaded with full URL');
+        img2.onerror = () => log('log2', '❌ Image failed with full URL');
+        log('log2', '⏳ Loading...');
+        
+        // Test Fetch
+        async function testFetch() {
+            const logDiv = document.getElementById('logFetch');
+            logDiv.innerHTML += '⏳ Testing fetch...\n';
+            
+            try {
+                const response = await fetch('/api/models/1393/preview-image');
+                logDiv.innerHTML += `Status: ${response.status}\n`;
+                logDiv.innerHTML += `Content-Type: ${response.headers.get('content-type')}\n`;
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    logDiv.innerHTML += `✅ Blob size: ${blob.size} bytes\n`;
+                    logDiv.innerHTML += `  Blob type: ${blob.type}\n`;
+                } else {
+                    logDiv.innerHTML += `❌ Response not OK\n`;
+                }
+            } catch (e) {
+                logDiv.innerHTML += `❌ Fetch error: ${e.message}\n`;
+            }
+        }
+    </script>
+</body>
+</html>

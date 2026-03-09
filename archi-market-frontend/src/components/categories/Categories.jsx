@@ -29,6 +29,7 @@ const Categories = () => {
     const [modelsLoading, setModelsLoading] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const [isMobile, setIsMobile] = useState(false);
+    const [realModelCounts, setRealModelCounts] = useState({});
 
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth <= 768);
@@ -53,14 +54,38 @@ const Categories = () => {
             console.log('📦 Categorías:', response.data);
             const categoriesData = response.data.data || response.data || [];
             setCategories(categoriesData);
+            
+            await fetchRealModelCounts(categoriesData);
+            
             if (categoriesData.length > 0) {
-                setSelectedCategory(categoriesData[0]);
+                const firstStructural = categoriesData.find(c => 
+                    c.category_type === 'estructural' || 
+                    determineCategoryType(c.name) === 'estructural'
+                );
+                setSelectedCategory(firstStructural || categoriesData[0]);
             }
         } catch (error) {
             console.error('Error cargando categorías:', error);
         } finally {
             setLoading(false);
         }
+    };
+
+    const fetchRealModelCounts = async (categoriesList) => {
+        const counts = {};
+        const promises = categoriesList.map(async (category) => {
+            try {
+                const response = await API.get(`/categories/${category.id}/models`);
+                const modelsData = response.data.data?.data || response.data.models || [];
+                counts[category.id] = modelsData.length;
+            } catch (error) {
+                console.error(`Error cargando modelos para categoría ${category.name}:`, error);
+                counts[category.id] = 0;
+            }
+        });
+        
+        await Promise.all(promises);
+        setRealModelCounts(counts);
     };
 
     const fetchCategoryModels = async (categoryId) => {
@@ -71,39 +96,150 @@ const Categories = () => {
 
             const modelsData = response.data.data?.data || response.data.models || [];
             setCategoryModels(modelsData);
+            
+            setRealModelCounts(prev => ({
+                ...prev,
+                [categoryId]: modelsData.length
+            }));
         } catch (error) {
             console.error('Error cargando modelos:', error);
+            setCategoryModels([]);
         } finally {
             setModelsLoading(false);
         }
     };
 
-    const getPreviewImage = (model) => {
-        try {
-            if (!model.files || model.files.length === 0) return null;
-            const file = model.files[0];
-            const preview = model.files.find(f => f.file_type === 'preview') || file;
-            if (!file || !file.file_url) return null;
-            //return 'http://127.0.0.1:8000' + file.file_url;
-            return `/api/storage/${preview.file_url.replace('/storage/', '')}`;
-        } catch (error) {
-            return null;
-        }
+    // MISMA FUNCIÓN QUE EN MODEL LIST
+    const getIconByCategory = (categoryName) => {
+        const icons = {
+            'Estructuras de Acero': '🏗️',
+            'Estructuras de Concreto': '🏗️',
+            'Cimentaciones': '🏗️',
+            'Elementos Portantes': '🏗️',
+            'Arquitectura Residencial': '🏠',
+            'Arquitectura Comercial': '🏢',
+            'Fachadas y Cerramientos': '🏛️',
+            'Cubiertas y Azoteas': '🏠',
+            'Sistemas Eléctricos': '⚡',
+            'Fontanería y Tuberías': '🔧',
+            'HVAC (Climatización)': '❄️',
+            'Protección Contra Incendios': '🔥',
+            'Mobiliario de Oficina': '🪑',
+            'Mobiliario Residencial': '🛋️',
+            'Mobiliario Urbano': '🚏',
+            'Equipamiento': '⚙️',
+            'Equipo Pesado': '🏗️',
+            'Maquinaria Industrial': '🏭',
+            'Equipo de Construcción': '🚜',
+            'Infraestructura Vial': '🛣️',
+            'Espacios Públicos': '🏞️',
+            'Paisajismo': '🌳',
+            'Redes de Servicio': '🔌'
+        };
+        return icons[categoryName] || '📦';
+    };
+
+    // MISMA FUNCIÓN QUE EN MODEL LIST
+    const getCategoryColor = (categoryName) => {
+        const colorMap = {
+            'Estructuras de Acero': '#3b82f6',
+            'Estructuras de Concreto': '#3b82f6',
+            'Cimentaciones': '#3b82f6',
+            'Elementos Portantes': '#3b82f6',
+            'Arquitectura Residencial': '#10b981',
+            'Arquitectura Comercial': '#10b981',
+            'Fachadas y Cerramientos': '#10b981',
+            'Cubiertas y Azoteas': '#10b981',
+            'Sistemas Eléctricos': '#f59e0b',
+            'Fontanería y Tuberías': '#f59e0b',
+            'HVAC (Climatización)': '#f59e0b',
+            'Protección Contra Incendios': '#f59e0b',
+            'Mobiliario de Oficina': '#8b5cf6',
+            'Mobiliario Residencial': '#8b5cf6',
+            'Mobiliario Urbano': '#8b5cf6',
+            'Equipamiento': '#8b5cf6',
+            'Equipo Pesado': '#ef4444',
+            'Maquinaria Industrial': '#ef4444',
+            'Equipo de Construcción': '#ef4444',
+            'Infraestructura Vial': '#06b6d4',
+            'Espacios Públicos': '#06b6d4',
+            'Paisajismo': '#06b6d4',
+            'Redes de Servicio': '#06b6d4'
+        };
+        return colorMap[categoryName] || '#3b82f6';
     };
 
     const getCategoryIcon = (categoryName, isActive = false) => {
         const color = isActive ? colors.white : colors.primary;
         const size = isMobile ? 20 : 24;
-        
-        const icons = {
+
+        const iconMap = {
+            'Estructuras de Acero': <FiBox size={size} color={color} />,
+            'Estructuras de Concreto': <FiBox size={size} color={color} />,
+            'Cimentaciones': <FiBox size={size} color={color} />,
+            'Elementos Portantes': <FiBox size={size} color={color} />,
             'Arquitectura Residencial': <FiHome size={size} color={color} />,
-            'Estructural': <FiBox size={size} color={color} />,
             'Arquitectura Comercial': <HiOutlineOfficeBuilding size={size} color={color} />,
-            'Interiores': <FiPackage size={size} color={color} />,
-            'Urbanismo': <FiGrid size={size} color={color} />,
-            'Instalaciones': <HiOutlineLightBulb size={size} color={color} />
+            'Fachadas y Cerramientos': <FiLayers size={size} color={color} />,
+            'Cubiertas y Azoteas': <FiLayers size={size} color={color} />,
+            'Sistemas Eléctricos': <HiOutlineLightBulb size={size} color={color} />,
+            'Fontanería y Tuberías': <FiPackage size={size} color={color} />,
+            'HVAC (Climatización)': <HiOutlineLightBulb size={size} color={color} />,
+            'Protección Contra Incendios': <FiPackage size={size} color={color} />,
+            'Mobiliario de Oficina': <FiPackage size={size} color={color} />,
+            'Mobiliario Residencial': <FiHome size={size} color={color} />,
+            'Mobiliario Urbano': <FiGrid size={size} color={color} />,
+            'Equipamiento': <FiPackage size={size} color={color} />,
+            'Equipo Pesado': <FiBox size={size} color={color} />,
+            'Maquinaria Industrial': <FiBox size={size} color={color} />,
+            'Equipo de Construcción': <FiBox size={size} color={color} />,
+            'Infraestructura Vial': <FiGrid size={size} color={color} />,
+            'Espacios Públicos': <FiGrid size={size} color={color} />,
+            'Paisajismo': <FiGrid size={size} color={color} />,
+            'Redes de Servicio': <FiPackage size={size} color={color} />
         };
-        return icons[categoryName] || <FiGrid size={size} color={color} />;
+        return iconMap[categoryName] || <FiGrid size={size} color={color} />;
+    };
+
+    const groupCategoriesByType = () => {
+        const groups = {
+            'Estructurales': [],
+            'Arquitectura': [],
+            'Instalaciones (MEP)': [],
+            'Mobiliario': [],
+            'Maquinaria': [],
+            'Urbanismo': []
+        };
+
+        const typeMap = {
+            'estructural': 'Estructurales',
+            'arquitectura': 'Arquitectura',
+            'instalaciones': 'Instalaciones (MEP)',
+            'mobiliario': 'Mobiliario',
+            'maquinaria': 'Maquinaria',
+            'urbanismo': 'Urbanismo'
+        };
+
+        categories.forEach(category => {
+            const categoryType = category.category_type || determineCategoryType(category.name);
+            const groupName = typeMap[categoryType] || 'Otros';
+            if (groups[groupName]) {
+                groups[groupName].push({ ...category, _type: categoryType });
+            }
+        });
+
+        return groups;
+    };
+
+    const determineCategoryType = (categoryName) => {
+        const name = categoryName.toLowerCase();
+        if (name.includes('estructura') || name.includes('acero') || name.includes('concreto') || name.includes('cimentación')) return 'estructural';
+        if (name.includes('arquitectura') || name.includes('residencial') || name.includes('comercial') || name.includes('fachada') || name.includes('cubierta')) return 'arquitectura';
+        if (name.includes('instalación') || name.includes('eléctrico') || name.includes('fontanería') || name.includes('hvac') || name.includes('incendio')) return 'instalaciones';
+        if (name.includes('mobiliario') || name.includes('equipamiento')) return 'mobiliario';
+        if (name.includes('maquinaria') || name.includes('equipo') || name.includes('industria')) return 'maquinaria';
+        if (name.includes('urbanismo') || name.includes('infraestructura') || name.includes('vial') || name.includes('espacio') || name.includes('paisaje')) return 'urbanismo';
+        return 'otros';
     };
 
     const filteredModels = categoryModels.filter(model =>
@@ -148,7 +284,6 @@ const Categories = () => {
             gridTemplateColumns: isMobile ? '1fr' : '320px 1fr',
             gap: isMobile ? '1.5rem' : '2rem'
         },
-        // Panel de categorías
         categoriesPanel: {
             backgroundColor: colors.white,
             borderRadius: '24px',
@@ -243,7 +378,6 @@ const Categories = () => {
         categoryArrowActive: {
             color: colors.white
         },
-        // Panel de modelos
         modelsPanel: {
             backgroundColor: colors.white,
             borderRadius: '24px',
@@ -293,7 +427,10 @@ const Categories = () => {
             outline: 'none',
             width: '100%',
             fontSize: '0.95rem',
-            backgroundColor: 'transparent'
+            backgroundColor: 'transparent',
+            '&:focus': {
+                outline: 'none'
+            }
         },
         modelsGrid: {
             display: 'grid',
@@ -318,12 +455,6 @@ const Categories = () => {
             position: 'relative',
             overflow: 'hidden'
         },
-        modelImageTag: {
-            width: '100%',
-            height: '100%',
-            objectFit: 'cover',
-            transition: 'transform 0.5s ease'
-        },
         modelBadge: {
             position: 'absolute',
             top: '0.8rem',
@@ -338,7 +469,8 @@ const Categories = () => {
             display: 'flex',
             alignItems: 'center',
             gap: '0.2rem',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
+            boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
+            zIndex: 10
         },
         modelInfo: {
             padding: isMobile ? '1rem' : '1.2rem'
@@ -348,7 +480,12 @@ const Categories = () => {
             fontWeight: '600',
             color: colors.dark,
             marginBottom: '0.5rem',
-            lineHeight: '1.4'
+            lineHeight: '1.4',
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis'
         },
         modelMeta: {
             display: 'flex',
@@ -361,7 +498,10 @@ const Categories = () => {
         modelMetaItem: {
             display: 'flex',
             alignItems: 'center',
-            gap: '0.3rem'
+            gap: '0.3rem',
+            background: colors.white,
+            padding: '0.2rem 0.8rem',
+            borderRadius: '30px'
         },
         modelPrice: {
             fontSize: isMobile ? '1.1rem' : '1.2rem',
@@ -374,7 +514,11 @@ const Categories = () => {
             gap: '0.5rem',
             marginTop: '0.5rem',
             fontSize: '0.75rem',
-            color: '#94a3b8'
+            color: '#94a3b8',
+            background: colors.white,
+            padding: '0.2rem 0.8rem',
+            borderRadius: '30px',
+            width: 'fit-content'
         },
         loadingState: {
             textAlign: 'center',
@@ -408,7 +552,6 @@ const Categories = () => {
 
     return (
         <div style={styles.container}>
-            {/* Header */}
             <motion.div
                 style={styles.header}
                 initial={{ opacity: 0, y: -20 }}
@@ -424,7 +567,6 @@ const Categories = () => {
             </motion.div>
 
             <div style={styles.mainGrid}>
-                {/* Panel de categorías */}
                 <motion.div
                     style={styles.categoriesPanel}
                     initial={{ opacity: 0, x: -20 }}
@@ -432,58 +574,80 @@ const Categories = () => {
                 >
                     <div style={styles.categoriesHeader}>
                         <div style={styles.categoriesTitle}>
-                            <FiLayers /> Todas las categorías
+                            <FiLayers /> Categorías
                         </div>
                         <span style={styles.categoriesCount}>{categories.length}</span>
                     </div>
 
                     <div style={styles.categoryList}>
-                        {categories.map((category, index) => {
-                            const isActive = selectedCategory?.id === category.id;
+                        {Object.entries(groupCategoriesByType()).map(([groupName, groupCategories]) => {
+                            if (groupCategories.length === 0) return null;
+
                             return (
-                                <motion.div
-                                    key={category.id}
-                                    style={{
-                                        ...styles.categoryItem,
-                                        ...(isActive ? styles.categoryItemActive : {})
-                                    }}
-                                    whileHover={{ x: isMobile ? 0 : 5 }}
-                                    initial={{ opacity: 0, x: -20 }}
-                                    animate={{ opacity: 1, x: 0 }}
-                                    transition={{ delay: index * 0.05 }}
-                                    onClick={() => setSelectedCategory(category)}
-                                >
-                                    <div style={styles.categoryLeft}>
-                                        <div style={{
-                                            ...styles.categoryIcon,
-                                            backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : colors.primary + '10'
-                                        }}>
-                                            {getCategoryIcon(category.name, isActive)}
-                                        </div>
-                                        <span style={{
-                                            ...styles.categoryName,
-                                            ...(isActive ? styles.categoryNameActive : {})
-                                        }}>
-                                            {category.name}
-                                            <span style={{
-                                                ...styles.categoryCount,
-                                                ...(isActive ? styles.categoryCountActive : {})
-                                            }}>
-                                                ({category.models_count || 0})
-                                            </span>
-                                        </span>
+                                <div key={groupName}>
+                                    <div style={{
+                                        fontSize: '0.85rem',
+                                        fontWeight: '700',
+                                        color: colors.primary,
+                                        textTransform: 'uppercase',
+                                        marginTop: '1rem',
+                                        marginBottom: '0.75rem',
+                                        paddingLeft: '0.5rem',
+                                        letterSpacing: '0.5px'
+                                    }}>
+                                        ⭐ {groupName}
                                     </div>
-                                    <FiChevronRight style={{
-                                        ...styles.categoryArrow,
-                                        ...(isActive ? styles.categoryArrowActive : {})
-                                    }} />
-                                </motion.div>
+
+                                    {groupCategories.map((category, index) => {
+                                        const isActive = selectedCategory?.id === category.id;
+                                        const modelCount = realModelCounts[category.id] || 0;
+                                        
+                                        return (
+                                            <motion.div
+                                                key={category.id}
+                                                style={{
+                                                    ...styles.categoryItem,
+                                                    ...(isActive ? styles.categoryItemActive : {})
+                                                }}
+                                                whileHover={{ x: isMobile ? 0 : 5 }}
+                                                initial={{ opacity: 0, x: -20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                                transition={{ delay: index * 0.05 }}
+                                                onClick={() => setSelectedCategory(category)}
+                                            >
+                                                <div style={styles.categoryLeft}>
+                                                    <div style={{
+                                                        ...styles.categoryIcon,
+                                                        backgroundColor: isActive ? 'rgba(255,255,255,0.2)' : colors.primary + '10'
+                                                    }}>
+                                                        {getCategoryIcon(category.name, isActive)}
+                                                    </div>
+                                                    <span style={{
+                                                        ...styles.categoryName,
+                                                        ...(isActive ? styles.categoryNameActive : {})
+                                                    }}>
+                                                        {category.name}
+                                                        <span style={{
+                                                            ...styles.categoryCount,
+                                                            ...(isActive ? styles.categoryCountActive : {})
+                                                        }}>
+                                                            ({modelCount})
+                                                        </span>
+                                                    </span>
+                                                </div>
+                                                <FiChevronRight style={{
+                                                    ...styles.categoryArrow,
+                                                    ...(isActive ? styles.categoryArrowActive : {})
+                                                }} />
+                                            </motion.div>
+                                        );
+                                    })}
+                                </div>
                             );
                         })}
                     </div>
                 </motion.div>
 
-                {/* Panel de modelos */}
                 <motion.div
                     style={styles.modelsPanel}
                     initial={{ opacity: 0, x: 20 }}
@@ -508,6 +672,7 @@ const Categories = () => {
                                 style={styles.searchInput}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
+                                onFocus={(e) => e.target.style.outline = 'none'}
                             />
                         </div>
                     </div>
@@ -524,7 +689,11 @@ const Categories = () => {
                     ) : (
                         <div style={styles.modelsGrid}>
                             {filteredModels.map((model, index) => {
-                                const previewImage = getPreviewImage(model);
+                                const categoryColor = getCategoryColor(selectedCategory?.name);
+                                const icon = getIconByCategory(selectedCategory?.name);
+                                const format = model.format || 'GLTF';
+                                const size = model.size_mb || '0';
+                                const price = model.price || 0;
 
                                 return (
                                     <motion.div
@@ -537,19 +706,21 @@ const Categories = () => {
                                         onClick={() => navigate(`/models/${model.id}`)}
                                     >
                                         <div style={styles.modelImage}>
-                                            {previewImage ? (
-                                                <img
-                                                    src={previewImage}
-                                                    alt={model.name}
-                                                    style={styles.modelImageTag}
-                                                    onError={(e) => {
-                                                        e.target.style.display = 'none';
-                                                        e.target.parentNode.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%"><svg>...</svg></div>';
-                                                    }}
-                                                />
-                                            ) : (
-                                                <HiOutlineCube size={48} color={colors.primary + '40'} />
-                                            )}
+                                            <div style={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'center',
+                                                width: '100%',
+                                                height: '100%',
+                                                background: `linear-gradient(135deg, ${categoryColor}10 0%, ${categoryColor}05 100%)`,
+                                                flexDirection: 'column',
+                                                gap: '0.5rem'
+                                            }}>
+                                                <div style={{ fontSize: '3rem' }}>{icon}</div>
+                                                <div style={{ fontSize: '0.9rem', color: categoryColor }}>
+                                                    {selectedCategory?.name || 'Modelo'}
+                                                </div>
+                                            </div>
                                             <div style={styles.modelBadge}>
                                                 <FiEye size={10} /> 3D
                                             </div>
@@ -558,17 +729,17 @@ const Categories = () => {
                                             <h3 style={styles.modelName}>{model.name}</h3>
                                             <div style={styles.modelMeta}>
                                                 <span style={styles.modelMetaItem}>
-                                                    <FiBox size={12} /> {model.format || 'GLTF'}
+                                                    <FiBox size={12} color={categoryColor} /> {format}
                                                 </span>
                                                 <span style={styles.modelMetaItem}>
-                                                    <FiDownload size={12} /> {model.size_mb || '0'} MB
+                                                    <FiDownload size={12} color={categoryColor} /> {size} MB
                                                 </span>
                                             </div>
                                             <div style={styles.modelPrice}>
-                                                ${model.price?.toFixed(2) || '99.99'}
+                                                ${typeof price === 'number' ? price.toFixed(2) : '0.00'}
                                             </div>
                                             <div style={styles.modelStats}>
-                                                <FiStar /> {model.rating || '4.5'} · {model.downloads || '120'} descargas
+                                                <FiStar color="#fbbf24" /> 4.5 · 128
                                             </div>
                                         </div>
                                     </motion.div>

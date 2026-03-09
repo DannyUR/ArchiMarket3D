@@ -21,23 +21,34 @@ class ImportSketchfabModels extends Command
         $category = $this->argument('category') ?? 'architecture';
         $limit = $this->option('limit');
 
-        $this->info("🔍 Buscando modelos de {$category}...");
+        $this->info("╔════════════════════════════════════════════╗");
+        $this->info("║      IMPORTADOR DE MODELOS SKETCHFAB       ║");
+        $this->info("╚════════════════════════════════════════════╝");
+        $this->newLine();
+
+        $this->info("🔍 Buscando modelos de categoría: <bg=blue> {$category} </>");
+        $this->info("📊 Límite de descarga: {$limit} modelos");
+        $this->newLine();
 
         $models = $sketchfab->searchArchitecturalModels($category, $limit);
 
         if (empty($models)) {
-            $this->error('No se encontraron modelos');
+            $this->error('❌ No se encontraron modelos');
             return 1;
         }
 
-        $this->info("📦 Encontrados " . count($models) . " modelos");
+        $this->info("✅ Encontrados " . count($models) . " modelos en Sketchfab");
+        $this->newLine();
+
         $bar = $this->output->createProgressBar(count($models));
+        $bar->setFormat('%current%/%max% [%bar%] %percent:3s%% %message%');
         $bar->start();
 
         $imported = 0;
         $skipped = 0;
 
         foreach ($models as $sketchfabModel) {
+            $bar->setMessage("Procesando: {$sketchfabModel['name']}");
             $result = $this->importModel($sketchfabModel, $sketchfab);
             if ($result) {
                 $imported++;
@@ -49,7 +60,15 @@ class ImportSketchfabModels extends Command
 
         $bar->finish();
         $this->newLine();
-        $this->info("✅ Importación completada: {$imported} importados, {$skipped} omitidos");
+        $this->newLine();
+
+        $this->info("╔════════════════════════════════════════════╗");
+        $this->info("║           RESUMEN DE IMPORTACIÓN           ║");
+        $this->info("╠════════════════════════════════════════════╣");
+        $this->info("║ ✅ Importados:    <fg=green>{$imported}</> modelos");
+        $this->info("║ ⏭️  Omitidos:     <fg=yellow>{$skipped}</> modelos");
+        $this->info("║ 📊 Total:        " . count($models) . " modelos");
+        $this->info("╚════════════════════════════════════════════╝");
 
         return 0;
     }
@@ -57,7 +76,7 @@ class ImportSketchfabModels extends Command
 protected function importModel($sketchfabModel, $sketchfabService)
 {
     // Verificar si ya existe
-    $exists = Model3D::where('name', $sketchfabModel['name'])->exists();
+    $exists = Model3D::where('sketchfab_id', $sketchfabModel['uid'])->exists();
     if ($exists) return false;
 
     // Obtener detalles
@@ -72,13 +91,18 @@ protected function importModel($sketchfabModel, $sketchfabService)
     }
 
     // Obtener categoría
-    $categoryId = $this->getCategoryId($details['categories'] ?? []);
+    $searchQuery = $this->argument('category') ?? 'architecture';
+    $categoryId = $this->getCategoryId($details['categories'] ?? [], $searchQuery);
+    $category = Category::find($categoryId);
+    $categoryType = $this->determineCategoryType($category);
 
     // Calcular tamaño
     $sizeMb = $this->calculateSize($details);
 
+    // Preparar metadatos según el tipo de categoría
+    $metadata = $this->generateMetadata($details, $categoryType);
+
     // Crear el modelo en BD
-    // Al crear el modelo, agrega:
     $model = Model3D::create([
         'name' => $sketchfabModel['name'],
         'description' => $this->cleanDescription($details['description'] ?? ''),
@@ -86,23 +110,20 @@ protected function importModel($sketchfabModel, $sketchfabService)
         'format' => 'GLTF',
         'size_mb' => $sizeMb,
         'category_id' => $categoryId,
+        'category_type' => $categoryType,
         'featured' => false,
         'publication_date' => now(),
         'sketchfab_id' => $sketchfabModel['uid'],
         'author_name' => $details['user']['username'] ?? 'Sketchfab User',
         'author_avatar' => $details['user']['avatar']['url'] ?? null,
         'author_bio' => $details['user']['bio'] ?? null,
-        // Nuevos campos técnicos
         'polygon_count' => $details['vertexCount'] ?? null,
         'material_count' => $details['materialCount'] ?? null,
-        'has_animations' => $details['animationCount'] > 0 ?? false,
-        'has_rigging' => $details['riggingCount'] > 0 ?? false,
-        'technical_specs' => json_encode($details['technologies'] ?? [])
+        'has_animations' => ($details['animationCount'] ?? 0) > 0,
+        'has_rigging' => ($details['riggingCount'] ?? 0) > 0,
+        'technical_specs' => json_encode($details['technologies'] ?? []),
+        'metadata' => json_encode($metadata),
     ]);
-
-    // Guardar el sketchfab_id
-    $model->sketchfab_id = $sketchfabModel['uid'];
-    $model->save();
 
     // Guardar imagen
     $this->savePreviewImage($model, $details);
@@ -110,40 +131,318 @@ protected function importModel($sketchfabModel, $sketchfabService)
     // Crear licencias
     $this->createLicenses($model);
     
+    $this->line("      ✅ Modelo importado: {$model->name} (Cat: {$category->name})");
     return true;
 }
 
-    protected function getCategoryId($categories)
+    protected function getCategoryId($categories, $searchQuery = '')
     {
-        // Mapear categorías de Sketchfab a tus categorías
+        // Mapeo mejorado con palabras clave y categorías específicas
         $categoryMap = [
-            'architecture' => 'Arquitectura Residencial',
-            'building' => 'Estructural',
+            // Estructuras de Acero
+            'steel structure' => 'Estructuras de Acero',
+            'steel beam' => 'Estructuras de Acero',
+            'steel column' => 'Estructuras de Acero',
+            'steel truss' => 'Estructuras de Acero',
+            'steel frame' => 'Estructuras de Acero',
+            
+            // Estructuras de Concreto
+            'concrete structure' => 'Estructuras de Concreto',
+            'reinforced concrete' => 'Estructuras de Concreto',
+            'concrete beam' => 'Estructuras de Concreto',
+            'concrete column' => 'Estructuras de Concreto',
+            'concrete foundation' => 'Cimentaciones',
+            
+            // Instalaciones
+            'plumbing' => 'Fontanería y Tuberías',
+            'pipe' => 'Fontanería y Tuberías',
+            'valve' => 'Fontanería y Tuberías',
+            'electrical' => 'Sistemas Eléctricos',
+            'wiring' => 'Sistemas Eléctricos',
+            'hvac' => 'HVAC (Climatización)',
+            'air conditioning' => 'HVAC (Climatización)',
+            'duct' => 'HVAC (Climatización)',
+            'sprinkler' => 'Protección Contra Incendios',
+            
+            // Mobiliario
+            'office chair' => 'Mobiliario de Oficina',
+            'office desk' => 'Mobiliario de Oficina',
+            'office furniture' => 'Mobiliario de Oficina',
+            'residential furniture' => 'Mobiliario Residencial',
+            'street furniture' => 'Mobiliario Urbano',
+            
+            // Arquitectura
             'house' => 'Arquitectura Residencial',
-            'interior' => 'Arquitectura Comercial',
-            'bridge' => 'Estructural',
-            'city' => 'Urbanismo',
+            'residential' => 'Arquitectura Residencial',
+            'commercial building' => 'Arquitectura Comercial',
+            'facade' => 'Fachadas y Cerramientos',
+            'roof' => 'Cubiertas y Azoteas',
+            
+            // Maquinaria
+            'construction equipment' => 'Equipo de Construcción',
+            'heavy equipment' => 'Equipo Pesado',
+            'industrial machine' => 'Maquinaria Industrial',
+            
+            // Urbanismo
+            'bridge' => 'Infraestructura Vial',
+            'highway' => 'Infraestructura Vial',
+            'plaza' => 'Espacios Públicos',
+            'landscape' => 'Paisajismo',
+            'pavement' => 'Infraestructura Vial',
         ];
 
+        // Primero, buscar en las categorías de Sketchfab
         foreach ($categories as $cat) {
-            $catName = $cat['name'] ?? '';
+            $catName = strtolower($cat['name'] ?? '');
             foreach ($categoryMap as $key => $value) {
                 if (stripos($catName, $key) !== false) {
-                    $category = Category::firstOrCreate(
-                        ['name' => $value],
-                        ['description' => 'Modelos de ' . $value]
-                    );
+                    $category = Category::where('name', $value)->first();
+                    if ($category) {
+                        $this->info("      📌 Categoría asignada: {$value}");
+                        return $category->id;
+                    }
+                }
+            }
+        }
+
+        // Si no encuentra, usar la palabra clave de búsqueda
+        $searchLower = strtolower($searchQuery);
+        foreach ($categoryMap as $key => $value) {
+            if (stripos($searchLower, $key) !== false) {
+                $category = Category::where('name', $value)->first();
+                if ($category) {
+                    $this->info("      📌 Categoría asignada por búsqueda: {$value}");
                     return $category->id;
                 }
             }
         }
 
         // Categoría por defecto
-        $default = Category::firstOrCreate(
-            ['name' => 'Arquitectura'],
-            ['description' => 'Modelos arquitectónicos generales']
-        );
-        return $default->id;
+        $default = Category::where('name', 'Arquitectura Residencial')->first();
+        if (!$default) {
+            $default = Category::first();
+        }
+        $this->info("      📌 Categoría por defecto: {$default->name}");
+        return $default?->id ?? 1;
+    }
+
+    protected function determineCategoryType($category)
+    {
+        if (!$category) return 'arquitectura';
+
+        $categoryName = strtolower($category->name);
+
+        // Mapear categorías a tipos
+        $typeMap = [
+            // Estructurales
+            'acero' => 'estructural',
+            'hormigón' => 'estructural',
+            'cimentación' => 'estructural',
+            'columna' => 'estructural',
+            'viga' => 'estructural',
+            'cercha' => 'estructural',
+            'marco' => 'estructural',
+            'estructura' => 'estructural',
+            'cubierta' => 'estructural',
+            
+            // Arquitectura
+            'diseño' => 'arquitectura',
+            'edificio' => 'arquitectura',
+            'vivienda' => 'arquitectura',
+            'interior' => 'arquitectura',
+            'fachada' => 'arquitectura',
+            'estilo' => 'arquitectura',
+            'minimalismo' => 'arquitectura',
+            
+            // Instalaciones
+            'hvac' => 'instalaciones',
+            'sanitaria' => 'instalaciones',
+            'eléctrica' => 'instalaciones',
+            'incendio' => 'instalaciones',
+            
+            // Mobiliario
+            'mobiliario' => 'mobiliario',
+            'silla' => 'mobiliario',
+            'mesa' => 'mobiliario',
+            'escritorio' => 'mobiliario',
+            'armario' => 'mobiliario',
+            
+            // Maquinaria
+            'máquina' => 'maquinaria',
+            'equipo' => 'maquinaria',
+            'herramienta' => 'maquinaria',
+            'industrial' => 'maquinaria',
+            
+            // Urbanismo
+            'urbanismo' => 'urbanismo',
+            'urban' => 'urbanismo',
+            'ciudad' => 'urbanismo',
+            'paisajismo' => 'urbanismo',
+            'transporte' => 'urbanismo',
+        ];
+
+        foreach ($typeMap as $key => $type) {
+            if (stripos($categoryName, $key) !== false) {
+                return $type;
+            }
+        }
+
+        return 'arquitectura'; // Por defecto
+    }
+
+    protected function generateMetadata($details, $categoryType)
+    {
+        $metadata = [];
+
+        // Metadatos básicos para todos
+        $metadata['polygon_count'] = $details['vertexCount'] ?? 0;
+        $metadata['material_count'] = $details['materialCount'] ?? 0;
+        $metadata['has_animations'] = ($details['animationCount'] ?? 0) > 0;
+        $metadata['has_rigging'] = ($details['riggingCount'] ?? 0) > 0;
+
+        // Metadatos específicos según el tipo de categoría
+        switch ($categoryType) {
+            case 'estructural':
+                $metadata['material'] = $this->guessMaterial($details);
+                $metadata['resistencia'] = $this->guessResistance($details);
+                $metadata['sistemas_disponibles'] = ['estructura', 'detalles', 'planos'];
+                break;
+
+            case 'arquitectura':
+                $metadata['area_aproximada'] = $this->guessArea($details);
+                $metadata['altura'] = $this->guessHeight($details);
+                $metadata['estilo'] = $this->guessStyle($details);
+                $metadata['render_calidad'] = 'Alta';
+                break;
+
+            case 'instalaciones':
+                $metadata['tipo_sistema'] = $this->guessInstallationType($details);
+                $metadata['diametro'] = 'Especificaciones según proyecto';
+                $metadata['presion_nominal'] = 'Varía según uso';
+                break;
+
+            case 'mobiliario':
+                $metadata['dimensiones'] = 'Ver especificaciones técnicas';
+                $metadata['material'] = $this->guessMaterial($details);
+                $metadata['estilo'] = $this->guessStyle($details);
+                break;
+
+            case 'maquinaria':
+                $metadata['potencia'] = 'Ver especificaciones técnicas';
+                $metadata['tipo_equipo'] = 'Equipo industrial';
+                $metadata['capacidad'] = 'Variable';
+                break;
+
+            case 'urbanismo':
+                $metadata['area_cobertura'] = $this->guessArea($details);
+                $metadata['densidad'] = 'Urbana';
+                $metadata['escala'] = 'Según proyecto';
+                break;
+        }
+
+        return $metadata;
+    }
+
+    protected function guessMaterial($details)
+    {
+        $description = strtolower($details['description'] ?? '');
+        $name = strtolower($details['name'] ?? '');
+        $text = $description . ' ' . $name;
+
+        $materials = [
+            'acero' => 'Acero',
+            'hormigón' => 'Hormigón',
+            'vidrio' => 'Vidrio',
+            'madera' => 'Madera',
+            'concreto' => 'Hormigón',
+            'ladrillo' => 'Ladrillo',
+            'piedra' => 'Piedra',
+            'aluminio' => 'Aluminio',
+        ];
+
+        foreach ($materials as $key => $value) {
+            if (stripos($text, $key) !== false) {
+                return $value;
+            }
+        }
+
+        return 'Mixto';
+    }
+
+    protected function guessResistance($details)
+    {
+        $description = strtolower($details['description'] ?? '');
+        
+        if (stripos($description, 'carga') !== false || stripos($description, 'pesado') !== false) {
+            return '> 500 kg/m²';
+        }
+        return '250-500 kg/m²';
+    }
+
+    protected function guessArea($details)
+    {
+        $vertexCount = $details['vertexCount'] ?? 10000;
+        
+        if ($vertexCount > 100000) {
+            return '> 5000 m²';
+        } elseif ($vertexCount > 50000) {
+            return '2000-5000 m²';
+        } else {
+            return '< 2000 m²';
+        }
+    }
+
+    protected function guessHeight($details)
+    {
+        $description = strtolower($details['description'] ?? '');
+        
+        if (stripos($description, 'torre') !== false || stripos($description, 'high') !== false) {
+            return '> 30 metros';
+        } elseif (stripos($description, 'edificio') !== false) {
+            return '15-30 metros';
+        }
+        return '< 15 metros';
+    }
+
+    protected function guessStyle($details)
+    {
+        $description = strtolower($details['description'] ?? '');
+        $name = strtolower($details['name'] ?? '');
+        $text = $description . ' ' . $name;
+
+        $styles = [
+            'moderno' => 'Moderno',
+            'contemporary' => 'Contemporáneo',
+            'clásico' => 'Clásico',
+            'minimalista' => 'Minimalista',
+            'industrial' => 'Industrial',
+            'art deco' => 'Art Déco',
+        ];
+
+        foreach ($styles as $key => $value) {
+            if (stripos($text, $key) !== false) {
+                return $value;
+            }
+        }
+
+        return 'Contemporáneo';
+    }
+
+    protected function guessInstallationType($details)
+    {
+        $description = strtolower($details['description'] ?? '');
+        $name = strtolower($details['name'] ?? '');
+        $text = $description . ' ' . $name;
+
+        if (stripos($text, 'hvac') !== false || stripos($text, 'aire') !== false) {
+            return 'HVAC';
+        } elseif (stripos($text, 'sanitaria') !== false || stripos($text, 'agua') !== false) {
+            return 'Sanitaria';
+        } elseif (stripos($text, 'eléctrica') !== false || stripos($text, 'electricidad') !== false) {
+            return 'Eléctrica';
+        }
+
+        return 'General';
     }
 
 protected function calculateSize($details)
@@ -176,6 +475,12 @@ protected function calculateSize($details)
                 return;
             }
 
+            // Determinar la extensión desde la URL
+            $extension = pathinfo(parse_url($imageUrl, PHP_URL_PATH), PATHINFO_EXTENSION);
+            if (!in_array($extension, ['jpg', 'jpeg', 'png'])) {
+                $extension = 'jpg'; // Por defecto
+            }
+
             // Descargar la imagen
             $response = Http::timeout(30)->get($imageUrl);
             
@@ -184,8 +489,8 @@ protected function calculateSize($details)
                 $path = 'models/' . $model->id;
                 Storage::disk('public')->makeDirectory($path);
                 
-                // Generar nombre único
-                $filename = $path . '/preview_' . time() . '.jpg';
+                // Generar nombre único con extensión correcta
+                $filename = $path . '/preview_' . time() . '.' . $extension;
                 
                 // Guardar en storage
                 Storage::disk('public')->put($filename, $response->body());
@@ -193,7 +498,7 @@ protected function calculateSize($details)
                 // Crear registro en model_files
                 ModelFile::create([
                     'model_id' => $model->id,
-                    'file_url' => '/storage/' . $filename, // 👈 IMPORTANTE: con /storage/
+                    'file_url' => '/storage/' . $filename,
                     'file_type' => 'preview',
                 ]);
 
@@ -208,15 +513,33 @@ protected function calculateSize($details)
     {
         if (isset($details['thumbnails']['images'])) {
             $images = $details['thumbnails']['images'];
+            
+            // Ordenar por tamaño descendente
             usort($images, function($a, $b) {
                 return ($b['width'] ?? 0) - ($a['width'] ?? 0);
             });
+            
+            // Buscar la primera imagen JPG (no SVG)
+            foreach ($images as $img) {
+                $url = $img['url'] ?? '';
+                // Preferir JPG, JPEG, PNG sobre SVG
+                if (preg_match('/\.(jpg|jpeg|png)$/i', $url)) {
+                    return $url;
+                }
+            }
+            
+            // Si no hay JPG, devolver la más grande (pero será SVG)
             return $images[0]['url'] ?? null;
         }
 
-        return $details['thumbnails']['url'] ?? null;
+        // Si solo hay una URL, verificar que no sea SVG
+        $url = $details['thumbnails']['url'] ?? null;
+        if ($url && preg_match('/\.(jpg|jpeg|png)$/i', $url)) {
+            return $url;
+        }
+        
+        return null;
     }
-
     protected function createLicenses($model)
     {
         $basePrice = $model->price;

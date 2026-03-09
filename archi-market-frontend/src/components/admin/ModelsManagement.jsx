@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     FiPackage,
@@ -35,8 +35,14 @@ const ModelsManagement = () => {
         format: 'OBJ',
         size_mb: '',
         category_id: '',
+        category_type: '',
+        metadata: {},
         featured: false
     });
+    const [previewFile, setPreviewFile] = useState(null);
+    const [previewUrl, setPreviewUrl] = useState('');
+    const [uploadingPreview, setUploadingPreview] = useState(false);
+    const fileInputRef = useRef();
     const [isMobile, setIsMobile] = useState(false);
 
     useEffect(() => {
@@ -54,7 +60,13 @@ const ModelsManagement = () => {
         try {
             const response = await API.get('/admin/models');
             console.log('Modelos recibidos:', response.data);
-            setModels(response.data.data || []);
+            if (response.data && response.data.data && Array.isArray(response.data.data.data)) {
+                setModels(response.data.data.data);
+            } else if (Array.isArray(response.data.data)) {
+                setModels(response.data.data);
+            } else {
+                setModels([]);
+            }
         } catch (error) {
             console.error('Error cargando modelos:', error);
             showError('Error al cargar los modelos');
@@ -132,11 +144,15 @@ const ModelsManagement = () => {
             format: 'OBJ',
             size_mb: '',
             category_id: '',
+            category_type: '',
+            metadata: {},
             featured: false
         });
+        setPreviewFile(null);
+        setPreviewUrl('');
     };
 
-    const openEditModal = (model) => {
+    const openEditModal = async (model) => {
         setEditingModel(model);
         setFormData({
             name: model.name,
@@ -145,9 +161,81 @@ const ModelsManagement = () => {
             format: model.format,
             size_mb: model.size_mb,
             category_id: model.category_id,
+            category_type: model.category_type || '',
+            metadata: model.metadata || {},
             featured: model.featured
         });
+        try {
+            const res = await API.get(`/models/${model.id}/files/preview`);
+            const previews = res.data.data || [];
+            if (previews.length > 0) {
+                setPreviewFile(previews[0]);
+                setPreviewUrl(previews[0].file_url.startsWith('http') ? previews[0].file_url : `${process.env.REACT_APP_API_URL || ''}${previews[0].file_url}`);
+            } else {
+                setPreviewFile(null);
+                setPreviewUrl('');
+            }
+        } catch (e) {
+            setPreviewFile(null);
+            setPreviewUrl('');
+        }
         setShowModal(true);
+    };
+
+    const handlePreviewUpload = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        setUploadingPreview(true);
+        const data = new FormData();
+        data.append('model_id', editingModel.id);
+        data.append('file', file);
+        data.append('file_type', 'preview');
+        try {
+            await API.post(`/admin/models/${editingModel.id}/files`, data, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            showSuccess('Preview actualizado');
+            openEditModal(editingModel);
+        } catch (err) {
+            showError('Error al subir preview');
+        }
+        setUploadingPreview(false);
+    };
+
+    const handleDeletePreview = async () => {
+        if (!previewFile) return;
+        if (!window.confirm('¿Eliminar la imagen de preview?')) return;
+        try {
+            await API.delete(`/admin/models/${editingModel.id}/files/${previewFile.id}`);
+            showSuccess('Preview eliminado');
+            setPreviewFile(null);
+            setPreviewUrl('');
+        } catch (err) {
+            showError('Error al eliminar preview');
+        }
+    };
+
+    const getMetadataSchema = (categoryType) => {
+        const schemas = {
+            'estructural': { material: '', resistencia: '', normativa: '', cargas: '' },
+            'arquitectura': { area: '', altura: '', materiales: '', estilo: '' },
+            'instalaciones': { diametro: '', presion: '', flujo: '', material: '' },
+            'mobiliario': { dimensiones: '', material: '', peso: '', capacidad: '' },
+            'maquinaria': { potencia: '', capacidad: '', dimensiones: '', ruido: '' }
+        };
+        return schemas[categoryType] || {};
+    };
+
+    const determineCategoryType = (categoryId) => {
+        const category = categories.find(c => c.id === categoryId);
+        if (!category) return '';
+        const name = category.name.toLowerCase();
+        if (name.includes('estructura') || name.includes('acero') || name.includes('concreto')) return 'estructural';
+        if (name.includes('arquitectura') || name.includes('residencial') || name.includes('comercial')) return 'arquitectura';
+        if (name.includes('instalación') || name.includes('eléctrico') || name.includes('fontanería')) return 'instalaciones';
+        if (name.includes('mobiliario')) return 'mobiliario';
+        if (name.includes('maquinaria') || name.includes('equipo')) return 'maquinaria';
+        return '';
     };
 
     const filteredModels = models.filter(model => {
@@ -159,12 +247,16 @@ const ModelsManagement = () => {
 
     const formats = [...new Set(models.map(m => m.format))];
 
+    const totalModels = models.length;
+    const featuredModels = models.filter(m => m.featured).length;
+    const totalDownloads = models.reduce((acc, m) => acc + (m.downloads || 0), 0);
+    const totalSize = models.reduce((acc, m) => acc + (m.size_mb || 0), 0).toFixed(0);
+
     const styles = {
         container: {
             padding: isMobile ? '1rem' : '1.5rem',
             width: '100%'
         },
-        // Header con título y botón
         header: {
             display: 'flex',
             justifyContent: 'space-between',
@@ -173,17 +265,12 @@ const ModelsManagement = () => {
         },
         title: {
             fontSize: isMobile ? '1.3rem' : '1.5rem',
-            fontWeight: '600',
-            color: colors.dark,
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem',
-            margin: 0
+            fontWeight: '500',
+            color: colors.dark
         },
         addButton: {
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
             gap: '0.5rem',
             padding: '0.75rem 1.5rem',
             backgroundColor: colors.primary,
@@ -191,18 +278,12 @@ const ModelsManagement = () => {
             border: 'none',
             borderRadius: '8px',
             cursor: 'pointer',
-            fontWeight: '500',
             fontSize: '0.95rem',
-            whiteSpace: 'nowrap',
-            transition: 'background-color 0.2s',
-            ':hover': {
-                backgroundColor: colors.secondary
-            }
+            fontWeight: '500',
+            transition: 'all 0.2s'
         },
-        // Stats cards
         statsGrid: {
             display: 'grid',
-            gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
             gap: '1rem',
             marginBottom: '1.5rem'
         },
@@ -223,7 +304,6 @@ const ModelsManagement = () => {
             fontSize: isMobile ? '0.75rem' : '0.85rem',
             color: '#64748b'
         },
-        // Top Bar con búsqueda (EXACTAMENTE IGUAL AL DASHBOARD)
         topBar: {
             display: 'flex',
             flexDirection: isMobile ? 'column' : 'row',
@@ -252,10 +332,7 @@ const ModelsManagement = () => {
             outline: 'none',
             backgroundColor: 'transparent',
             width: '100%',
-            fontSize: '0.95rem',
-            '::placeholder': {
-                color: '#94a3b8'
-            }
+            fontSize: '0.95rem'
         },
         filterGroup: {
             display: 'flex',
@@ -278,7 +355,6 @@ const ModelsManagement = () => {
             backgroundPosition: 'right 0.5rem center',
             backgroundSize: '16px'
         },
-        // Vista para móvil (tarjetas)
         cardsContainer: {
             display: 'grid',
             gridTemplateColumns: '1fr',
@@ -364,7 +440,6 @@ const ModelsManagement = () => {
             fontSize: '0.8rem',
             color: colors.dark
         },
-        // Vista para desktop (tabla)
         tableContainer: {
             backgroundColor: '#fff',
             borderRadius: '12px',
@@ -396,7 +471,10 @@ const ModelsManagement = () => {
         modelInfo: {
             display: 'flex',
             alignItems: 'center',
-            gap: '0.75rem'
+            gap: '0.75rem',
+            maxWidth: 260,
+            minWidth: 180,
+            overflow: 'hidden',
         },
         modelIcon: {
             width: '36px',
@@ -406,11 +484,18 @@ const ModelsManagement = () => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            color: colors.primary
+            color: colors.primary,
+            flexShrink: 0
         },
         modelName: {
             fontWeight: '500',
-            color: colors.dark
+            color: colors.dark,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            maxWidth: 180,
+            display: 'inline-block',
+            cursor: 'pointer'
         },
         badge: {
             display: 'inline-flex',
@@ -440,10 +525,7 @@ const ModelsManagement = () => {
             cursor: 'pointer',
             color: '#64748b',
             borderRadius: '4px',
-            fontSize: '1rem',
-            ':hover': {
-                color: colors.primary
-            }
+            fontSize: '1rem'
         },
         loadingState: {
             textAlign: 'center',
@@ -458,7 +540,6 @@ const ModelsManagement = () => {
             borderRadius: '12px',
             border: `2px solid ${colors.primary}`
         },
-        // Modal
         modalOverlay: {
             position: 'fixed',
             top: 0,
@@ -571,11 +652,6 @@ const ModelsManagement = () => {
         }
     };
 
-    const totalModels = models.length;
-    const featuredModels = models.filter(m => m.featured).length;
-    const totalDownloads = models.reduce((acc, m) => acc + (m.downloads || 0), 0);
-    const totalSize = models.reduce((acc, m) => acc + (m.size_mb || 0), 0).toFixed(0);
-
     if (loading) {
         return (
             <div style={styles.container}>
@@ -587,18 +663,21 @@ const ModelsManagement = () => {
     return (
         <div style={styles.container}>
             {/* Header con título y botón a la derecha */}
-            <div style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                marginBottom: '1.5rem'
-            }}>
-                <button style={styles.addButton} onClick={() => { resetForm(); setShowModal(true); }}>
+            <div style={styles.header}>
+                <h2 style={styles.title}>Gestión de Modelos 3D</h2>
+                <button 
+                    style={styles.addButton} 
+                    onClick={() => { resetForm(); setShowModal(true); }}
+                >
                     <FiPlus /> Nuevo Modelo
                 </button>
             </div>
 
             {/* Stats Cards */}
-            <div style={styles.statsGrid}>
+            <div style={{
+                ...styles.statsGrid,
+                gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)'
+            }}>
                 <div style={styles.statCard}>
                     <div style={styles.statValue}>{totalModels}</div>
                     <div style={styles.statLabel}>Total modelos</div>
@@ -617,7 +696,7 @@ const ModelsManagement = () => {
                 </div>
             </div>
 
-            {/* Top Bar con búsqueda (IGUAL AL DASHBOARD) */}
+            {/* Top Bar con búsqueda */}
             <div style={styles.topBar}>
                 <div style={styles.searchBox}>
                     <FiSearch color="#94a3b8" />
@@ -631,14 +710,22 @@ const ModelsManagement = () => {
                 </div>
 
                 <div style={styles.filterGroup}>
-                    <select style={styles.filterSelect} value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
+                    <select 
+                        style={styles.filterSelect} 
+                        value={filterCategory} 
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                    >
                         <option value="all">Todas las categorías</option>
                         {categories.map(cat => (
                             <option key={cat.id} value={cat.id}>{cat.name}</option>
                         ))}
                     </select>
 
-                    <select style={styles.filterSelect} value={filterFormat} onChange={(e) => setFilterFormat(e.target.value)}>
+                    <select 
+                        style={styles.filterSelect} 
+                        value={filterFormat} 
+                        onChange={(e) => setFilterFormat(e.target.value)}
+                    >
                         <option value="all">Todos los formatos</option>
                         {formats.map(f => (
                             <option key={f} value={f}>{f}</option>
@@ -753,19 +840,20 @@ const ModelsManagement = () => {
                                         </td>
                                     </tr>
                                 ) : (
-                                    filteredModels.map((model, index) => (
+                                    filteredModels.map((model) => (
                                         <motion.tr
                                             key={model.id}
                                             initial={{ opacity: 0 }}
                                             animate={{ opacity: 1 }}
-                                            transition={{ delay: index * 0.05 }}
                                         >
                                             <td style={styles.td}>
                                                 <div style={styles.modelInfo}>
                                                     <div style={styles.modelIcon}>
                                                         <HiOutlineCube size={18} />
                                                     </div>
-                                                    <span style={styles.modelName}>{model.name}</span>
+                                                    <span style={styles.modelName} title={model.name}>
+                                                        {model.name}
+                                                    </span>
                                                 </div>
                                             </td>
                                             <td style={styles.td}>{model.category?.name || '-'}</td>
@@ -815,7 +903,7 @@ const ModelsManagement = () => {
                 </div>
             )}
 
-            {/* Modal */}
+            {/* Modal para crear/editar modelo */}
             <AnimatePresence>
                 {showModal && (
                     <motion.div
@@ -823,14 +911,12 @@ const ModelsManagement = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
-                        onClick={() => setShowModal(false)}
                     >
                         <motion.div
                             style={styles.modal}
-                            initial={{ scale: 0.9, y: 20 }}
-                            animate={{ scale: 1, y: 0 }}
-                            exit={{ scale: 0.9, y: 20 }}
-                            onClick={e => e.stopPropagation()}
+                            initial={{ scale: 0.9, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.9, opacity: 0 }}
                         >
                             <div style={styles.modalHeader}>
                                 <h3 style={styles.modalTitle}>
@@ -842,6 +928,40 @@ const ModelsManagement = () => {
                             </div>
 
                             <form onSubmit={handleSubmit}>
+                                {/* Imagen de preview actual y controles */}
+                                <div style={{ marginBottom: '1.2rem' }}>
+                                    <label style={styles.label}>Imagen de Preview</label>
+                                    {previewUrl ? (
+                                        <div style={{ marginBottom: 8 }}>
+                                            <img 
+                                                src={previewUrl} 
+                                                alt="Preview" 
+                                                style={{ maxWidth: '100%', maxHeight: 180, borderRadius: 8, border: '1px solid #eee' }} 
+                                            />
+                                            <div style={{ marginTop: 6, display: 'flex', gap: 8 }}>
+                                                <button 
+                                                    type="button" 
+                                                    style={{ ...styles.cancelBtn, background: '#f87171', color: 'white' }} 
+                                                    onClick={handleDeletePreview}
+                                                >
+                                                    Eliminar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div style={{ color: '#64748b', marginBottom: 8 }}>No hay imagen de preview</div>
+                                    )}
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        ref={fileInputRef}
+                                        style={{ display: 'block', marginTop: 8 }}
+                                        onChange={handlePreviewUpload}
+                                        disabled={uploadingPreview}
+                                    />
+                                    {uploadingPreview && <div style={{ color: colors.primary, marginTop: 4 }}>Subiendo imagen...</div>}
+                                </div>
+
                                 <div style={styles.formGroup}>
                                     <label style={styles.label}>Nombre *</label>
                                     <input
@@ -916,7 +1036,15 @@ const ModelsManagement = () => {
                                         <select
                                             name="category_id"
                                             value={formData.category_id}
-                                            onChange={handleInputChange}
+                                            onChange={(e) => {
+                                                handleInputChange(e);
+                                                const categoryType = determineCategoryType(e.target.value);
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    category_type: categoryType,
+                                                    metadata: getMetadataSchema(categoryType)
+                                                }));
+                                            }}
                                             style={styles.select}
                                             required
                                         >
@@ -927,6 +1055,45 @@ const ModelsManagement = () => {
                                         </select>
                                     </div>
                                 </div>
+
+                                {/* Metadatos dinámicos según categoría */}
+                                {formData.category_type && Object.keys(getMetadataSchema(formData.category_type)).length > 0 && (
+                                    <div style={{
+                                        ...styles.formGroup,
+                                        backgroundColor: colors.primary + '05',
+                                        padding: '1rem',
+                                        borderRadius: '8px',
+                                        border: `1px solid ${colors.primary}20`
+                                    }}>
+                                        <label style={{ ...styles.label, fontWeight: '600', marginBottom: '1rem' }}>
+                                            📋 Metadatos específicos de {formData.category_type}
+                                        </label>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                            {Object.keys(getMetadataSchema(formData.category_type)).map(key => (
+                                                <div key={key} style={styles.formGroup}>
+                                                    <label style={styles.label}>
+                                                        {key.charAt(0).toUpperCase() + key.slice(1)}
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        placeholder={`Ej: ${key}`}
+                                                        value={formData.metadata[key] || ''}
+                                                        onChange={(e) => {
+                                                            setFormData(prev => ({
+                                                                ...prev,
+                                                                metadata: {
+                                                                    ...prev.metadata,
+                                                                    [key]: e.target.value
+                                                                }
+                                                            }));
+                                                        }}
+                                                        style={styles.input}
+                                                    />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div style={styles.checkbox}>
                                     <input

@@ -11,8 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('review_replies', function (Blueprint $table) {
-            $table->foreignId('parent_reply_id')->nullable()->constrained('review_replies')->onDelete('cascade');
+        Schema::table('model_files', function (Blueprint $table) {
+            $table->string('origin')->nullable()->after('file_type'); // 'sketchfab' o 'manual'
         });
     }
 
@@ -21,8 +21,8 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('review_replies', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('parent_reply_id');
+        Schema::table('model_files', function (Blueprint $table) {
+            $table->dropColumn('origin');
         });
     }
 };

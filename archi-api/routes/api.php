@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ReviewLikeController;
 use App\Http\Controllers\Api\ReviewReplyController;
 use App\Http\Controllers\Api\ReviewReplyLikeController;
 use App\Http\Controllers\Api\ModelFileController;
+use App\Http\Controllers\Api\ImageController;
 use App\Http\Controllers\Api\LicenseController;
 use App\Http\Controllers\Api\MixedRealityController;
 use App\Http\Controllers\Api\Admin\DashboardController;
@@ -126,10 +127,14 @@ Route::prefix('models')->group(function () {
     Route::get('/featured', [ModelController::class, 'featured']);
     Route::get('/latest', [ModelController::class, 'latest']);
     Route::get('/search', [ModelController::class, 'search']);
+    Route::get('/{modelId}/preview-image', [ImageController::class, 'preview']);
     Route::get('/{id}', [ModelController::class, 'show']);
     Route::get('/{id}/reviews', [ReviewController::class, 'index']);
     Route::get('/{id}/files/preview', [ModelFileController::class, 'previews']);
 });
+
+// ✅ PROXY DE IMÁGENES (NUEVA RUTA)
+Route::get('/proxy/image', [App\Http\Controllers\Api\ProxyController::class, 'image']);
 
 // Categorías
 Route::prefix('categories')->group(function () {
