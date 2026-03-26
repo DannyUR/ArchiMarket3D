@@ -95,7 +95,7 @@ const Navbar = () => {
             backdropFilter: scrolled || !isLandingPage ? 'blur(10px)' : 'none',
             boxShadow: scrolled || !isLandingPage ? '0 4px 20px rgba(0,0,0,0.05)' : 'none',
             padding: isMobile ? '0.8rem 1rem' : '1rem 2rem',
-            position: 'fixed', // Cambia de 'sticky' a 'fixed'
+            position: 'fixed',
             top: 0,
             left: 0,
             right: 0,
@@ -149,11 +149,11 @@ const Navbar = () => {
             zIndex: 999,
             display: isOpen ? 'flex' : 'none',
             flexDirection: 'column',
-            padding: '80px 1.5rem 2rem', // ← Ajustado el padding superior
+            padding: '80px 1.5rem 2rem',
             overflowY: 'auto',
-            WebkitOverflowScrolling: 'touch', // ← Scroll suave en iOS
-            height: '100vh', // ← Altura completa
-            width: '100vw', // ← Ancho completo
+            WebkitOverflowScrolling: 'touch',
+            height: '100vh',
+            width: '100vw',
             boxSizing: 'border-box'
         },
         link: {
@@ -248,7 +248,7 @@ const Navbar = () => {
             textOverflow: 'ellipsis',
             whiteSpace: 'nowrap'
         },
-        // Dropdown - VERSIÓN MEJORADA
+        // Dropdown
         dropdownOverlay: {
             position: 'fixed',
             top: 0,
@@ -366,8 +366,8 @@ const Navbar = () => {
         <nav style={styles.navbar}>
             <div style={styles.container}>
                 {/* Logo */}
-                <Link to="/" style={styles.logo}>
-                    <HiOutlineCube size={isMobile ? 28 : 32} style={styles.logoIcon} />
+                <Link to={isLoggedIn ? '/home' : '/'} style={styles.logo}>
+                    <HiOutlineCube size={isMobile ? 28 : 32} />
                     <span>ArchiMarket3D</span>
                 </Link>
 
@@ -377,6 +377,23 @@ const Navbar = () => {
                         {/* Links normales (solo si no es landing) */}
                         {!isLandingPage && (
                             <>
+                                <Link
+                                    to="/home"
+                                    style={{
+                                        ...styles.link,
+                                        ...(location.pathname === '/home' ? styles.linkActive : {})
+                                    }}
+                                >
+                                    Inicio
+                                    {location.pathname === '/home' && (
+                                        <motion.div
+                                            layoutId="underline"
+                                            style={styles.linkUnderline}
+                                            initial={false}
+                                            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                                        />
+                                    )}
+                                </Link>
                                 <Link
                                     to="/models"
                                     style={{
@@ -642,7 +659,6 @@ const Navbar = () => {
                                     exit={{ x: '100%' }}
                                     transition={{ type: 'spring', damping: 20 }}
                                 >
-
                                     {/* Logo en móvil */}
                                     <div style={{ marginBottom: '2rem', textAlign: 'center' }}>
                                         <HiOutlineCube size={60} color={colors.primary} />
@@ -652,6 +668,22 @@ const Navbar = () => {
                                     {/* Links móvil */}
                                     {!isLandingPage && (
                                         <div style={{ width: '100%' }}>
+                                            <Link
+                                                to="/home"
+                                                style={{
+                                                    display: 'block',
+                                                    color: colors.dark,
+                                                    fontSize: '1.2rem',
+                                                    padding: '1rem',
+                                                    textDecoration: 'none',
+                                                    borderBottom: '1px solid #f0f0f0',
+                                                    width: '100%',
+                                                    boxSizing: 'border-box'
+                                                }}
+                                                onClick={() => setIsOpen(false)}
+                                            >
+                                                Inicio
+                                            </Link>
                                             <Link
                                                 to="/models"
                                                 style={{

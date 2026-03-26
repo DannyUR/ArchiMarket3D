@@ -4,8 +4,11 @@ namespace App\Console\Commands;
 
 use App\Models\Category;
 use App\Models\Model3d;
+use App\Models\ModelFile;
 use App\Services\SketchfabService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 class SketchfabImportAll extends Command
 {
@@ -16,6 +19,7 @@ class SketchfabImportAll extends Command
     private $totalImported = 0;
     private $totalErrors = 0;
     private $totalSkipped = 0;
+    private $totalFilesDownloaded = 0;
 
     public function __construct(SketchfabService $sketchfabService)
     {
@@ -58,8 +62,8 @@ class SketchfabImportAll extends Command
         $this->newLine(2);
         $this->info('✅ Importación masiva completada!');
         $this->table(
-            ['Total Importados', 'Omitidos (duplicados)', 'Errores', 'Categorías Procesadas'],
-            [[$this->totalImported, $this->totalSkipped, $this->totalErrors, $categories->count()]]
+            ['Total Importados', 'Omitidos (duplicados)', 'Archivos Descargados', 'Errores', 'Categorías Procesadas'],
+            [[$this->totalImported, $this->totalSkipped, $this->totalFilesDownloaded, $this->totalErrors, $categories->count()]]
         );
 
         return 0;
@@ -145,7 +149,7 @@ class SketchfabImportAll extends Command
                 return false;
             }
 
-            // Verificar usando sketchfab_id en lugar de sku
+            // Verificar usando sketchfab_id
             $exists = Model3d::where('sketchfab_id', $uid)->exists();
             
             if ($exists) {
@@ -154,8 +158,8 @@ class SketchfabImportAll extends Command
 
             $thumbnail = $this->getBestThumbnail($modelData);
 
-            // Busca la parte donde se crea el modelo (alrededor de línea 200-220)
-            Model3d::create([
+            // Crear el modelo
+            $model = Model3d::create([
                 'name' => $modelData['name'] ?? 'Modelo sin nombre',
                 'description' => $modelData['description'] ?? 'Modelo 3D arquitectónico de Sketchfab',
                 'sketchfab_id' => $uid,
@@ -163,14 +167,14 @@ class SketchfabImportAll extends Command
                 'price' => $this->calculatePrice($modelData),
                 'author_name' => $modelData['user']['displayName'] ?? $modelData['user']['username'] ?? 'Unknown',
                 'author_avatar' => $modelData['user']['avatar']['images'][0]['url'] ?? null,
-                'preview_url' => $this->getBestThumbnail($modelData),  // <-- NUEVO
-                'embed_url' => $modelData['embedUrl'] ?? "https://sketchfab.com/models/{$uid}/embed",  // <-- NUEVO
-                'sketchfab_url' => $modelData['viewerUrl'] ?? "https://sketchfab.com/3d-models/{$uid}",  // <-- NUEVO
+                'preview_url' => $this->getBestThumbnail($modelData),
+                'embed_url' => $modelData['embedUrl'] ?? "https://sketchfab.com/models/{$uid}/embed",
+                'sketchfab_url' => $modelData['viewerUrl'] ?? "https://sketchfab.com/3d-models/{$uid}",
                 'polygon_count' => $modelData['faceCount'] ?? 0,
                 'material_count' => 0,
                 'has_animations' => ($modelData['animationCount'] ?? 0) > 0,
                 'has_rigging' => false,
-                'format' => 'GLTF',
+                'format' => 'GLTF', // Por defecto
                 'size_mb' => $this->calculateSize($modelData),
                 'metadata' => json_encode([
                     'sketchfab_uid' => $uid,
@@ -185,12 +189,109 @@ class SketchfabImportAll extends Command
                 'publication_date' => $modelData['publishedAt'] ?? now(),
             ]);
 
+            $this->line("      📥 Descargando archivos del modelo...");
+            
+            // Descargar los archivos del modelo
+            $filesDownloaded = $this->downloadModelFiles($modelData, $model->id);
+            $this->totalFilesDownloaded += $filesDownloaded;
+            
+            if ($filesDownloaded > 0) {
+                $this->line("      ✅ {$filesDownloaded} archivo(s) descargado(s)");
+            } else {
+                $this->warn("      ⚠️ No se pudieron descargar archivos");
+            }
+
             return true;
             
         } catch (\Exception $e) {
             $this->warn("   ⚠️  Error guardando modelo: " . $e->getMessage());
             return false;
         }
+    }
+
+    /**
+     * Descargar archivos del modelo desde Sketchfab
+     */
+    private function downloadModelFiles($modelData, $modelId)
+    {
+        $archives = $modelData['archives'] ?? [];
+        $downloaded = 0;
+        
+        if (empty($archives)) {
+            return 0;
+        }
+
+        foreach ($archives as $format => $archive) {
+            // Intentar obtener URL de descarga
+            $downloadUrl = $archive['url'] ?? null;
+            
+            if (!$downloadUrl) {
+                continue;
+            }
+
+            $this->line("         📦 Descargando formato: {$format}");
+            
+            try {
+                // Descargar el archivo
+                $response = Http::withHeaders([
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept' => '*/*',
+                ])->timeout(120)->get($downloadUrl);
+
+                if (!$response->successful()) {
+                    $this->warn("         ⚠️ Error descargando {$format}: HTTP " . $response->status());
+                    continue;
+                }
+
+                // Crear directorio si no existe
+                $directory = 'models/' . $modelId;
+                Storage::disk('public')->makeDirectory($directory);
+
+                // Generar nombre de archivo
+                $fileName = $this->sanitizeFilename($modelData['name'] ?? 'modelo') . '.' . $format;
+                $filePath = $directory . '/' . $fileName;
+
+                // Guardar archivo
+                Storage::disk('public')->put($filePath, $response->body());
+
+                // Obtener tamaño
+                $size = $response->header('Content-Length') ?? strlen($response->body());
+
+                // Guardar registro en model_files
+                ModelFile::create([
+                    'model_id' => $modelId,
+                    'file_url' => '/storage/' . $filePath,
+                    'file_type' => 'download',
+                    'format' => strtoupper($format),
+                    'original_name' => $fileName,
+                    'size_bytes' => $size,
+                    'origin' => 'sketchfab'
+                ]);
+
+                $downloaded++;
+                $this->line("         ✅ {$format} descargado (" . round($size / 1024 / 1024, 2) . " MB)");
+
+                // Pequeña pausa entre descargas
+                sleep(1);
+
+            } catch (\Exception $e) {
+                $this->warn("         ⚠️ Error descargando {$format}: " . $e->getMessage());
+                continue;
+            }
+        }
+
+        return $downloaded;
+    }
+
+    /**
+     * Sanitizar nombre de archivo
+     */
+    private function sanitizeFilename($name)
+    {
+        // Eliminar caracteres especiales y espacios
+        $name = preg_replace('/[^a-zA-Z0-9]/', '_', $name);
+        // Limitar longitud
+        return substr($name, 0, 50);
     }
 
     private function getBestThumbnail($modelData)
@@ -208,7 +309,7 @@ class SketchfabImportAll extends Command
         }
         
         if (empty($thumbnails)) {
-            // Intentar con la estructura alternativa que vimos en tinker
+            // Intentar con la estructura alternativa
             if (isset($modelData['thumbnails'][0]['url'])) {
                 $thumbnails = $modelData['thumbnails'];
             }

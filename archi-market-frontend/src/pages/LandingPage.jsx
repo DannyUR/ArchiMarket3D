@@ -892,7 +892,9 @@ const LandingPage = () => {
                                     </div>
                                     <div style={styles.modelInfo}>
                                         <div style={styles.modelCategory}>
-                                            {model.category_name || model.category || 'Estructural'}
+                                            {model.category_name ||
+                                                (typeof model.category === 'object' ? model.category?.name : model.category) ||
+                                                'Estructural'}
                                         </div>
                                         <h3 style={styles.modelName}>
                                             {model.name || `Modelo Profesional ${idx + 1}`}

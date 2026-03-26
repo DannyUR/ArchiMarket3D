@@ -32,5 +32,12 @@ return [
     'sketchfab' => [
         'api_key' => env('SKETCHFAB_API_KEY'),
     ],
+    'paypal' => [
+    'client_id' => env('PAYPAL_CLIENT_ID'),
+    'secret' => env('PAYPAL_SECRET'),
+    'mode' => env('PAYPAL_MODE', 'sandbox'),
+    'webhook_id' => env('PAYPAL_WEBHOOK_ID'),
+    'business_email' => env('PAYPAL_SANDBOX_EMAIL'),
+    ],
 
 ];

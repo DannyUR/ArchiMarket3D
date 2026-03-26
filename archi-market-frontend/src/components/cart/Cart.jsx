@@ -10,9 +10,8 @@ import {
     FiCheckCircle,
     FiCreditCard,
     FiShield,
-    FiTruck,
-    FiPackage,
     FiDownload,
+    FiPackage,
     FiTag,
     FiPercent,
     FiGift,
@@ -698,11 +697,6 @@ const Cart = () => {
                         <span>${tax.toFixed(2)}</span>
                     </div>
 
-                    <div style={styles.summaryRow}>
-                        <span>Envío</span>
-                        <span style={{ color: colors.success }}>Gratis</span>
-                    </div>
-
                     <div style={styles.summaryTotal}>
                         <span>Total</span>
                         <span>${total.toFixed(2)}</span>
@@ -725,7 +719,7 @@ const Cart = () => {
                             <FiShield /> Compra protegida
                         </span>
                         <span style={styles.secureItem}>
-                            <FiTruck /> Descarga inmediata
+                            <FiDownload /> Descarga inmediata
                         </span>
                     </div>
                 </motion.div>

@@ -272,7 +272,7 @@ const PurchaseDetail = () => {
         },
         totalAmountCard: {
             gridColumn: isMobile ? '1' : 'span 2',
-            backgroundColor: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primary}dd 100%)`,
+            background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primary}dd 100%)`,
             color: 'white',
             padding: isMobile ? '1.5rem' : '2rem',
             borderRadius: '24px',
@@ -590,12 +590,6 @@ const PurchaseDetail = () => {
                             <span style={styles.infoLabel}>Impuestos (16%)</span>
                             <span style={styles.infoValue}>
                                 ${(purchase.total * 0.16).toFixed(2)}
-                            </span>
-                        </div>
-                        <div style={styles.infoRow}>
-                            <span style={styles.infoLabel}>Envío</span>
-                            <span style={{ ...styles.infoValue, color: colors.success }}>
-                                Gratis
                             </span>
                         </div>
                     </div>

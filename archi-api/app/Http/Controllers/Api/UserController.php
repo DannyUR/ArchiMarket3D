@@ -158,6 +158,7 @@ class UserController extends Controller
     {
         $user = auth()->user();
         
+        // ✅ MOSTRAR TODAS LAS LICENCIAS (activas e inactivas/pendientes)
         $licenses = $user->licenses()
             ->with(['model:id,name,format,description'])
             ->get()
@@ -181,12 +182,16 @@ class UserController extends Controller
                 ];
             });
         
-        Log::info('Licencias enviadas:', $licenses->toArray());
+        Log::info('✅ Licencias retornadas:', [
+            'count' => $licenses->count(),
+            'data' => $licenses->toArray()
+        ]);
         
         return response()->json([
             'success' => true,
             'data' => [
-                'licenses' => $licenses
+                'licenses' => $licenses,
+                'total_active' => $licenses->count()
             ]
         ]);
     }

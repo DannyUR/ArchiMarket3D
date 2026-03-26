@@ -81,6 +81,116 @@ class ModelFileController extends Controller
     }
 
     /**
+     * Obtener formatos disponibles para un modelo
+     */
+    public function availableFormats($modelId)
+    {
+        $model = Model3D::find($modelId);
+
+        if (!$model) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Modelo no encontrado'
+            ], 404);
+        }
+
+        // Obtener todos los archivos de descarga para este modelo
+        $files = $model->files()
+            ->where('file_type', 'download')
+            ->get(['id', 'file_url', 'format', 'size_bytes', 'created_at']);
+
+        if ($files->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'data' => [],
+                'message' => 'No hay formatos disponibles para este modelo'
+            ]);
+        }
+
+        // Formatear la respuesta
+        $formats = $files->map(function($file) {
+            return [
+                'id' => $file->id,
+                'format' => $file->format ?? strtoupper(pathinfo($file->file_url, PATHINFO_EXTENSION)),
+                'size_bytes' => $file->size_bytes ?? 0,
+                'size_mb' => round(($file->size_bytes ?? 0) / 1024 / 1024, 2),
+                'file_url' => $file->file_url,
+                'created_at' => $file->created_at
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $formats,
+            'count' => $formats->count()
+        ]);
+    }
+
+    /**
+     * Descargar modelo con selección de formato
+     */
+    public function downloadByFormat(Request $request, $modelId)
+    {
+        $format = strtoupper($request->query('format'));
+
+        if (!$format) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debes especificar un formato (format=GLB)'
+            ], 422);
+        }
+
+        $model = Model3D::find($modelId);
+
+        if (!$model) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Modelo no encontrado'
+            ], 404);
+        }
+
+        // Verificar compra
+        $user = auth()->user();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Debes iniciar sesión para descargar'
+            ], 401);
+        }
+
+        $hasPurchased = $user->shopping()
+            ->whereHas('models', function($q) use ($model) {
+                $q->where('model_id', $model->id);
+            })->exists();
+
+        if (!$hasPurchased && $user->user_type !== 'admin') {
+            return response()->json([
+                'success' => false,
+                'message' => 'No has comprado este modelo'
+            ], 403);
+        }
+
+        // Buscar el archivo con el formato solicitado
+        $file = $model->files()
+            ->where('file_type', 'download')
+            ->where(function($q) use ($format) {
+                $q->where('format', $format)
+                  ->orWhere('format', strtolower($format));
+            })
+            ->first();
+
+        if (!$file) {
+            return response()->json([
+                'success' => false,
+                'message' => "Formato {$format} no disponible para este modelo"
+            ], 404);
+        }
+
+        return $this->serveFile($file);
+    }
+
+    /**
      * Servir el archivo
      */
     private function serveFile($file)
@@ -95,6 +205,87 @@ class ModelFileController extends Controller
         }
 
         return Storage::disk('public')->download($path);
+    }
+
+    /**
+     * Información pública sobre descargas (para mostrar ANTES de comprar)
+     */
+    public function downloadInfo($modelId)
+    {
+        $model = Model3D::find($modelId);
+
+        if (!$model) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Modelo no encontrado'
+            ], 404);
+        }
+
+        $files = $model->files()
+            ->where('file_type', 'download')
+            ->get(['format', 'size_bytes']);
+
+        if ($files->isEmpty()) {
+            return response()->json([
+                'success' => true,
+                'is_downloadable' => false,
+                'available_formats' => [],
+                'message' => 'Este modelo no tiene archivos disponibles para descargar'
+            ]);
+        }
+
+        $totalSize = $files->sum('size_bytes');
+        
+        // Agrupar archivos por formato
+        $formattedFiles = $files->groupBy('format')->map(function($group) {
+            $size = $group->first()->size_bytes;
+            return [
+                'format' => $group->first()->format,
+                'size_bytes' => $size,
+                'size_mb' => round($size / 1024 / 1024, 2),
+                'count' => $group->count()
+            ];
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'is_downloadable' => true,
+            'model_name' => $model->name,
+            'available_formats' => $formattedFiles,
+            'total_formats' => $formattedFiles->count(),
+            'total_size_bytes' => $totalSize,
+            'total_size_mb' => round($totalSize / 1024 / 1024, 2),
+            'data' => [
+                'available_formats' => $formattedFiles
+            ]
+        ]);
+    }
+
+    /**
+     * Verificar si un modelo es descargable (simple sí/no)
+     */
+    public function isDownloadable($modelId)
+    {
+        $model = Model3D::find($modelId);
+
+        if (!$model) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Modelo no encontrado'
+            ], 404);
+        }
+
+        $hasDownloads = $model->files()
+            ->where('file_type', 'download')
+            ->exists();
+
+        return response()->json([
+            'success' => true,
+            'is_downloadable' => $hasDownloads,
+            'message' => $hasDownloads 
+                ? 'Este modelo puede descargarse' 
+                : 'Este modelo no está disponible para descargar'
+        ]);
     }
 
     /**

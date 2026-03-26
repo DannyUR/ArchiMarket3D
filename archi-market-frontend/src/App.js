@@ -19,12 +19,14 @@ import PublicLicenses from './components/licenses/PublicLicenses';
 import Licenses from './components/user/Licenses';
 import 'react-intersection-observer';
 import AdminDashboard from './components/admin/Dashboard';
+import Success from './pages/Success';
+import Home from './pages/Home';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const AppContent = () => {
     const location = useLocation();
-    const hideNavbarPaths = ['/','/login', '/register', '/admin'];
+    const hideNavbarPaths = ['/', '/login', '/register', '/admin'];
     const shouldShowNavbar = !hideNavbarPaths.includes(location.pathname);
 
     const PrivateRoute = ({ children, adminOnly = false }) => {
@@ -61,7 +63,16 @@ const AppContent = () => {
                 <Route path="/models/:id" element={<ModelDetail />} />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/licenses" element={<PublicLicenses />} />
-                
+
+                {/* ✅ Ruta de éxito (pública para recibir el callback de PayPal) */}
+                <Route path="/purchases/success" element={<Success />} />
+
+                <Route path="/home" element={
+                    <PrivateRoute>
+                        <Home />
+                    </PrivateRoute>
+                } />
+
                 {/* Rutas protegidas (requieren login) */}
                 <Route path="/cart" element={
                     <PrivateRoute>
@@ -98,7 +109,7 @@ const AppContent = () => {
                         <Licenses />
                     </PrivateRoute>
                 } />
-                
+
                 {/* Rutas de admin */}
                 <Route
                     path="/admin/*"
@@ -108,7 +119,7 @@ const AppContent = () => {
                         </PrivateRoute>
                     }
                 />
-                
+
                 {/* Ruta 404 - Redirigir a inicio */}
                 <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

@@ -16,7 +16,7 @@ class ReviewLikeController extends Controller
      */
     public function toggle($reviewId)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         
         if (!$user) {
             return response()->json([

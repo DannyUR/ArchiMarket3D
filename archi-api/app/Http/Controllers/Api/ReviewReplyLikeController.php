@@ -14,7 +14,7 @@ class ReviewReplyLikeController extends Controller
      */
     public function toggle($replyId)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         
         if (!$user) {
             return response()->json([

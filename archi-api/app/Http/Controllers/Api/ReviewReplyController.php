@@ -15,7 +15,7 @@ class ReviewReplyController extends Controller
      */
     public function store(Request $request, $reviewId)
     {
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         
         if (!$user) {
             return response()->json([
@@ -93,7 +93,7 @@ class ReviewReplyController extends Controller
             ], 404);
         }
 
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         
         // Solo el autor o admin pueden eliminar
         if ($reply->user_id !== $user->id && $user->user_type !== 'admin') {
@@ -122,7 +122,7 @@ class ReviewReplyController extends Controller
             ], 404);
         }
 
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
         
         // Solo el autor puede editar
         if ($reply->user_id !== $user->id) {

@@ -16,27 +16,27 @@ const ENVIRONMENTS = {
 const getBaseURL = () => {
     const hostname = window.location.hostname;
     const isProduction = process.env.NODE_ENV === 'production';
-    
+
     // 1. Si es producción, usar URL de producción
     if (isProduction) {
         return ENVIRONMENTS.production.url;
     }
-    
+
     // 2. Si estamos en ngrok (la URL contiene ngrok)
     if (hostname.includes('ngrok')) {
         return ENVIRONMENTS.development.ngrok;
     }
-    
+
     // 3. Si estamos en localhost
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return ENVIRONMENTS.development.local;
     }
-    
+
     // 4. Si estamos en IP local (red)
     if (hostname.match(/^192\.168\.\d+\.\d+$/)) {
         return ENVIRONMENTS.development.network;
     }
-    
+
     // 5. Por defecto, intentar con local
     console.warn('⚠️ No se pudo determinar el entorno, usando localhost por defecto');
     return ENVIRONMENTS.development.local;
@@ -44,7 +44,7 @@ const getBaseURL = () => {
 
 // Crear instancia de axios
 const API = axios.create({
-    baseURL: '/api', // Usar ruta relativa para aprovechar el proxy en desarrollo   ',
+    baseURL: 'http://127.0.0.1:8000/api', // URL completa del servidor Laravel
     withCredentials: true,
     timeout: 30000, // 30 segundos de timeout
     headers: {
@@ -65,29 +65,23 @@ API.getBaseURL = () => {
     return API.defaults.baseURL;
 };
 
-// Interceptor de peticiones
+// Interceptor de peticiones mejorado
 API.interceptors.request.use(
     (config) => {
         const token = localStorage.getItem('token');
-        
-        // Logging detallado
-        console.group('📡 Petición HTTP');
-        console.log('URL completa:', config.baseURL + config.url);
-        console.log('Método:', config.method);
-        console.log('Headers:', config.headers);
-        console.log('Token enviado:', token ? '✅ Sí' : '❌ No');
-        console.groupEnd();
-        
+
+        console.log('📍 URL COMPLETA:', config.baseURL + config.url);
+        console.log('🎯 BaseURL configurada:', config.baseURL);
+        console.log('🔗 Ruta relativa:', config.url);
+        console.log('🌐 Location hostname:', window.location.hostname);
+
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
-        
+
         return config;
     },
-    (error) => {
-        console.error('❌ Error en la petición:', error);
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
 // Interceptor de respuestas
@@ -98,7 +92,7 @@ API.interceptors.response.use(
         console.log('Status:', response.status);
         console.log('Data:', response.data);
         console.groupEnd();
-        
+
         return response;
     },
     (error) => {
@@ -109,15 +103,15 @@ API.interceptors.response.use(
         console.error('Status:', error.response?.status);
         console.error('Status Text:', error.response?.statusText);
         console.error('Mensaje:', error.message);
-        
+
         if (error.response?.data) {
             console.error('Respuesta del servidor:', error.response.data);
         }
-        
+
         if (error.code === 'ECONNABORTED') {
             console.error('⏱️ Timeout - El servidor tardó demasiado en responder');
         }
-        
+
         if (!error.response) {
             console.error('🌐 Error de red - No se pudo conectar al servidor');
         }
@@ -128,25 +122,25 @@ API.interceptors.response.use(
             console.warn('🔒 Sesión expirada - Redirigiendo a login');
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            
+
             // Evitar redirección en peticiones de login
             if (!error.config.url.includes('/auth/login')) {
                 window.location.href = '/login';
             }
         }
-        
+
         if (error.response?.status === 403) {
             console.warn('🚫 Acceso prohibido');
         }
-        
+
         if (error.response?.status === 404) {
             console.warn('🔍 Recurso no encontrado');
         }
-        
+
         if (error.response?.status === 422) {
             console.warn('📋 Error de validación');
         }
-        
+
         if (error.response?.status >= 500) {
             console.error('🔥 Error del servidor (500)');
         }
@@ -161,7 +155,7 @@ API.download = async (url, filename) => {
         const response = await API.get(url, {
             responseType: 'blob'
         });
-        
+
         const blob = new Blob([response.data]);
         const downloadUrl = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -171,7 +165,7 @@ API.download = async (url, filename) => {
         link.click();
         link.remove();
         window.URL.revokeObjectURL(downloadUrl);
-        
+
         return true;
     } catch (error) {
         console.error('Error en descarga:', error);

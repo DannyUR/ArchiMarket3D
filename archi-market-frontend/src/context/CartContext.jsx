@@ -16,48 +16,74 @@ export const CartProvider = ({ children }) => {
     const [cartItems, setCartItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const { showSuccess, showError, showInfo } = useNotification(); // ✅ AHORA ESTÁ DENTRO
+    const [cartLoaded, setCartLoaded] = useState(false); // Track if cart has been loaded
+    const { showSuccess, showError, showInfo } = useNotification();
 
     // Cargar carrito del localStorage al iniciar
     useEffect(() => {
         const savedCart = localStorage.getItem('cart');
         if (savedCart) {
-            setCartItems(JSON.parse(savedCart));
+            try {
+                const parsed = JSON.parse(savedCart);
+                setCartItems(parsed);
+                console.log('✅ Carrito cargado desde localStorage:', parsed);
+            } catch (e) {
+                console.error('Error parsing cart from localStorage:', e);
+                localStorage.removeItem('cart');
+            }
+        } else {
+            console.log('ℹ️ No hay carrito guardado en localStorage');
         }
+        setCartLoaded(true); // Mark cart as loaded
     }, []);
 
     // Guardar carrito en localStorage cuando cambie
     useEffect(() => {
-        localStorage.setItem('cart', JSON.stringify(cartItems));
-    }, [cartItems]);
+        if (cartLoaded) { // Only save after initial load
+            localStorage.setItem('cart', JSON.stringify(cartItems));
+            console.log('💾 Carrito guardado en localStorage');
+        }
+    }, [cartItems, cartLoaded]);
 
     const addToCart = (model, license, quantity = 1) => {
-        setCartItems(prev => {
-            const existingItem = prev.find(item => 
-                item.model.id === model.id && item.license === license
-            );
+        // Buscar si el modelo ya existe (con cualquier licencia)
+        const existingItemIndex = cartItems.findIndex(item => item.model.id === model.id);
+        const existingItem = existingItemIndex >= 0 ? cartItems[existingItemIndex] : null;
 
-            if (existingItem) {
-                showSuccess(`🛒 Se actualizó la cantidad de ${model.name}`); // ✅ NOTIFICACIÓN
-                return prev.map(item =>
+        if (existingItem && existingItem.license === license) {
+            // Mismo modelo, misma licencia → aumentar cantidad
+            setCartItems(prev =>
+                prev.map(item =>
                     item.model.id === model.id && item.license === license
                         ? { ...item, quantity: item.quantity + quantity }
                         : item
-                );
-            }
-
-            showSuccess(`🛒 ${model.name} agregado al carrito`); // ✅ NOTIFICACIÓN
-            return [...prev, {
+                )
+            );
+            showSuccess(`🛒 Se actualizó la cantidad de ${model.name}`);
+        } else if (existingItem && existingItem.license !== license) {
+            // Mismo modelo, DIFERENTE licencia → actualizar licencia
+            setCartItems(prev =>
+                prev.map((item, idx) =>
+                    idx === existingItemIndex
+                        ? { ...item, license, price: calculateLicensePrice(model.price, license) }
+                        : item
+                )
+            );
+            showSuccess(`🛒 Se cambió la licencia de ${model.name} a ${license}`);
+        } else {
+            // Modelo nuevo → agregar
+            setCartItems(prev => [...prev, {
                 model,
                 license,
                 quantity,
                 price: calculateLicensePrice(model.price, license)
-            }];
-        });
+            }]);
+            showSuccess(`🛒 ${model.name} agregado al carrito`);
+        }
     };
 
     const removeFromCart = (modelId, license, modelName) => {
-        setCartItems(prev => 
+        setCartItems(prev =>
             prev.filter(item => !(item.model.id === modelId && item.license === license))
         );
         showInfo(`🗑️ ${modelName} eliminado del carrito`); // ✅ NOTIFICACIÓN
@@ -80,6 +106,8 @@ export const CartProvider = ({ children }) => {
 
     const clearCart = () => {
         setCartItems([]);
+        localStorage.removeItem('cart'); // ✅ LIMPIAR TAMBIÉN DEL LOCALSTORAGE
+        console.log('✅ Carrito limpiado completamente');
     };
 
     const calculateLicensePrice = (basePrice, license) => {
@@ -92,7 +120,7 @@ export const CartProvider = ({ children }) => {
     };
 
     const getCartTotal = () => {
-        return cartItems.reduce((total, item) => 
+        return cartItems.reduce((total, item) =>
             total + (item.price * item.quantity), 0
         );
     };
@@ -101,35 +129,45 @@ export const CartProvider = ({ children }) => {
         return cartItems.reduce((count, item) => count + item.quantity, 0);
     };
 
-    const checkout = async () => {
-        setLoading(true);
-        setError(null);
 
+    const checkout = async () => {
         try {
+            setLoading(true);
+
+            // Verificar que el carrito no esté vacío
+            if (!cartItems || cartItems.length === 0) {
+                const error = new Error('El carrito está vacío. Por favor, agrega productos antes de hacer checkout.');
+                console.error('❌ Carrito vacío:', error.message);
+                showError('El carrito está vacío');
+                throw error;
+            }
+
             const items = cartItems.map(item => ({
                 model_id: item.model.id,
                 license_type: item.license
             }));
 
-            console.log('Enviando items:', items);
+            console.log('📦 Carrito antes de checkout:', JSON.stringify(cartItems, null, 2));
+            console.log('📦 Items enviados al servidor:', JSON.stringify(items, null, 2));
 
-            const response = await API.post('/purchases/checkout', { items });
-            console.log('Respuesta del servidor:', response.data);
-            
+            // Usar la nueva ruta de PayPal
+            const response = await API.post('/shopping/create-paypal-order', { items });
+
             if (response.data.success) {
-                showSuccess('✅ ¡Compra realizada con éxito!'); // ✅ NOTIFICACIÓN
-                clearCart();
+                // Redirigir a PayPal
+                window.location.href = response.data.approval_url;
                 return response.data;
             } else {
-                throw new Error(response.data.message || 'Error en la compra');
+                console.error('❌ Error del servidor:', response.data);
+                throw new Error(response.data.message || 'Error al crear la orden');
             }
-            
-        } catch (err) {
-            console.error('Error completo:', err.response?.data || err);
-            const errorMsg = err.response?.data?.message || 'Error al procesar la compra';
-            setError(errorMsg);
-            showError('❌ ' + errorMsg); // ✅ NOTIFICACIÓN DE ERROR
-            throw err;
+        } catch (error) {
+            console.error('❌ Error en checkout:', error.response?.data || error.message);
+            if (error.response?.data?.errors) {
+                console.error('Errores de validación:', error.response.data.errors);
+                console.error('Datos recibidos por el servidor:', error.response.data.received_data);
+            }
+            throw error;
         } finally {
             setLoading(false);
         }
@@ -139,6 +177,7 @@ export const CartProvider = ({ children }) => {
         cartItems,
         loading,
         error,
+        cartLoaded,
         addToCart,
         removeFromCart,
         updateQuantity,

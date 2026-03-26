@@ -42,6 +42,8 @@ const ModelList = () => {
         total: 0,
         per_page: 12
     });
+    const [downloadInfo, setDownloadInfo] = useState({});
+    const [downloadInfoLoaded, setDownloadInfoLoaded] = useState(false); // Rastrear cuando esté completamente cargado
 
     // Detectar móvil
     useEffect(() => {
@@ -168,6 +170,56 @@ const ModelList = () => {
             setLoading(false);
         }
     };
+
+    // Cargar información de descargas para cada modelo (asincrónico)
+    const loadDownloadInfo = async (modelsToLoad) => {
+        try {
+            const downloadInfoMap = {};
+            
+            // Cargar información de descargas en paralelo (máximo 5 simultáneas)
+            const batchSize = 5;
+            for (let i = 0; i < modelsToLoad.length; i += batchSize) {
+                const batch = modelsToLoad.slice(i, i + batchSize);
+                
+                const promises = batch.map(model =>
+                    API.get(`/models/${model.id}/download-info`)
+                        .then(response => {
+                            // La respuesta ya viene en response.data (un nivel de envolvimiento por Axios)
+                            const data = response.data;
+                            downloadInfoMap[model.id] = {
+                                is_downloadable: data?.is_downloadable || false,
+                                available_formats: data?.available_formats || [],
+                                total_size_mb: data?.total_size_mb || 0
+                            };
+                        })
+                        .catch(error => {
+                            console.error(`Error loading download info for model ${model.id}:`, error);
+                            downloadInfoMap[model.id] = {
+                                is_downloadable: false,
+                                available_formats: [],
+                                total_size_mb: 0
+                            };
+                        })
+                );
+                
+                await Promise.all(promises);
+            }
+            
+            // SOLO actualizar downloadInfo, NO ordenar
+            setDownloadInfo(downloadInfoMap);
+            setDownloadInfoLoaded(true); // Marcar como completamente cargado
+        } catch (error) {
+            console.error('Error loading download info:', error);
+        }
+    };
+
+    // Cargar download info cuando cambien los modelos
+    useEffect(() => {
+        if (models.length > 0) {
+            setDownloadInfoLoaded(false); // Reset cuando lleguen nuevos modelos
+            loadDownloadInfo(models);
+        }
+    }, [models]);
 
     const handleSearch = () => {
         console.log('Buscando:', search);
@@ -851,7 +903,23 @@ const ModelList = () => {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                     >
-                        {models.map((model, index) => {
+                        {/* Modelos ordenados: primero los con descarga, luego sin descarga */}
+                        {models
+                            .slice()
+                            .sort((a, b) => {
+                                // Solo ordenar si downloadInfo está completamente cargado
+                                if (!downloadInfoLoaded) return 0;
+                                
+                                const aDown = downloadInfo[a.id]?.is_downloadable || false;
+                                const bDown = downloadInfo[b.id]?.is_downloadable || false;
+                                
+                                // Los descargables primero (true primero)
+                                if (aDown !== bDown) {
+                                    return bDown ? 1 : -1;
+                                }
+                                return 0;
+                            })
+                            .map((model, index) => {
                             const previewImage = getPreviewImage(model);
                             const categoryColor = getCategoryColorHex(model.category);
                             const categoryName = typeof model.category === 'object'
@@ -931,6 +999,52 @@ const ModelList = () => {
                                         <div style={styles.cardBadge}>
                                             <FiEye size={12} /> Vista previa 3D
                                         </div>
+
+                                        {/* 📥 Badge de Descargas Disponibles */}
+                                        {downloadInfo[model.id] && (
+                                            <motion.div
+                                                style={{
+                                                    position: 'absolute',
+                                                    bottom: '1rem',
+                                                    left: '1rem',
+                                                    padding: '0.5rem 0.75rem',
+                                                    borderRadius: '8px',
+                                                    fontSize: '0.75rem',
+                                                    fontWeight: '600',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: '0.4rem',
+                                                    background: downloadInfo[model.id].is_downloadable 
+                                                        ? '#ecfdf5' 
+                                                        : '#fef3c7',
+                                                    color: downloadInfo[model.id].is_downloadable 
+                                                        ? '#059669' 
+                                                        : '#92400e',
+                                                    border: downloadInfo[model.id].is_downloadable 
+                                                        ? '1px solid #a7f3d0' 
+                                                        : '1px solid #fcd34d',
+                                                    whiteSpace: 'nowrap',
+                                                    backdropFilter: 'blur(4px)'
+                                                }}
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                            >
+                                                {downloadInfo[model.id].is_downloadable ? (
+                                                    <>
+                                                        <span>✓</span>
+                                                        <span>
+                                                            {downloadInfo[model.id].available_formats?.length || 0} formato(s)
+                                                        </span>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <span>⏳</span>
+                                                        <span>Sin descargas</span>
+                                                    </>
+                                                )}
+                                            </motion.div>
+                                        )}
+
                                         <motion.button
                                             style={styles.cardFavorite}
                                             whileHover={{ scale: 1.1, backgroundColor: colors.primary, color: 'white' }}

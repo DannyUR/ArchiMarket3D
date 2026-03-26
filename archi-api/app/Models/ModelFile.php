@@ -12,7 +12,10 @@ class ModelFile extends Model
         'model_id',
         'file_url',
         'file_type',
-        'origin'
+        'origin',
+        'format',
+        'size_bytes',
+        'original_name'
     ];
 
     protected $casts = [

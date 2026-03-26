@@ -20,7 +20,7 @@ class SketchfabService
         try {
             $response = Http::withHeaders([
                 'Accept' => 'application/json',
-            ])->get($this->baseUrl . '/search', [  // ← CAMBIADO: /search en lugar de /models
+            ])->get($this->baseUrl . '/search', [
                 'type' => 'models',
                 'q' => $query,
                 'categories' => 'architecture',
@@ -60,6 +60,65 @@ class SketchfabService
         } catch (\Exception $e) {
             Log::error('Error obteniendo detalles: ' . $e->getMessage());
             return null;
+        }
+    }
+
+    /**
+     * Obtener URLs de descarga para un modelo
+     */
+    public function getDownloadUrls($modelId)
+    {
+        try {
+            $this->apiKey = config('services.sketchfab.api_key');
+            Log::info('🔑 API Key (primeros 10): ' . substr($this->apiKey, 0, 10));
+            
+            $response = Http::withHeaders([
+                'Authorization' => 'Token ' . $this->apiKey,
+                'Accept' => 'application/json',
+            ])->get($this->baseUrl . "/models/{$modelId}/download");
+
+            Log::info('📡 Status: ' . $response->status());
+            Log::info('📦 Body: ' . $response->body());
+
+            if ($response->successful()) {
+                return $response->json();
+            }
+
+            Log::error('Error obteniendo URLs de descarga: ' . $response->body());
+            return null;
+
+        } catch (\Exception $e) {
+            Log::error('Error obteniendo URLs de descarga: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Descargar un archivo real de Sketchfab
+     */
+    public function downloadModelFile($downloadUrl)
+    {
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                'Accept' => '*/*',
+            ])->timeout(60)->get($downloadUrl);
+
+            if ($response->successful()) {
+                return [
+                    'success' => true,
+                    'data' => $response->body(),
+                    'content_type' => $response->header('Content-Type'),
+                    'size' => $response->header('Content-Length') ?? strlen($response->body())
+                ];
+            }
+
+            Log::error('Error descargando archivo: ' . $response->body());
+            return ['success' => false, 'error' => 'Error en descarga'];
+
+        } catch (\Exception $e) {
+            Log::error('Excepción descargando archivo: ' . $e->getMessage());
+            return ['success' => false, 'error' => $e->getMessage()];
         }
     }
 }

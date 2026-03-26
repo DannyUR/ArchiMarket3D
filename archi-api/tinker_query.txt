@@ -1,0 +1,1 @@
+DB::table('models')->select('id', 'name', 'sketchfab_id', 'embed_url')->limit(5)->get()

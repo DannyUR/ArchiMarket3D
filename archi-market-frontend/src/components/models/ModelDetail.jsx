@@ -17,12 +17,14 @@ import {
     FiThumbsUp,
     FiMessageCircle,
     FiShare2,
-    FiHeart
+    FiHeart,
+    FiRefreshCw
 } from 'react-icons/fi';
 import { HiOutlineCube } from 'react-icons/hi';
 import { useCart } from '../../context/CartContext';
 import API from '../../services/api';
 import { colors } from '../../styles/theme';
+import './ModelDetail.css';
 
 // Componente visor de Sketchfab mejorado
 // Componente visor de Sketchfab mejorado
@@ -108,7 +110,6 @@ const SketchfabViewer = ({ model }) => {
                     borderRadius: '24px'
                 }}
                 allow="autoplay; fullscreen; xr-spatial-tracking"
-                allowFullScreen
                 onLoad={() => setIsLoading(false)}
                 onError={() => setViewerError(true)}
             />
@@ -144,11 +145,14 @@ const ModelDetail = () => {
     const [editingReplyComment, setEditingReplyComment] = useState('');
     const { addToCart } = useCart();
     const [showReviewForm, setShowReviewForm] = useState(false);
+    const [showPurchaseRequiredModal, setShowPurchaseRequiredModal] = useState(false);
     const [newReview, setNewReview] = useState({
         rating: 5,
         comment: ''
     });
     const [submittingReview, setSubmittingReview] = useState(false);
+    const [downloadInfo, setDownloadInfo] = useState(null);
+    const [downloadInfoLoading, setDownloadInfoLoading] = useState(false);
 
     // Multiplicadores de licencia (coinciden con PublicLicenses)
     const multipliers = {
@@ -175,6 +179,13 @@ const ModelDetail = () => {
         if (token) {
             fetchCurrentUser();
         }
+
+        // Auto-refresco de reseñas cada 15 segundos para ver updates del admin
+        const refreshInterval = setInterval(() => {
+            fetchModel();
+        }, 15000);
+
+        return () => clearInterval(refreshInterval);
     }, [id]);
 
     // Cargar likes y respuestas cuando cambia el modelo
@@ -291,11 +302,29 @@ const ModelDetail = () => {
                 const preview = modelData.files.find(f => f.file_type === 'preview');
                 setSelectedImage(preview?.file_url || null);
             }
+
+            // 📥 Cargar información de descargas disponibles
+            fetchDownloadInfo(id);
         } catch (error) {
             console.error('Error cargando modelo:', error);
             setLoading(false);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchDownloadInfo = async (modelId) => {
+        try {
+            setDownloadInfoLoading(true);
+            const response = await API.get(`/models/${modelId}/download-info`);
+            const data = response.data?.data || response.data;
+            console.log('📥 Download info recibida:', data);
+            setDownloadInfo(data);
+        } catch (error) {
+            console.error('Error cargando información de descargas:', error);
+            setDownloadInfo(null);
+        } finally {
+            setDownloadInfoLoading(false);
         }
     };
 
@@ -333,6 +362,67 @@ const ModelDetail = () => {
             month: 'long',
             day: 'numeric'
         });
+    };
+
+    // Función helper para determinar el estado del reviewer
+    const getReviewerStatus = () => {
+        const reviewerStatus = model?.access?.reviewer_status;
+        
+        console.log('🔍 DEBUG getReviewerStatus:', {
+            reviewerStatus,
+            access: model?.access,
+            isLoggedIn,
+            model_id: model?.id,
+            full_model: model
+        });
+        
+        switch(reviewerStatus) {
+            case 'not_logged_in':
+                return {
+                    canWrite: false,
+                    buttonText: 'Iniciar sesión para reseñar',
+                    buttonColor: '#64748b',
+                    isDisabled: false,
+                    onClick: () => navigate('/login'),
+                    title: 'Inicia sesión para escribir una reseña'
+                };
+            case 'not_purchased':
+                return {
+                    canWrite: false,
+                    buttonText: 'Necesitas comprar primero',
+                    buttonColor: '#f97316',
+                    isDisabled: true,
+                    onClick: () => setShowPurchaseRequiredModal(true),
+                    title: 'Compra este modelo primero para escribir una reseña'
+                };
+            case 'already_reviewed':
+                return {
+                    canWrite: true,
+                    buttonText: showReviewForm ? 'Cancelar' : 'Editar reseña',
+                    buttonColor: colors.primary,
+                    isDisabled: false,
+                    onClick: () => setShowReviewForm(!showReviewForm),
+                    title: 'Edita tu reseña anterior'
+                };
+            case 'can_review':
+                return {
+                    canWrite: true,
+                    buttonText: showReviewForm ? 'Cancelar' : 'Escribir reseña',
+                    buttonColor: colors.primary,
+                    isDisabled: false,
+                    onClick: () => setShowReviewForm(!showReviewForm),
+                    title: 'Escribe tu reseña para este modelo'
+                };
+            default:
+                return {
+                    canWrite: false,
+                    buttonText: 'Cargando...',
+                    buttonColor: '#94a3b8',
+                    isDisabled: true,
+                    onClick: () => {},
+                    title: ''
+                };
+        }
     };
 
     // Agrega esta función para enviar la reseña
@@ -647,11 +737,7 @@ const ModelDetail = () => {
             cursor: 'pointer',
             transition: 'all 0.2s',
             overflow: 'hidden',
-            border: '2px solid transparent',
-            ':hover': {
-                transform: 'scale(1.05)',
-                borderColor: colors.primary
-            }
+            border: `2px solid transparent`,
         },
         thumbnailImage: {
             width: '100%',
@@ -895,7 +981,9 @@ const ModelDetail = () => {
         tab: {
             padding: '1rem 0',
             cursor: 'pointer',
-            borderBottom: '3px solid transparent',
+            borderBottomWidth: '3px',
+            borderBottomStyle: 'solid',
+            borderBottomColor: 'transparent',
             transition: 'all 0.3s',
             color: '#64748b',
             fontWeight: '500',
@@ -1139,6 +1227,83 @@ const ModelDetail = () => {
                     transition={{ duration: 0.5 }}
                 >
                     <h1 style={styles.title}>{model.name}</h1>
+
+                    {/* 📥 BANNER PROMINENTE - Descargas disponibles */}
+                    {downloadInfo && downloadInfo.available_formats && downloadInfo.available_formats.length > 0 && (
+                        <motion.div
+                            style={{
+                                padding: '1.25rem',
+                                backgroundColor: '#dcfce7',
+                                border: '2px solid #22c55e',
+                                borderRadius: '12px',
+                                marginBottom: '1.5rem',
+                                boxShadow: '0 4px 12px rgba(34, 197, 94, 0.15)'
+                            }}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{ duration: 0.4 }}
+                        >
+                            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', marginBottom: '0.75rem' }}>
+                                <span style={{ fontSize: '1.5rem' }}>✓</span>
+                                <span style={{ fontWeight: '700', color: '#15803d', fontSize: '1.1rem' }}>
+                                    Descargas disponibles
+                                </span>
+                            </div>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))',
+                                gap: '0.5rem'
+                            }}>
+                                {downloadInfo.available_formats.map((format) => (
+                                    <div
+                                        key={format.format}
+                                        style={{
+                                            padding: '0.5rem 0.75rem',
+                                            backgroundColor: 'white',
+                                            borderRadius: '8px',
+                                            border: '1px solid #86efac',
+                                            textAlign: 'center',
+                                            fontSize: '0.85rem'
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: '600', color: '#16a34a' }}>
+                                            {format.format}
+                                        </div>
+                                        <div style={{ color: '#64748b', fontSize: '0.75rem' }}>
+                                            {(format.size_bytes / 1024 / 1024).toFixed(2)} MB
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </motion.div>
+                    )}
+
+                    {/* ⏳ Sin descargas aún */}
+                    {(!downloadInfo || !downloadInfo.available_formats || downloadInfo.available_formats.length === 0) && (
+                        <motion.div
+                            style={{
+                                padding: '1rem',
+                                backgroundColor: '#fef08a',
+                                border: '2px solid #eab308',
+                                borderRadius: '12px',
+                                marginBottom: '1.5rem'
+                            }}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                        >
+                            <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'flex-start' }}>
+                                <span style={{ fontSize: '1.25rem' }}>⏳</span>
+                                <div>
+                                    <div style={{ fontWeight: '600', color: '#854d0e' }}>
+                                        Descargas en preparación
+                                    </div>
+                                    <div style={{ fontSize: '0.85rem', color: '#a16207' }}>
+                                        El administrador está preparando los archivos para este modelo
+                                    </div>
+                                </div>
+                            </div>
+                        </motion.div>
+                    )}
 
                     {/* Autor */}
                     {model.author && model.author.name && (
@@ -1433,29 +1598,58 @@ const ModelDetail = () => {
                                             <strong>{model.stats?.total_reviews || 0}</strong> reseñas
                                         </div>
                                     </div>
-                                    {model?.access?.can_review && (
-                                        <motion.button
-                                            style={{
-                                                marginLeft: 'auto',
-                                                padding: '0.75rem 1.5rem',
-                                                backgroundColor: colors.primary,
-                                                color: 'white',
-                                                border: 'none',
-                                                borderRadius: '30px',
-                                                fontWeight: '600',
-                                                cursor: 'pointer',
-                                                display: 'flex',
-                                                alignItems: 'center',
-                                                gap: '0.5rem'
-                                            }}
-                                            whileHover={{ scale: 1.02 }}
-                                            whileTap={{ scale: 0.98 }}
-                                            onClick={() => setShowReviewForm(!showReviewForm)}
-                                        >
-                                            <FiMessageCircle />
-                                            {showReviewForm ? 'Cancelar' : 'Escribir reseña'}
-                                        </motion.button>
-                                    )}
+                                    {/* Botón de reseña - SIEMPRE VISIBLE */}
+                                    {(() => {
+                                        const reviewerStatus = getReviewerStatus();
+                                        return (
+                                            <div style={{ display: 'flex', gap: '1rem', marginLeft: 'auto', alignItems: 'center' }}>
+                                                <motion.button
+                                                    style={{
+                                                        padding: '0.75rem 1.5rem',
+                                                        backgroundColor: reviewerStatus.buttonColor,
+                                                        color: 'white',
+                                                        border: 'none',
+                                                        borderRadius: '30px',
+                                                        fontWeight: '600',
+                                                        cursor: reviewerStatus.isDisabled ? 'not-allowed' : 'pointer',
+                                                        opacity: reviewerStatus.isDisabled ? 0.6 : 1,
+                                                        transition: 'all 0.3s ease'
+                                                    }}
+                                                    whileHover={!reviewerStatus.isDisabled ? { scale: 1.02 } : {}}
+                                                    whileTap={!reviewerStatus.isDisabled ? { scale: 0.98 } : {}}
+                                                    onClick={reviewerStatus.onClick}
+                                                    title={reviewerStatus.title}
+                                                >
+                                                    <FiMessageCircle style={{ marginRight: '0.5rem' }} />
+                                                    {reviewerStatus.buttonText}
+                                                </motion.button>
+                                                {/* Botón de refrescar reseñas */}
+                                                <motion.button
+                                                    style={{
+                                                        padding: '0.75rem 1rem',
+                                                        backgroundColor: 'transparent',
+                                                        borderColor: colors.primary,
+                                                        color: colors.primary,
+                                                        border: `2px solid ${colors.primary}`,
+                                                        borderRadius: '30px',
+                                                        fontWeight: '600',
+                                                        cursor: 'pointer',
+                                                        transition: 'all 0.3s ease',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.5rem'
+                                                    }}
+                                                    whileHover={{ scale: 1.02, backgroundColor: colors.primary + '10' }}
+                                                    whileTap={{ scale: 0.98 }}
+                                                    onClick={fetchModel}
+                                                    title="Refrescar reseñas para ver respuestas del admin"
+                                                >
+                                                    <FiRefreshCw size={16} />
+                                                    Refrescar
+                                                </motion.button>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 {/* Formulario de reseña */}
@@ -1563,7 +1757,7 @@ const ModelDetail = () => {
 
                                 {/* Lista de reseñas */}
                                 {model.reviews && model.reviews.length > 0 ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '2rem' }}>
                                         {model.reviews.map(review => (
                                             <motion.div
                                                 key={review.id}
@@ -1636,6 +1830,62 @@ const ModelDetail = () => {
                                                         review.comment
                                                     )}
                                                 </div>
+
+                                                {/* Banner de estado de moderación */}
+                                                {review.status && (
+                                                    <div style={{
+                                                        marginTop: '1rem',
+                                                        padding: '0.75rem 1rem',
+                                                        borderRadius: '8px',
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.5rem',
+                                                        fontSize: '0.9rem',
+                                                        fontWeight: '500',
+                                                        backgroundColor: review.status === 'pending' ? '#fef3c7' : review.status === 'approved' ? '#d1fae5' : '#fee2e2',
+                                                        color: review.status === 'pending' ? '#b45309' : review.status === 'approved' ? '#047857' : '#991b1b'
+                                                    }}>
+                                                        {review.status === 'pending' && '⏳ Tu comentario está en espera de moderación'}
+                                                        {review.status === 'approved' && '✅ Tu comentario fue aprobado'}
+                                                        {review.status === 'rejected' && '❌ Tu comentario fue rechazado'}
+                                                    </div>
+                                                )}
+
+                                                {/* Respuesta del admin */}
+                                                {review.reply && (
+                                                    <div style={{
+                                                        marginTop: '1rem',
+                                                        padding: '1rem',
+                                                        backgroundColor: '#f0f4ff',
+                                                        borderRadius: '12px',
+                                                        borderLeft: `4px solid ${colors.primary}`,
+                                                    }}>
+                                                        <div style={{
+                                                            fontSize: '0.9rem',
+                                                            fontWeight: '600',
+                                                            color: colors.primary,
+                                                            marginBottom: '0.5rem',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: '0.5rem'
+                                                        }}>
+                                                            👨‍💼 Respuesta del equipo
+                                                        </div>
+                                                        <div style={{
+                                                            color: colors.dark,
+                                                            lineHeight: '1.6',
+                                                            marginBottom: '0.5rem'
+                                                        }}>
+                                                            {review.reply.text}
+                                                        </div>
+                                                        <div style={{
+                                                            fontSize: '0.8rem',
+                                                            color: '#64748b'
+                                                        }}>
+                                                            {new Date(review.reply.created_at).toLocaleDateString('es-MX')}
+                                                        </div>
+                                                    </div>
+                                                )}
 
                                                 {/* Sección de respuestas */}
                                                 {getReplies(review.id).length > 0 && (
@@ -2093,7 +2343,7 @@ const ModelDetail = () => {
                                                 whileTap={{ scale: 0.98 }}
                                                 onClick={() => setShowReviewForm(true)}
                                             >
-                                                Escribir primera reseña
+                                            Escribe la primera reseña
                                             </motion.button>
                                         )}
                                     </div>
@@ -2103,6 +2353,116 @@ const ModelDetail = () => {
                     </motion.div>
                 </AnimatePresence>
             </div>
+
+            {/* Modal para mostrar "necesita comprar primero" */}
+            {showPurchaseRequiredModal && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    style={{
+                        position: 'fixed',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        zIndex: 1000,
+                        backdropFilter: 'blur(4px)'
+                    }}
+                    onClick={() => setShowPurchaseRequiredModal(false)}
+                >
+                    <motion.div
+                        initial={{ scale: 0.9, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.9, opacity: 0 }}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                            backgroundColor: 'white',
+                            borderRadius: '24px',
+                            padding: '3rem',
+                            maxWidth: '500px',
+                            width: '90%',
+                            boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+                            textAlign: 'center'
+                        }}
+                    >
+                        <div style={{ marginBottom: '1.5rem' }}>
+                            <FiShoppingCart size={64} color={colors.primary} style={{ margin: '0 auto' }} />
+                        </div>
+                        
+                        <h2 style={{
+                            fontSize: '1.5rem',
+                            fontWeight: '700',
+                            color: colors.dark,
+                            marginBottom: '1rem'
+                        }}>
+                            Necesitas comprar este modelo primero
+                        </h2>
+
+                        <p style={{
+                            color: '#64748b',
+                            fontSize: '1rem',
+                            lineHeight: '1.6',
+                            marginBottom: '2rem'
+                        }}>
+                            Para poder escribir una reseña y compartir tu experiencia con otros usuarios, primero debes comprar este modelo. Las reseñas ayudan a nuestra comunidad a tomar mejores decisiones.
+                        </p>
+
+                        <div style={{
+                            display: 'flex',
+                            gap: '1rem',
+                            justifyContent: 'center',
+                            flexWrap: 'wrap'
+                        }}>
+                            <motion.button
+                                style={{
+                                    padding: '0.75rem 2rem',
+                                    backgroundColor: colors.primary,
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    flex: 1,
+                                    minWidth: '150px'
+                                }}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => {
+                                    setShowPurchaseRequiredModal(false);
+                                    handleBuyNow();
+                                }}
+                            >
+                                <FiShoppingCart style={{ marginRight: '0.5rem' }} />
+                                Comprar ahora
+                            </motion.button>
+                            
+                            <motion.button
+                                style={{
+                                    padding: '0.75rem 2rem',
+                                    backgroundColor: 'transparent',
+                                    color: colors.primary,
+                                    border: `2px solid ${colors.primary}`,
+                                    borderRadius: '12px',
+                                    fontWeight: '600',
+                                    cursor: 'pointer',
+                                    flex: 1,
+                                    minWidth: '150px'
+                                }}
+                                whileHover={{ backgroundColor: colors.primary + '10' }}
+                                whileTap={{ scale: 0.98 }}
+                                onClick={() => setShowPurchaseRequiredModal(false)}
+                            >
+                                Cancelar
+                            </motion.button>
+                        </div>
+                    </motion.div>
+                </motion.div>
+            )}
 
             <style>{`
                 @keyframes spin {

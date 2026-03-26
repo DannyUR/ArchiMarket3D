@@ -26,7 +26,8 @@ import {
     FiAlertTriangle,
     FiClock,
     FiCheck,
-
+    FiList,
+    FiUsers,
 
 } from 'react-icons/fi';
 import { colors } from '../../styles/theme';
@@ -36,13 +37,19 @@ import { useNotification } from '../../context/NotificationContext';
 const ReviewsManagement = () => {
     const { showSuccess, showError, showInfo } = useNotification();
     const [reviews, setReviews] = useState([]);
+    const [deletedReviews, setDeletedReviews] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [filterRating, setFilterRating] = useState('all');
     const [filterStatus, setFilterStatus] = useState('all');
     const [selectedReview, setSelectedReview] = useState(null);
     const [showReplyModal, setShowReplyModal] = useState(false);
+    const [showTrash, setShowTrash] = useState(false); // ← Nuevo: mostrar historial
+    const [showDeleteReason, setShowDeleteReason] = useState(false); // ← Modal para razón
+    const [deleteReason, setDeleteReason] = useState('');
+    const [reviewToDelete, setReviewToDelete] = useState(null);
     const [replyText, setReplyText] = useState('');
+    const [viewType, setViewType] = useState('list'); // 'list' o 'by-user'
     const [stats, setStats] = useState({
         totalReviews: 0,
         averageRating: 0,
@@ -64,6 +71,13 @@ const ReviewsManagement = () => {
         fetchReviews();
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
+
+    // Cargar historial cuando se abre la sección de trash
+    useEffect(() => {
+        if (showTrash) {
+            fetchTrash();
+        }
+    }, [showTrash]);
 
     const fetchReviews = async () => {
         setLoading(true);
@@ -109,6 +123,29 @@ const ReviewsManagement = () => {
         }
     };
 
+    // ← NUEVA FUNCIÓN: Cargar reseñas eliminadas
+    const fetchTrash = async () => {
+        try {
+            const params = new URLSearchParams();
+            if (searchTerm) params.append('search', searchTerm);
+
+            const response = await API.get(`/admin/reviews/trash?${params.toString()}`);
+            
+            let trashData = [];
+            if (response.data?.data?.data) {
+                trashData = response.data.data.data;
+            } else if (response.data?.data) {
+                trashData = response.data.data;
+            }
+
+            setDeletedReviews(trashData);
+        } catch (error) {
+            console.error('Error cargando historial:', error);
+            showError('Error al cargar historial de eliminadas');
+            setDeletedReviews([]);
+        }
+    };
+
     const handleApprove = async (id) => {
         try {
             const response = await API.post(`/admin/reviews/${id}/approve`);
@@ -132,13 +169,57 @@ const ReviewsManagement = () => {
     };
 
     const handleDelete = async (id) => {
-        if (window.confirm('¿Eliminar esta reseña?')) {
+        // Abrir modal para pedir razón
+        setReviewToDelete(id);
+        setDeleteReason('');
+        setShowDeleteReason(true);
+    };
+
+    // ← NUEVA FUNCIÓN: Confirmar eliminación con razón
+    const confirmDelete = async () => {
+        if (!deleteReason.trim()) {
+            showInfo('Por favor, especifica una razón');
+            return;
+        }
+
+        try {
+            await API.delete(`/admin/reviews/${reviewToDelete}`, {
+                data: { reason: deleteReason }
+            });
+            showSuccess('🗑️ Reseña movida al historial');
+            setShowDeleteReason(false);
+            setReviewToDelete(null);
+            setDeleteReason('');
+            fetchReviews();
+        } catch (error) {
+            console.error('Error eliminando:', error);
+            showError('❌ Error al eliminar');
+        }
+    };
+
+    // ← NUEVA FUNCIÓN: Restaurar from trash
+    const handleRestore = async (id) => {
+        try {
+            await API.post(`/admin/reviews/${id}/restore`);
+            showSuccess('✅ Reseña restaurada');
+            fetchTrash();
+            // Actualizar también reviews normales
+            setTimeout(() => fetchReviews(), 500);
+        } catch (error) {
+            console.error('Error restaurando:', error);
+            showError('❌ Error al restaurar');
+        }
+    };
+
+    // ← NUEVA FUNCIÓN: Eliminar permanentemente
+    const handleForceDelete = async (id) => {
+        if (window.confirm('⚠️ ¿Eliminar PERMANENTEMENTE? Esta acción no se puede deshacer.')) {
             try {
-                await API.delete(`/admin/reviews/${id}`);
-                showSuccess('🗑️ Reseña eliminada');
-                fetchReviews();
+                await API.delete(`/admin/reviews/${id}/permanent`);
+                showSuccess('🗑️ Eliminado permanentemente');
+                fetchTrash();
             } catch (error) {
-                console.error('Error eliminando:', error);
+                console.error('Error eliminando permanentemente:', error);
                 showError('❌ Error al eliminar');
             }
         }
@@ -169,6 +250,13 @@ const ReviewsManagement = () => {
             return;
         }
 
+        if (!selectedReview || !selectedReview.id) {
+            console.error('❌ selectedReview no tiene ID:', selectedReview);
+            showError('Error: No se pudo identificar la reseña');
+            return;
+        }
+
+        console.log('📤 Enviando respuesta para review ID:', selectedReview.id, 'Texto:', replyText);
         await handleReply(selectedReview.id, replyText);
     };
 
@@ -213,6 +301,39 @@ const ReviewsManagement = () => {
         const matchesStatus = filterStatus === 'all' || review.status === filterStatus;
         return matchesSearch && matchesRating && matchesStatus;
     });
+
+    // ✨ Agrupar reseñas por usuario
+    const getReviewsByUser = () => {
+        const grouped = {};
+        filteredReviews.forEach(review => {
+            const userId = review.user?.id || 'unknown';
+            const userKey = `${userId}`;
+            if (!grouped[userKey]) {
+                grouped[userKey] = {
+                    user: review.user,
+                    reviews: [],
+                    totalReviews: 0,
+                    averageRating: 0,
+                    lastReview: null
+                };
+            }
+            grouped[userKey].reviews.push(review);
+            grouped[userKey].totalReviews += 1;
+            if (!grouped[userKey].lastReview || new Date(review.created_at) > new Date(grouped[userKey].lastReview.created_at)) {
+                grouped[userKey].lastReview = review;
+            }
+        });
+
+        // Calcular promedio de calificación por usuario
+        Object.values(grouped).forEach(userGroup => {
+            const totalRating = userGroup.reviews.reduce((sum, r) => sum + (r.rating || 0), 0);
+            userGroup.averageRating = (totalRating / userGroup.totalReviews).toFixed(1);
+        });
+
+        return Object.values(grouped).sort((a, b) => 
+            new Date(b.lastReview?.created_at) - new Date(a.lastReview?.created_at)
+        );
+    };
 
     const styles = {
         container: {
@@ -318,6 +439,28 @@ const ReviewsManagement = () => {
             backgroundPosition: 'right 0.5rem center',
             backgroundSize: '16px'
         },
+        viewToggleContainer: {
+            display: 'flex',
+            gap: '0.5rem',
+            padding: '0.5rem',
+            backgroundColor: '#f8fafc',
+            borderRadius: '8px',
+            border: `2px solid ${colors.primary}`
+        },
+        viewToggleButton: (isActive) => ({
+            padding: '0.5rem 1rem',
+            borderRadius: '6px',
+            border: 'none',
+            backgroundColor: isActive ? colors.primary : 'transparent',
+            color: isActive ? '#fff' : colors.dark,
+            fontWeight: isActive ? '600' : '500',
+            cursor: 'pointer',
+            fontSize: '0.9rem',
+            transition: 'all 0.2s ease',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.5rem'
+        }),
         cardsContainer: {
             display: 'grid',
             gridTemplateColumns: '1fr',
@@ -644,239 +787,437 @@ const ReviewsManagement = () => {
                     <option value="pending">Pendientes</option>
                     <option value="rejected">Rechazadas</option>
                 </select>
+
+                <div style={styles.viewToggleContainer}>
+                    <button 
+                        style={styles.viewToggleButton(viewType === 'list')}
+                        onClick={() => setViewType('list')}
+                        title="Vista de lista"
+                    >
+                        <FiList size={16} />
+                        Lista
+                    </button>
+                    <button 
+                        style={styles.viewToggleButton(viewType === 'by-user')}
+                        onClick={() => setViewType('by-user')}
+                        title="Vista agrupada por usuario"
+                    >
+                        <FiUsers size={16} />
+                        Por Usuario
+                    </button>
+                    {/* ← NUEVO: Botón para historial de eliminadas */}
+                    <button 
+                        style={{
+                            ...styles.viewToggleButton(showTrash),
+                            marginLeft: 'auto',
+                            backgroundColor: showTrash ? colors.danger : 'transparent'
+                        }}
+                        onClick={() => setShowTrash(!showTrash)}
+                        title="Ver historial de reseñas eliminadas"
+                    >
+                        <FiTrash2 size={16} />
+                        Historial
+                    </button>
+                </div>
             </div>
 
-            {/* Vista móvil */}
-            {isMobile && (
-                <div style={styles.cardsContainer}>
-                    {filteredReviews.length === 0 ? (
+            {/* ← NUEVA SECCIÓN: Historial de reseñas eliminadas */}
+            {showTrash ? (
+                <div style={{ marginTop: '2rem' }}>
+                    <h3 style={{ marginBottom: '1.5rem', color: colors.dark, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <FiTrash2 color={colors.danger} />
+                        Historial de Reseñas Eliminadas ({deletedReviews.length})
+                    </h3>
+
+                    {deletedReviews.length === 0 ? (
                         <div style={styles.emptyState}>
-                            No se encontraron reseñas
+                            No hay reseñas eliminadas
                         </div>
                     ) : (
-                        filteredReviews.map((review) => (
-                            <motion.div
-                                key={review.id}
-                                style={styles.reviewCard}
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                            >
-                                <div style={styles.cardHeader}>
-                                    <div style={styles.userInfo}>
-                                        <div style={styles.userAvatar}>
-                                            {review.user?.name?.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <div style={styles.userName}>{review.user?.name}</div>
-                                            <div style={styles.userEmail}>{review.user?.email}</div>
-                                        </div>
-                                    </div>
-                                    <span style={{
-                                        ...styles.statusBadge,
-                                        backgroundColor: getStatusColor(review.status) + '10',
-                                        color: getStatusColor(review.status)
-                                    }}>
-                                        {getStatusText(review.status)}
-                                    </span>
-                                </div>
-
-                                <div style={styles.cardContent}>
-                                    <div style={styles.rating}>{getRatingStars(review.rating)}</div>
-                                    <div style={styles.modelName}>{review.model?.name}</div>
-                                    <div style={styles.comment}>"{review.comment}"</div>
-                                    <div style={styles.date}>
-                                        <FiCalendar size={12} /> {new Date(review.created_at).toLocaleDateString()}
-                                        {review.reported && (
-                                            <span style={{ color: colors.danger, marginLeft: '0.5rem' }}>
-                                                <FiAlertCircle /> Reportada
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {review.reply && (
-                                    <div style={styles.replySection}>
-                                        <div style={styles.replyHeader}>
-                                            <FiMessageSquare /> Respuesta del equipo
-                                        </div>
-                                        <div style={styles.replyText}>{review.reply.text}</div>
-                                        <div style={styles.replyDate}>
-                                            {new Date(review.reply.created_at).toLocaleDateString()}
-                                        </div>
-                                    </div>
-                                )}
-
-                                <div style={styles.cardActions}>
-                                    {review.status === 'pending' && (
-                                        <>
-                                            <button
-                                                style={styles.cardActionBtn}
-                                                onClick={() => handleApprove(review.id)}
-                                            >
-                                                <FiCheckCircle color={colors.success} /> Aprobar
-                                            </button>
-                                            <button
-                                                style={styles.cardActionBtn}
-                                                onClick={() => handleReject(review.id)}
-                                            >
-                                                <FiXCircle color={colors.danger} /> Rechazar
-                                            </button>
-                                        </>
-                                    )}
-                                    <button
-                                        style={styles.cardActionBtn}
-                                        onClick={() => handleReply(review)}
-                                    >
-                                        <FiMessageSquare /> Responder
-                                    </button>
-                                    <button
-                                        style={styles.cardActionBtn}
-                                        onClick={() => handleReport(review.id)}
-                                    >
-                                        <FiFlag color={review.reported ? colors.danger : '#64748b'} />
-                                        {review.reported ? 'Reportada' : 'Reportar'}
-                                    </button>
-                                    <button
-                                        style={styles.cardActionBtn}
-                                        onClick={() => handleDelete(review.id)}
-                                    >
-                                        <FiTrash2 color={colors.danger} /> Eliminar
-                                    </button>
-                                </div>
-                            </motion.div>
-                        ))
-                    )}
-                </div>
-            )}
-
-            {/* Vista desktop */}
-            {!isMobile && (
-                <div style={styles.tableContainer}>
-                    <div style={{ overflowX: 'auto' }}>
-                        <table style={styles.table}>
-                            <thead>
-                                <tr>
-                                    <th style={styles.th}>Usuario</th>
-                                    <th style={styles.th}>Modelo</th>
-                                    <th style={styles.th}>Calificación</th>
-                                    <th style={styles.th}>Comentario</th>
-                                    <th style={styles.th}>Fecha</th>
-                                    <th style={styles.th}>Estado</th>
-                                    <th style={styles.th}>Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredReviews.length === 0 ? (
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={styles.table}>
+                                <thead>
                                     <tr>
-                                        <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
-                                            No se encontraron reseñas
-                                        </td>
+                                        <th style={styles.th}>Usuario</th>
+                                        <th style={styles.th}>Modelo</th>
+                                        <th style={styles.th}>Rating</th>
+                                        <th style={styles.th}>Razón Eliminación</th>
+                                        <th style={styles.th}>Fecha Eliminación</th>
+                                        <th style={styles.th}>Acciones</th>
                                     </tr>
-                                ) : (
-                                    filteredReviews.map((review, index) => (
-                                        <motion.tr
-                                            key={review.id}
-                                            initial={{ opacity: 0 }}
-                                            animate={{ opacity: 1 }}
-                                            transition={{ delay: index * 0.05 }}
-                                        >
+                                </thead>
+                                <tbody>
+                                    {deletedReviews.map((review) => (
+                                        <tr key={review.id} style={{ backgroundColor: colors.danger + '08' }}>
                                             <td style={styles.td}>
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                    <div style={{
-                                                        width: '32px',
-                                                        height: '32px',
-                                                        borderRadius: '8px',
-                                                        backgroundColor: colors.primary + '10',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        color: colors.primary
-                                                    }}>
-                                                        {review.user?.name?.charAt(0).toUpperCase()}
-                                                    </div>
-                                                    <div>
-                                                        <div>{review.user?.name}</div>
-                                                        <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
-                                                            {review.user?.email}
-                                                        </div>
+                                                <div>
+                                                    <strong>{review.user?.name}</strong>
+                                                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                                        {review.user?.email}
                                                     </div>
                                                 </div>
                                             </td>
                                             <td style={styles.td}>{review.model?.name}</td>
                                             <td style={styles.td}>{getRatingStars(review.rating)}</td>
                                             <td style={styles.td}>
-                                                <div style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                                    {review.comment.substring(0, 50)}...
+                                                <div style={{ fontSize: '0.85rem', color: '#64748b', maxWidth: '150px' }}>
+                                                    {review.deletion_reason || 'Sin especificar'}
                                                 </div>
                                             </td>
                                             <td style={styles.td}>
-                                                {new Date(review.created_at).toLocaleDateString()}
-                                            </td>
-                                            <td style={styles.td}>
-                                                <span style={{
-                                                    ...styles.statusBadge,
-                                                    backgroundColor: getStatusColor(review.status) + '10',
-                                                    color: getStatusColor(review.status)
-                                                }}>
-                                                    {getStatusText(review.status)}
-                                                </span>
-                                                {review.reported && (
-                                                    <span style={{ marginLeft: '0.5rem', color: colors.danger }}>
-                                                        <FiAlertCircle />
-                                                    </span>
-                                                )}
+                                                {new Date(review.deleted_at).toLocaleDateString('es-MX')}
                                             </td>
                                             <td style={styles.td}>
                                                 <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                                    {review.status === 'pending' && (
-                                                        <>
-                                                            <button
-                                                                style={styles.actionBtn}
-                                                                onClick={() => handleApprove(review.id)}
-                                                                title="Aprobar"
-                                                            >
-                                                                <FiCheckCircle color={colors.success} />
-                                                            </button>
-                                                            <button
-                                                                style={styles.actionBtn}
-                                                                onClick={() => handleReject(review.id)}
-                                                                title="Rechazar"
-                                                            >
-                                                                <FiXCircle color={colors.danger} />
-                                                            </button>
-                                                        </>
-                                                    )}
                                                     <button
+                                                        onClick={() => handleRestore(review.id)}
                                                         style={styles.actionBtn}
-                                                        onClick={() => handleReply(review)}
-                                                        title="Responder"
+                                                        title="Restaurar"
                                                     >
-                                                        <FiMessageSquare />
+                                                        <FiRefreshCw />
                                                     </button>
                                                     <button
+                                                        onClick={() => handleForceDelete(review.id)}
                                                         style={styles.actionBtn}
-                                                        onClick={() => handleReport(review.id)}
-                                                        title={review.reported ? 'Quitar reporte' : 'Reportar'}
+                                                        title="Eliminar permanentemente"
                                                     >
-                                                        <FiFlag color={review.reported ? colors.danger : '#64748b'} />
-                                                    </button>
-                                                    <button
-                                                        style={styles.actionBtn}
-                                                        onClick={() => handleDelete(review.id)}
-                                                        title="Eliminar"
-                                                    >
-                                                        <FiTrash2 color={colors.danger} />
+                                                        <FiX color={colors.danger} />
                                                     </button>
                                                 </div>
                                             </td>
-                                        </motion.tr>
-                                    ))
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </div>
-            )}
+            ) : !isMobile ? (
+                <div>
+                    {viewType === 'list' ? (
+                        // Vista de lista - Tabla
+                        <div style={styles.tableContainer}>
+                            <div style={{ overflowX: 'auto' }}>
+                                <table style={styles.table}>
+                                    <thead>
+                                        <tr>
+                                            <th style={styles.th}>Usuario</th>
+                                            <th style={styles.th}>Modelo</th>
+                                            <th style={styles.th}>Calificación</th>
+                                            <th style={styles.th}>Comentario</th>
+                                            <th style={styles.th}>Fecha</th>
+                                            <th style={styles.th}>Estado</th>
+                                            <th style={styles.th}>Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {filteredReviews.length === 0 ? (
+                                            <tr>
+                                                <td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#64748b' }}>
+                                                    No se encontraron reseñas
+                                                </td>
+                                            </tr>
+                                        ) : (
+                                            filteredReviews.map((review, index) => (
+                                                <motion.tr
+                                                    key={review.id}
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    transition={{ delay: index * 0.05 }}
+                                                >
+                                                    <td style={styles.td}>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                                            <div style={{
+                                                                width: '32px',
+                                                                height: '32px',
+                                                                borderRadius: '8px',
+                                                                backgroundColor: colors.primary + '10',
+                                                                display: 'flex',
+                                                                alignItems: 'center',
+                                                                justifyContent: 'center',
+                                                                color: colors.primary
+                                                            }}>
+                                                                {review.user?.name?.charAt(0).toUpperCase()}
+                                                            </div>
+                                                            <div>
+                                                                <div>{review.user?.name}</div>
+                                                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                                                    {review.user?.email}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td style={styles.td}>{review.model?.name}</td>
+                                                    <td style={styles.td}>{getRatingStars(review.rating)}</td>
+                                                    <td style={styles.td}>
+                                                        <div style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                            {review.comment.substring(0, 50)}...
+                                                        </div>
+                                                    </td>
+                                                    <td style={styles.td}>
+                                                        {new Date(review.created_at).toLocaleDateString()}
+                                                    </td>
+                                                    <td style={styles.td}>
+                                                        <span style={{
+                                                            ...styles.statusBadge,
+                                                            backgroundColor: getStatusColor(review.status) + '10',
+                                                            color: getStatusColor(review.status)
+                                                        }}>
+                                                            {getStatusText(review.status)}
+                                                        </span>
+                                                        {review.reported && (
+                                                            <span style={{ marginLeft: '0.5rem', color: colors.danger }}>
+                                                                <FiAlertCircle />
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td style={styles.td}>
+                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                            {review.status === 'pending' && (
+                                                                <>
+                                                                    <button
+                                                                        style={styles.actionBtn}
+                                                                        onClick={() => handleApprove(review.id)}
+                                                                        title="Aprobar"
+                                                                    >
+                                                                        <FiCheckCircle color={colors.success} />
+                                                                    </button>
+                                                                    <button
+                                                                        style={styles.actionBtn}
+                                                                        onClick={() => handleReject(review.id)}
+                                                                        title="Rechazar"
+                                                                    >
+                                                                        <FiXCircle color={colors.danger} />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            <button
+                                                                style={styles.actionBtn}
+                                                                onClick={() => {
+                                                                    setSelectedReview(review);
+                                                                    setShowReplyModal(true);
+                                                                }}
+                                                                title="Responder"
+                                                            >
+                                                                <FiMessageSquare />
+                                                            </button>
+                                                            <button
+                                                                style={styles.actionBtn}
+                                                                onClick={() => handleReport(review.id)}
+                                                                title={review.reported ? 'Quitar reporte' : 'Reportar'}
+                                                            >
+                                                                <FiFlag color={review.reported ? colors.danger : '#64748b'} />
+                                                            </button>
+                                                            <button
+                                                                style={styles.actionBtn}
+                                                                onClick={() => handleDelete(review.id)}
+                                                                title="Eliminar"
+                                                            >
+                                                                <FiTrash2 color={colors.danger} />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </motion.tr>
+                                            ))
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ) : (
+                        // Vista agrupada por usuario
+                        <div style={styles.cardsContainer}>
+                            {getReviewsByUser().length === 0 ? (
+                                <div style={styles.emptyState}>
+                                    No se encontraron reseñas
+                                </div>
+                            ) : (
+                                getReviewsByUser().map((userGroup, index) => (
+                                    <motion.div
+                                        key={`user-${userGroup.user?.id}`}
+                                        style={styles.reviewCard}
+                                        initial={{ opacity: 0, y: 10 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        transition={{ delay: index * 0.05 }}
+                                    >
+                                        {/* Encabezado del grupo de usuario */}
+                                        <div style={styles.cardHeader}>
+                                            <div style={styles.userInfo}>
+                                                <div style={styles.userAvatar}>
+                                                    {userGroup.user?.name?.charAt(0).toUpperCase() || '?'}
+                                                </div>
+                                                <div>
+                                                    <div style={styles.userName}>{userGroup.user?.name || 'Usuario desconocido'}</div>
+                                                    <div style={styles.userEmail}>{userGroup.user?.email}</div>
+                                                </div>
+                                            </div>
+                                            <div style={{
+                                                display: 'flex',
+                                                gap: '1rem',
+                                                alignItems: 'center'
+                                            }}>
+                                                <div style={{ textAlign: 'right' }}>
+                                                    <div style={{ fontSize: '0.9rem', fontWeight: '600', color: colors.dark }}>
+                                                        {userGroup.totalReviews} reseña{userGroup.totalReviews !== 1 ? 's' : ''}
+                                                    </div>
+                                                    <div style={{ fontSize: '0.85rem', color: colors.warning }}>
+                                                        ⭐ {userGroup.averageRating}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Lista de reseñas del usuario */}
+                                        <div style={{ borderTop: `2px solid ${colors.primary}10`, paddingTop: '1rem', marginTop: '1rem' }}>
+                                            {userGroup.reviews.map((review, reviewIndex) => (
+                                                <motion.div
+                                                    key={review.id}
+                                                    style={{
+                                                        paddingBottom: reviewIndex < userGroup.reviews.length - 1 ? '1rem' : '0',
+                                                        borderBottom: reviewIndex < userGroup.reviews.length - 1 ? `1px solid ${colors.primary}10` : 'none'
+                                                    }}
+                                                    initial={{ opacity: 0 }}
+                                                    animate={{ opacity: 1 }}
+                                                    transition={{ delay: (index * 0.05) + (reviewIndex * 0.02) }}
+                                                >
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                                                        <div>
+                                                            <div style={{ fontSize: '0.9rem', fontWeight: '600', color: colors.dark }}>
+                                                                {review.model?.name}
+                                                            </div>
+                                                            <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                                                {getRatingStars(review.rating)}
+                                                            </div>
+                                                        </div>
+                                                        <span style={{
+                                                            ...styles.statusBadge,
+                                                            backgroundColor: getStatusColor(review.status) + '10',
+                                                            color: getStatusColor(review.status),
+                                                            fontSize: '0.75rem'
+                                                        }}>
+                                                            {getStatusText(review.status)}
+                                                        </span>
+                                                    </div>
+                                                    <div style={{ fontSize: '0.85rem', color: '#1e293b', marginBottom: '0.75rem' }}>
+                                                        "{review.comment}"
+                                                    </div>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                                            {new Date(review.created_at).toLocaleDateString()} {new Date(review.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </div>
+                                                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                            {review.status === 'pending' && (
+                                                                <>
+                                                                    <button
+                                                                        style={styles.actionBtn}
+                                                                        onClick={() => handleApprove(review.id)}
+                                                                        title="Aprobar"
+                                                                    >
+                                                                        <FiCheckCircle color={colors.success} />
+                                                                    </button>
+                                                                    <button
+                                                                        style={styles.actionBtn}
+                                                                        onClick={() => handleReject(review.id)}
+                                                                        title="Rechazar"
+                                                                    >
+                                                                        <FiXCircle color={colors.danger} />
+                                                                    </button>
+                                                                </>
+                                                            )}
+                                                            <button
+                                                                style={styles.actionBtn}
+                                                                onClick={() => {
+                                                                    setSelectedReview(review);
+                                                                    setShowReplyModal(true);
+                                                                }}
+                                                                title="Responder"
+                                                            >
+                                                                <FiMessageSquare />
+                                                            </button>
+                                                            <button
+                                                                style={styles.actionBtn}
+                                                                onClick={() => handleReport(review.id)}
+                                                                title={review.reported ? 'Quitar reporte' : 'Reportar'}
+                                                            >
+                                                                <FiFlag color={review.reported ? colors.danger : '#64748b'} />
+                                                            </button>
+                                                            <button
+                                                                style={styles.actionBtn}
+                                                                onClick={() => handleDelete(review.id)}
+                                                                title="Eliminar"
+                                                            >
+                                                                <FiTrash2 color={colors.danger} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </motion.div>
+                                            ))}
+                                        </div>
+                                    </motion.div>
+                                ))
+                            )}
+                        </div>
+                    )}
+                </div>
+
+            ) : null}
+
+            {/* ← NUEVO: Modal de razón de eliminación */}
+            <AnimatePresence>
+                {showDeleteReason && (
+                    <motion.div
+                        style={styles.modalOverlay}
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        onClick={() => setShowDeleteReason(false)}
+                    >
+                        <motion.div
+                            style={styles.modal}
+                            initial={{ scale: 0.9, y: 20 }}
+                            animate={{ scale: 1, y: 0 }}
+                            exit={{ scale: 0.9, y: 20 }}
+                            onClick={e => e.stopPropagation()}
+                        >
+                            <div style={styles.modalHeader}>
+                                <h3 style={styles.modalTitle}>
+                                    <FiAlertTriangle style={{ marginRight: '0.5rem', color: colors.danger }} />
+                                    Eliminar reseña
+                                </h3>
+                                <button style={styles.closeBtn} onClick={() => setShowDeleteReason(false)}>
+                                    <FiX />
+                                </button>
+                            </div>
+
+                            <p style={{ color: '#64748b', marginBottom: '1rem' }}>
+                                ¿Por qué deseas eliminar esta reseña? (Se guardará en el historial)
+                            </p>
+
+                            <textarea
+                                placeholder="Especifica la razón (ej: Spam, Contenido ofensivo, etc.)..."
+                                style={styles.textarea}
+                                value={deleteReason}
+                                onChange={(e) => setDeleteReason(e.target.value)}
+                            />
+
+                            <div style={styles.modalActions}>
+                                <button
+                                    style={{ ...styles.button, ...styles.secondaryButton }}
+                                    onClick={() => setShowDeleteReason(false)}
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    style={{ ...styles.button, backgroundColor: colors.danger }}
+                                    onClick={confirmDelete}
+                                >
+                                    Eliminar
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
 
             {/* Modal de respuesta */}
             <AnimatePresence>

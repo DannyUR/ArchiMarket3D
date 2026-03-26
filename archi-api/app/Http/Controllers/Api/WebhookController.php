@@ -127,51 +127,65 @@ class WebhookController extends Controller
 /**
  * Procesar pago exitoso
  */
-private function processSuccessfulPayment($provider, $paymentId, $paymentData)
-{
-    DB::transaction(function () use ($provider, $paymentId, $paymentData) {
-        // Buscar la compra usando el ID que guardaste en metadata al crear el pago
-        $shoppingId = $paymentData['metadata']['shopping_id'] ?? null;
-        
-        if (!$shoppingId) {
-            Log::error('Webhook: No se encontró shopping_id en metadata', [
-                'provider' => $provider,
-                'payment_id' => $paymentId
-            ]);
-            throw new \Exception("No se encontró shopping_id en los metadatos");
-        }
+    private function processSuccessfulPayment($provider, $paymentId, $paymentData)
+    {
+        DB::transaction(function () use ($provider, $paymentId, $paymentData) {
+            // Buscar shopping_id en el campo 'custom' de la transacción
+            $shoppingId = null;
+            
+            // Intentar obtener de metadata (si existe)
+            $shoppingId = $paymentData['metadata']['shopping_id'] ?? null;
+            
+            // Si no, buscar en el campo 'custom' (PayPal lo envía aquí)
+            if (!$shoppingId && isset($paymentData['purchase_units'][0]['payments']['captures'][0]['custom'])) {
+                $customData = json_decode($paymentData['purchase_units'][0]['payments']['captures'][0]['custom'], true);
+                $shoppingId = $customData['shopping_id'] ?? null;
+            }
+            
+            // También buscar en el invoice_id (respaldo)
+            if (!$shoppingId && isset($paymentData['invoice_id'])) {
+                // Si el invoice_id tiene formato "123-1234567890"
+                $parts = explode('-', $paymentData['invoice_id']);
+                $shoppingId = $parts[0] ?? null;
+            }
+            
+            if (!$shoppingId) {
+                Log::error('Webhook: No se encontró shopping_id', [
+                    'provider' => $provider,
+                    'payment_id' => $paymentId,
+                    'data' => $paymentData
+                ]);
+                throw new \Exception("No se encontró shopping_id");
+            }
 
-        $shopping = Shopping::find($shoppingId);
-        
-        if (!$shopping) {
-            Log::error('Webhook: Compra no encontrada', [
+            $shopping = Shopping::find($shoppingId);
+            
+            if (!$shopping) {
+                Log::error('Webhook: Compra no encontrada', [
+                    'shopping_id' => $shoppingId,
+                    'provider' => $provider
+                ]);
+                throw new \Exception("Compra no encontrada: {$shoppingId}");
+            }
+
+            // Actualizar compra
+            $shopping->status = 'completed';
+            $shopping->payment_id = $paymentId;
+            $shopping->payment_provider = $provider;
+            $shopping->save();
+
+            // Activar licencias
+            UserLicense::where('shopping_id', $shopping->id)
+                ->update(['is_active' => true]);
+
+            Log::info('✅ Pago procesado exitosamente', [
                 'shopping_id' => $shoppingId,
-                'provider' => $provider
+                'provider' => $provider,
+                'payment_id' => $paymentId,
+                'user_id' => $shopping->user_id
             ]);
-            throw new \Exception("Compra no encontrada: {$shoppingId}");
-        }
-
-        // ✅ 1. CAMBIAR ESTADO DE LA COMPRA (necesitas agregar columna 'status' a shopping)
-        $shopping->status = 'completed';
-        $shopping->payment_id = $paymentId; // 👈 Necesitas agregar columna 'payment_id'
-        $shopping->payment_provider = $provider; // 👈 Necesitas agregar columna
-        $shopping->save();
-
-        // ✅ 2. ACTIVAR LAS LICENCIAS (si usas campo 'is_active' en user_licenses)
-        UserLicense::where('shopping_id', $shopping->id)
-            ->update(['is_active' => true]); // 👈 Necesitas agregar columna 'is_active'
-
-        // ✅ 3. ENVIAR EMAIL DE CONFIRMACIÓN (opcional)
-        // Mail::to($shopping->user->email)->send(new PurchaseConfirmed($shopping));
-
-        Log::info('Pago procesado exitosamente', [
-            'shopping_id' => $shoppingId,
-            'provider' => $provider,
-            'payment_id' => $paymentId,
-            'user_id' => $shopping->user_id
-        ]);
-    });
-}
+        });
+    }
 
     /**
      * Procesar pago fallido

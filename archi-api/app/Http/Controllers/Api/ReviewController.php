@@ -29,9 +29,33 @@ class ReviewController extends Controller
 
         $reviews = Review::where('model_id', $modelId)
             ->with('user:id,name')
-            ->select('id', 'user_id', 'rating', 'comment', 'created_at')
+            ->select('id', 'user_id', 'rating', 'comment', 'created_at', 'approved_at', 'rejected_at', 'admin_reply', 'replied_at')
             ->latest()
             ->paginate(10);
+
+        // Transformar reviews para agregar estado y respuesta formateada
+        $reviews->getCollection()->transform(function ($review) {
+            // Determinar estado
+            if ($review->rejected_at !== null) {
+                $review->status = 'rejected';
+            } elseif ($review->approved_at !== null) {
+                $review->status = 'approved';
+            } else {
+                $review->status = 'pending';
+            }
+
+            // Formatar respuesta del admin si existe
+            if ($review->admin_reply && $review->replied_at) {
+                $review->reply = [
+                    'text' => $review->admin_reply,
+                    'created_at' => $review->replied_at
+                ];
+            } else {
+                $review->reply = null;
+            }
+
+            return $review;
+        });
 
         $stats = [
             'average_rating' => round($model->reviews()->avg('rating') ?? 0, 1),
@@ -77,7 +101,7 @@ class ReviewController extends Controller
             ], 422);
         }
 
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
 
         // Verificar si ya reseñó este modelo
         $existingReview = Review::where('user_id', $user->id)
@@ -91,20 +115,35 @@ class ReviewController extends Controller
             ], 409);
         }
 
-        // Verificar si compró el modelo (opcional - política de negocio)
-        $hasPurchased = DB::table('shopping')
-            ->join('shopping_details', 'shopping.id', '=', 'shopping_details.shopping_id')
-            ->where('shopping.user_id', $user->id)
-            ->where('shopping_details.model_id', $modelId)
-            ->where('shopping.status', 'completed')
+        // Verificar si compró el modelo - CHECK BOTH licenses y shopping tables
+        $hasActiveLicense = DB::table('user_licenses')
+            ->where('user_id', $user->id)
+            ->where('model_id', $modelId)
+            ->where('is_active', true)
             ->exists();
 
-        // Puedes requerir compra para reseñar
+        $hasPendingPurchase = DB::table('shopping_details')
+            ->join('shopping', 'shopping.id', '=', 'shopping_details.shopping_id')
+            ->where('shopping.user_id', $user->id)
+            ->where('shopping_details.model_id', $modelId)
+            ->where('shopping.status', '!=', 'cancelled')
+            ->exists();
+
+        $hasPurchased = $hasActiveLicense || $hasPendingPurchase;
+
+        // Requerir compra para reseñar
         if (!$hasPurchased) {
+            \Log::warning('Review blocked - user has not purchased', [
+                'user_id' => $user->id,
+                'model_id' => $modelId,
+                'hasActiveLicense' => $hasActiveLicense,
+                'hasPendingPurchase' => $hasPendingPurchase
+            ]);
             return response()->json([
-                 'message' => 'Debes comprar el modelo para poder reseñarlo'
+                 'message' => 'Debes comprar el modelo para poder reseñarlo',
+                 'success' => false
              ], 403);
-      }
+        }
 
         $review = Review::create([
             'user_id' => $user->id,
@@ -136,7 +175,7 @@ class ReviewController extends Controller
         }
 
         // Verificar que sea el autor
-        if ($review->user_id !== auth()->id()) {
+        if ($review->user_id !== auth('sanctum')->id()) {
             return response()->json([
                 'message' => 'No autorizado para editar esta reseña'
             ], 403);
@@ -175,7 +214,7 @@ class ReviewController extends Controller
             ], 404);
         }
 
-        $user = auth()->user();
+        $user = auth('sanctum')->user();
 
         // Solo autor o admin pueden eliminar
         if ($review->user_id !== $user->id && $user->user_type !== 'admin') {

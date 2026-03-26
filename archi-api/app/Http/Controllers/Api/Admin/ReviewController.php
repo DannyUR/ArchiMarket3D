@@ -18,13 +18,16 @@ class ReviewController extends Controller
     public function index(Request $request)
     {
         try {
+            // Por defecto NO mostrar eliminadas, a menos que se especifique
             $query = Review::with(['user:id,name,email', 'model:id,name'])
+                ->whereNull('deleted_at')
                 ->orderBy('created_at', 'desc');
 
             // Filtros
             if ($request->has('status') && $request->status !== 'all') {
                 if ($request->status === 'pending') {
-                    $query->whereNull('approved_at');
+                    $query->whereNull('approved_at')
+                          ->whereNull('rejected_at');
                 } elseif ($request->status === 'approved') {
                     $query->whereNotNull('approved_at');
                 } elseif ($request->status === 'rejected') {
@@ -53,6 +56,13 @@ class ReviewController extends Controller
             }
 
             $reviews = $query->paginate(15);
+
+            // Mapear reviews para agregar el campo 'status' calculado
+            $reviews->getCollection()->transform(function ($review) {
+                $review->status = $this->determineStatus($review);
+                $review->reply = $this->getReplyData($review);
+                return $review;
+            });
 
             // Calcular estadísticas
             $stats = [
@@ -97,6 +107,35 @@ class ReviewController extends Controller
     }
 
     /**
+     * Determinar el estado de una reseña
+     */
+    private function determineStatus($review)
+    {
+        if ($review->rejected_at !== null) {
+            return 'rejected';
+        } elseif ($review->approved_at !== null) {
+            return 'approved';
+        } else {
+            return 'pending';
+        }
+    }
+
+    /**
+     * Obtener datos de respuesta si existen
+     */
+    private function getReplyData($review)
+    {
+        if ($review->admin_reply && $review->replied_at) {
+            return [
+                'text' => $review->admin_reply,
+                'created_at' => $review->replied_at
+            ];
+        }
+        return null;
+    }
+
+
+    /**
      * Aprobar una reseña
      */
     public function approve($id)
@@ -117,7 +156,7 @@ class ReviewController extends Controller
 
             Log::info('Reseña aprobada', [
                 'review_id' => $review->id,
-                'admin_id' => auth()->id()
+                'admin_id' => auth('sanctum')->id()
             ]);
 
             return response()->json([
@@ -157,7 +196,7 @@ class ReviewController extends Controller
 
             Log::info('Reseña rechazada', [
                 'review_id' => $review->id,
-                'admin_id' => auth()->id()
+                'admin_id' => auth('sanctum')->id()
             ]);
 
             return response()->json([
@@ -204,20 +243,22 @@ class ReviewController extends Controller
 
             $review->admin_reply = $request->reply;
             $review->replied_at = now();
-            $review->replied_by = auth()->id();
+            $review->replied_by = auth('sanctum')->id();
             $review->save();
 
             Log::info('Respuesta a reseña', [
                 'review_id' => $review->id,
-                'admin_id' => auth()->id()
+                'admin_id' => auth('sanctum')->id()
             ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Respuesta enviada correctamente',
                 'data' => [
-                    'reply' => $review->admin_reply,
-                    'replied_at' => $review->replied_at
+                    'reply' => [
+                        'text' => $review->admin_reply,
+                        'created_at' => $review->replied_at
+                    ]
                 ]
             ]);
 
@@ -268,12 +309,12 @@ class ReviewController extends Controller
     }
 
     /**
-     * Eliminar reseña (admin)
+     * Soft-delete (mover a historial) una reseña
      */
-    public function destroy($id)
+    public function destroy(Request $request, $id)
     {
         try {
-            $review = Review::find($id);
+            $review = Review::withTrashed()->find($id);
 
             if (!$review) {
                 return response()->json([
@@ -282,16 +323,23 @@ class ReviewController extends Controller
                 ], 404);
             }
 
+            // Registrar quién eliminó y la razón
+            $review->deleted_by = auth('sanctum')->id();
+            $review->deletion_reason = $request->input('reason', 'Sin especificar');
+            $review->save();
+            
+            // Realizar soft delete
             $review->delete();
 
-            Log::info('Reseña eliminada por admin', [
+            Log::info('Reseña movida a historial', [
                 'review_id' => $id,
-                'admin_id' => auth()->id()
+                'admin_id' => auth('sanctum')->id(),
+                'reason' => $review->deletion_reason
             ]);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Reseña eliminada correctamente'
+                'message' => 'Reseña movida al historial correctamente'
             ]);
 
         } catch (\Exception $e) {
@@ -300,6 +348,154 @@ class ReviewController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al eliminar reseña',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Ver historial de reseñas eliminadas
+     */
+    public function trash(Request $request)
+    {
+        try {
+            $query = Review::withTrashed()
+                ->whereNotNull('deleted_at')
+                ->with(['user:id,name,email', 'model:id,name'])
+                ->orderBy('deleted_at', 'desc');
+
+            // Búsqueda
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function($q) use ($search) {
+                    $q->whereHas('user', function($userQuery) use ($search) {
+                        $userQuery->where('name', 'LIKE', "%{$search}%")
+                                  ->orWhere('email', 'LIKE', "%{$search}%");
+                    })->orWhereHas('model', function($modelQuery) use ($search) {
+                        $modelQuery->where('name', 'LIKE', "%{$search}%");
+                    })->orWhere('comment', 'LIKE', "%{$search}%");
+                });
+            }
+
+            $deletedReviews = $query->paginate(15);
+
+            // Agregar info del admin que eliminó
+            $deletedReviews->getCollection()->transform(function ($review) {
+                $review->status = $this->determineStatus($review);
+                $review->deleted_by_user = $review->deleted_by ? 
+                    \App\Models\User::find($review->deleted_by) : null;
+                return $review;
+            });
+
+            return response()->json([
+                'success' => true,
+                'data' => $deletedReviews,
+                'pagination' => [
+                    'current_page' => $deletedReviews->currentPage(),
+                    'last_page' => $deletedReviews->lastPage(),
+                    'per_page' => $deletedReviews->perPage(),
+                    'total' => $deletedReviews->total()
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al obtener historial: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener historial de eliminados',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Restaurar una reseña eliminada
+     */
+    public function restore($id)
+    {
+        try {
+            $review = Review::withTrashed()
+                ->where('id', $id)
+                ->whereNotNull('deleted_at')
+                ->first();
+
+            if (!$review) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Reseña eliminada no encontrada'
+                ], 404);
+            }
+
+            $review->restore();
+            $review->deleted_by = null;
+            $review->deletion_reason = null;
+            $review->save();
+
+            Log::info('Reseña restaurada', [
+                'review_id' => $id,
+                'admin_id' => auth('sanctum')->id()
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Reseña restaurada correctamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al restaurar reseña: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al restaurar reseña',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Eliminar permanentemente (hard delete) una reseña
+     */
+    public function forceDelete($id)
+    {
+        try {
+            $review = Review::withTrashed()
+                ->where('id', $id)
+                ->first();
+
+            if (!$review) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Reseña no encontrada'
+                ], 404);
+            }
+
+            // Guardar info antes de eliminar
+            $reviewData = [
+                'id' => $review->id,
+                'model_name' => $review->model?->name,
+                'user_email' => $review->user?->email,
+                'rating' => $review->rating
+            ];
+
+            $review->forceDelete();
+
+            Log::warning('Reseña eliminada permanentemente', [
+                'review_data' => $reviewData,
+                'admin_id' => auth('sanctum')->id()
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Reseña eliminada permanentemente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al eliminar permanentemente: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al eliminar permanentemente',
                 'error' => $e->getMessage()
             ], 500);
         }

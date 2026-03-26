@@ -41,6 +41,12 @@ class UserLicense extends Model
     // Verificar si la licencia está activa
     public function isValid()
     {
+        // Primero, verificar que esté activa
+        if (!$this->is_active) {
+            return false;
+        }
+        
+        // Luego, verificar la fecha de expiración
         if (!$this->expires_at) {
             return true; // No expira
         }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
+import {
     FiDownload,
     FiPackage,
     FiCalendar,
@@ -20,6 +20,7 @@ import {
 import { HiOutlineCube } from 'react-icons/hi';
 import API from '../../services/api';
 import { colors } from '../../styles/theme';
+import DownloadModal from '../models/DownloadModal';
 
 const Downloads = () => {
     const navigate = useNavigate();
@@ -30,6 +31,9 @@ const Downloads = () => {
     const [selectedFormat, setSelectedFormat] = useState('all');
     const [showFilters, setShowFilters] = useState(false);
     const [isMobile, setIsMobile] = useState(false);
+    const [showDownloadModal, setShowDownloadModal] = useState(false);
+    const [selectedDownloadModel, setSelectedDownloadModel] = useState(null);
+    const [isDownloading, setIsDownloading] = useState(false);
 
     // Detectar móvil
     useEffect(() => {
@@ -49,7 +53,7 @@ const Downloads = () => {
         try {
             const purchasesResponse = await API.get('/purchases');
             const purchases = purchasesResponse.data?.data?.data || [];
-            
+
             const allDownloads = [];
             purchases.forEach(purchase => {
                 if (purchase.models && purchase.status === 'completed') {
@@ -69,7 +73,7 @@ const Downloads = () => {
                     });
                 }
             });
-            
+
             setDownloads(allDownloads);
         } catch (error) {
             console.error('Error cargando descargas:', error);
@@ -78,38 +82,153 @@ const Downloads = () => {
         }
     };
 
+    // En la función handleDownload, antes de abrir el modal
     const handleDownload = async (modelId, modelName, format) => {
         try {
-            const modelResponse = await API.get(`/models/${modelId}`);
-            const modelFiles = modelResponse.data?.data?.model?.files || [];
-            const downloadFile = modelFiles.find(f => f.file_type === 'download');
+            console.log(`📥 Obteniendo formatos disponibles para modelo ${modelId}...`);
             
-            if (!downloadFile) {
-                alert('No hay archivo disponible para descargar');
+            // Usar el nuevo endpoint para obtener formatos
+            const formatsResponse = await API.get(`/models/${modelId}/formats`);
+            const availableFormats = formatsResponse.data?.data || [];
+
+            console.log('📦 Formatos disponibles:', availableFormats);
+
+            if (availableFormats.length === 0) {
+                alert('Este modelo no tiene archivos disponibles para descargar. Por favor contacte al administrador.');
                 return;
             }
 
+            const downloadModel = downloads.find(d => d.id === modelId);
+            if (downloadModel) {
+                setSelectedDownloadModel({
+                    ...downloadModel,
+                    availableFormats
+                });
+                setShowDownloadModal(true);
+            }
+        } catch (error) {
+            console.error('Error obteniendo formatos:', error);
+            alert('Error al cargar las opciones de descarga');
+        }
+    };
+
+    // Función auxiliar para realizar la descarga
+    const performDownload = async (downloadFile, selectedFormat) => {
+        try {
+            console.log('✅ Archivo encontrado:', downloadFile);
+
+            // Descargar el archivo
             const response = await API.get(`/download/${downloadFile.id}`, {
                 responseType: 'blob'
             });
-            
+
+            console.log('📥 Archivo descargado, tamaño:', response.data.size);
+
+            if (!response.data || response.data.size === 0) {
+                alert('Error: El archivo está vacío. Por favor intenta de nuevo.');
+                return false;
+            }
+
+            // Crear blob y descargar
             const url = window.URL.createObjectURL(new Blob([response.data]));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `${modelName}.${format.toLowerCase()}`);
+
+            // Generar nombre del archivo
+            const fileName = selectedDownloadModel.name.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+
+            // Obtener extensión de la URL del archivo
+            const urlParts = downloadFile.file_url?.split('.') || [];
+            const extension = urlParts[urlParts.length - 1] || selectedFormat.toLowerCase();
+
+            link.setAttribute('download', `${fileName}.${extension}`);
             document.body.appendChild(link);
             link.click();
             link.remove();
+            window.URL.revokeObjectURL(url);
 
-            setDownloads(prev => prev.map(d => 
-                d.id === modelId 
+            // Actualizar contador de descargas
+            setDownloads(prev => prev.map(d =>
+                d.id === selectedDownloadModel.id
                     ? { ...d, download_count: (d.download_count || 0) + 1, last_downloaded: new Date().toISOString() }
                     : d
             ));
 
+            console.log(`✅ Descarga completada: ${fileName}.${extension}`);
+            return true;
+
         } catch (error) {
-            console.error('Error descargando archivo:', error);
-            alert('Error al descargar el archivo');
+            console.error('❌ Error en descarga:', error);
+            throw error;
+        }
+    };
+
+    const handleDownloadWithFormat = async (selectedFormat) => {
+        if (!selectedDownloadModel) return;
+
+        try {
+            setIsDownloading(true);
+
+            console.log(`📥 Iniciando descarga del formato: ${selectedFormat}`);
+
+            // Usar el nuevo endpoint con selección de formato
+            const downloadUrl = `/models/${selectedDownloadModel.id}/download?format=${selectedFormat}`;
+            
+            const response = await API.get(downloadUrl, {
+                responseType: 'blob'
+            });
+
+            console.log('✅ Archivo descargado, tamaño:', response.data.size);
+
+            if (!response.data || response.data.size === 0) {
+                alert('Error: El archivo está vacío. Por favor intenta de nuevo.');
+                setIsDownloading(false);
+                return;
+            }
+
+            // Crear blob y descargar
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+
+            // Generar nombre del archivo
+            const fileName = selectedDownloadModel.name.replace(/[^a-z0-9]/gi, '_').substring(0, 50);
+            const extension = selectedFormat.toLowerCase();
+
+            link.setAttribute('download', `${fileName}.${extension}`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url);
+
+            // Actualizar contador de descargas
+            setDownloads(prev => prev.map(d =>
+                d.id === selectedDownloadModel.id
+                    ? { ...d, download_count: (d.download_count || 0) + 1, last_downloaded: new Date().toISOString() }
+                    : d
+            ));
+
+            console.log(`✅ Descarga completada: ${fileName}.${extension}`);
+
+            // Cerrar modal
+            setShowDownloadModal(false);
+            setSelectedDownloadModel(null);
+
+        } catch (error) {
+            console.error('❌ Error descargando archivo:', error);
+
+            if (error.response?.status === 403) {
+                alert('No tienes permiso para descargar este modelo. Asegúrate de haberlo comprado.');
+            } else if (error.response?.status === 401) {
+                alert('Por favor inicia sesión para descargar.');
+                navigate('/login');
+            } else if (error.response?.status === 404) {
+                alert('El formato seleccionado no está disponible para este modelo. Por favor, contacta al administrador.');
+            } else {
+                alert('Error al descargar el archivo. Por favor intenta de nuevo.');
+            }
+        } finally {
+            setIsDownloading(false);
         }
     };
 
@@ -141,7 +260,7 @@ const Downloads = () => {
 
     const getFormatIcon = (format) => {
         const iconProps = { size: isMobile ? 20 : 24 };
-        switch(format?.toLowerCase()) {
+        switch (format?.toLowerCase()) {
             case 'obj':
                 return <FiArchive {...iconProps} />;
             case 'fbx':
@@ -155,7 +274,7 @@ const Downloads = () => {
     };
 
     const getFormatColor = (format) => {
-        switch(format?.toLowerCase()) {
+        switch (format?.toLowerCase()) {
             case 'obj': return '#3b82f6';
             case 'fbx': return '#8b5cf6';
             case 'gltf':
@@ -525,9 +644,9 @@ const Downloads = () => {
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                
+
                 <div style={styles.filterGroup}>
-                    <select 
+                    <select
                         style={styles.filterSelect}
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value)}
@@ -537,7 +656,7 @@ const Downloads = () => {
                         <option value="size">Por tamaño</option>
                     </select>
 
-                    <select 
+                    <select
                         style={styles.filterSelect}
                         value={selectedFormat}
                         onChange={(e) => setSelectedFormat(e.target.value)}
@@ -552,7 +671,7 @@ const Downloads = () => {
 
             {/* Grid de descargas */}
             {filteredDownloads.length === 0 ? (
-                <motion.div 
+                <motion.div
                     style={styles.emptyState}
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -562,8 +681,8 @@ const Downloads = () => {
                         No hay modelos para descargar
                     </h3>
                     <p style={{ color: '#94a3b8', maxWidth: '400px', margin: '0 auto' }}>
-                        {searchTerm || selectedFormat !== 'all' 
-                            ? 'Intenta con otros filtros de búsqueda' 
+                        {searchTerm || selectedFormat !== 'all'
+                            ? 'Intenta con otros filtros de búsqueda'
                             : 'Realiza tu primera compra para comenzar a descargar modelos'}
                     </p>
                 </motion.div>
@@ -648,7 +767,7 @@ const Downloads = () => {
                                 <div style={styles.downloadCount}>
                                     <FiDownload /> {download.download_count || 0}
                                 </div>
-                                <motion.button 
+                                <motion.button
                                     style={styles.downloadBtn}
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}
@@ -671,6 +790,19 @@ const Downloads = () => {
                     100% { transform: rotate(360deg); }
                 }
             `}</style>
+
+            {/* Download Modal */}
+            <DownloadModal
+                isOpen={showDownloadModal}
+                onClose={() => {
+                    setShowDownloadModal(false);
+                    setSelectedDownloadModel(null);
+                }}
+                model={selectedDownloadModel}
+                onDownload={handleDownloadWithFormat}
+                isDownloading={isDownloading}
+                availableFormats={selectedDownloadModel?.availableFormats || []}
+            />
         </div>
     );
 };

@@ -192,12 +192,16 @@ class ModelController extends Controller
     public function show($id)
     {
         try {
+            // OPTIMIZED: Load reviews for display + calculate stats separately
+            $startTime = microtime(true);
+            
             $model = Model3D::with([
                 'category:id,name',
                 'files:id,model_id,file_url,file_type',
                 'licenses:id,model_id,type,description',
                 'reviews' => function($q) {
                     $q->with('user:id,name')
+                    ->select('id', 'user_id', 'model_id', 'rating', 'comment', 'created_at', 'approved_at', 'rejected_at', 'admin_reply', 'replied_at')
                     ->latest()
                     ->limit(5);
                 }
@@ -206,7 +210,7 @@ class ModelController extends Controller
                 'id', 'name', 'description', 'price', 'format', 
                 'size_mb', 'publication_date', 'category_id', 'featured',
                 'metadata', 'preview_url', 'embed_url', 'sketchfab_url',
-                'author_name', 'author_avatar', 'author_bio'  // Estos ya están aquí
+                'author_name', 'author_avatar', 'author_bio'
             )
             ->find($id);
 
@@ -217,37 +221,80 @@ class ModelController extends Controller
                 ], 404);
             }
 
-            $user = auth()->user();
+            // Transformar reviews para agregar status y reply
+            $model->reviews = $model->reviews->map(function ($review) {
+                // Determinar estado
+                if ($review->rejected_at !== null) {
+                    $review->status = 'rejected';
+                } elseif ($review->approved_at !== null) {
+                    $review->status = 'approved';
+                } else {
+                    $review->status = 'pending';
+                }
+
+                // Formatar respuesta del admin si existe
+                if ($review->admin_reply && $review->replied_at) {
+                    $review->reply = [
+                        'text' => $review->admin_reply,
+                        'created_at' => $review->replied_at
+                    ];
+                } else {
+                    $review->reply = null;
+                }
+
+                return $review;
+            });
+
+            $user = auth('sanctum')->user();
             $isPurchased = false;
             $hasReviewed = false;
 
             if ($user) {
-                $isPurchased = DB::table('shopping_details')
-                    ->where('model_id', $id)
-                    ->join('shopping', 'shopping.id', '=', 'shopping_details.shopping_id')
-                    ->where('shopping.user_id', $user->id)
-                    ->exists();
-                    
-                $hasReviewed = $model->reviews()
+                // ⚡ OPTIMIZED: Single consolidated query for purchase verification
+                $purchaseCheck = DB::table('user_licenses')
                     ->where('user_id', $user->id)
+                    ->where('model_id', $id)
+                    ->where('is_active', true)
                     ->exists();
+
+                if (!$purchaseCheck) {
+                    // Check pending purchases only if no active license
+                    $purchaseCheck = DB::table('shopping_details')
+                        ->join('shopping', 'shopping.id', '=', 'shopping_details.shopping_id')
+                        ->where('shopping.user_id', $user->id)
+                        ->where('shopping_details.model_id', $id)
+                        ->where('shopping.status', '!=', 'cancelled')
+                        ->exists();
+                }
+
+                $isPurchased = $purchaseCheck;
+
+                // ⚡ OPTIMIZED: Use loaded reviews instead of another query
+                $hasReviewed = $model->reviews->contains('user_id', $user->id);
+            } else {
+                \Log::warning('⚠️ No authenticated user accessing model detail');
             }
 
-            // Count avg rating manually
-            $reviewsCount = $model->reviews()->count();
+            // ⚡ OPTIMIZED: Calculate stats using separate queries to avoid limit() affecting aggregates
+            $reviewsCount = DB::table('reviews')
+                ->where('model_id', $id)
+                ->count();
+            
             $avgRating = 0;
             if ($reviewsCount > 0) {
-                $avgRating = round($model->reviews()->avg('rating') ?? 0, 1);
+                $avgRating = round(DB::table('reviews')
+                    ->where('model_id', $id)
+                    ->avg('rating'), 1);
             }
 
-            // Count purchases
-            $purchasesCount = DB::table('shopping_details')
+            // ⚡ OPTIMIZED: Single query for purchases count
+            $purchasesCount = DB::table('user_licenses')
                 ->where('model_id', $id)
-                ->join('shopping', 'shopping.id', '=', 'shopping_details.shopping_id')
-                ->distinct('shopping_id')
-                ->count('shopping_id');
+                ->where('is_active', true)
+                ->distinct()
+                ->count('user_id');
 
-            return response()->json([
+            $responseData = [
                 'success' => true,
                 'data' => [
                     'model' => $model,
@@ -264,10 +311,22 @@ class ModelController extends Controller
                     'access' => [
                         'can_download' => $isPurchased,
                         'can_preview' => true,
-                        'can_review' => $isPurchased && !$hasReviewed
+                        'can_review' => $isPurchased && !$hasReviewed,
+                        'has_license' => $isPurchased,
+                        'has_reviewed' => $hasReviewed,
+                        'is_viewer_logged_in' => (bool)$user,
+                        'can_write_review' => $isPurchased && !$hasReviewed,
+                        'reviewer_status' => $user ? 
+                            ($isPurchased ? ($hasReviewed ? 'already_reviewed' : 'can_review') : 'not_purchased') : 
+                            'not_logged_in'
                     ]
                 ]
-            ]);
+            ];
+
+            $duration = microtime(true) - $startTime;
+            \Log::debug('ModelController::show completed in ' . round($duration * 1000, 2) . 'ms for model ' . $id);
+
+            return response()->json($responseData);
             
         } catch (\Exception $e) {
             \Log::error('Error in ModelController::show - ' . $e->getMessage());

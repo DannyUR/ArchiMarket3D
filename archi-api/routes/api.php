@@ -37,6 +37,42 @@ Route::get('/', function() {
     ]);
 });
 
+// 🔍 DEBUG ENDPOINT - Verifica el estado de autenticación
+Route::get('/debug/auth', function(Request $request) {
+    return response()->json([
+        'has_auth_header' => $request->hasHeader('Authorization'),
+        'auth_header' => $request->header('Authorization') ? 'Bearer token present' : 'No token',
+        'user' => auth()->user() ? [
+            'id' => auth()->user()->id,
+            'email' => auth()->user()->email,
+            'name' => auth()->user()->name
+        ] : null,
+        'user_is_null' => auth()->user() === null,
+        'all_headers' => $request->headers->keys()
+    ]);
+});
+
+// 🔍 QUIEN SOY - Verifica usuario logueado con Sanctum
+Route::get('/debug/whoami', function(Request $request) {
+    $user = auth('sanctum')->user();
+    
+    if (!$user) {
+        return response()->json([
+            'authenticated' => false,
+            'message' => 'No user authenticated with Sanctum'
+        ]);
+    }
+    
+    return response()->json([
+        'authenticated' => true,
+        'user_id' => $user->id,
+        'name' => $user->name,
+        'email' => $user->email,
+        'user_type' => $user->user_type,
+        'is_admin' => $user->user_type === 'admin'
+    ]);
+});
+
 /*
 |--------------------------------------------------------------------------
 | Autenticación Pública
@@ -114,6 +150,22 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Descargas
     Route::get('/download/{fileId}', [ModelFileController::class, 'download'])->name('download.file');
+    Route::get('/models/{modelId}/download', [ModelFileController::class, 'downloadByFormat'])->name('download.by-format');
+    Route::get('/models/{modelId}/formats', [ModelFileController::class, 'availableFormats'])->name('model.formats');
+
+    // Compras - Agrega estas dos rutas DENTRO del grupo existente
+    Route::prefix('shopping')->group(function () {
+        Route::post('/create-paypal-order', [ShoppingController::class, 'createPayPalOrder']);
+    });
+});
+
+/*
+|--------------------------------------------------------------------------
+| PayPal Callback (Sin autenticación)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('shopping')->group(function () {
+    Route::get('/execute-paypal-payment', [ShoppingController::class, 'executePayPalPayment'])->name('shopping.execute-paypal');
 });
 
 /*
@@ -131,6 +183,10 @@ Route::prefix('models')->group(function () {
     Route::get('/{id}', [ModelController::class, 'show']);
     Route::get('/{id}/reviews', [ReviewController::class, 'index']);
     Route::get('/{id}/files/preview', [ModelFileController::class, 'previews']);
+    
+    // 🆕 Info de descarga (público - mostrable antes de comprar)
+    Route::get('/{modelId}/download-info', [ModelFileController::class, 'downloadInfo']);
+    Route::get('/{modelId}/is-downloadable', [ModelFileController::class, 'isDownloadable']);
 });
 
 // ✅ PROXY DE IMÁGENES (NUEVA RUTA)
@@ -248,11 +304,14 @@ Route::prefix('admin')->middleware(['auth:sanctum', 'admin'])->group(function ()
     Route::prefix('reviews')->group(function () {
         Route::get('/', [AdminReviewController::class, 'index']);
         Route::get('/stats', [AdminReviewController::class, 'stats']);
+        Route::get('/trash', [AdminReviewController::class, 'trash']); // Historial de eliminadas
         Route::post('/{id}/approve', [AdminReviewController::class, 'approve']);
         Route::post('/{id}/reject', [AdminReviewController::class, 'reject']);
         Route::post('/{id}/reply', [AdminReviewController::class, 'reply']);
         Route::post('/{id}/toggle-report', [AdminReviewController::class, 'toggleReport']);
-        Route::delete('/{id}', [AdminReviewController::class, 'destroy']);
+        Route::post('/{id}/restore', [AdminReviewController::class, 'restore']); // Restaurar eliminada
+        Route::delete('/{id}', [AdminReviewController::class, 'destroy']); // Soft delete
+        Route::delete('/{id}/permanent', [AdminReviewController::class, 'forceDelete']); // Eliminar permanentemente
     });
 
     // Notificaciones

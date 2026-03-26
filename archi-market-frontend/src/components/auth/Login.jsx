@@ -53,7 +53,7 @@ const Login = () => {
             if (response.data.data.user.user_type === 'admin') {
                 navigate('/admin', { replace: true });
             } else {
-                navigate('/models', { replace: true });
+                navigate('/home', { replace: true });
             }
 
         } catch (err) {

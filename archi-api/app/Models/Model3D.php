@@ -77,4 +77,29 @@ class Model3D extends Model
         return $this->hasMany(UserLicense::class, 'model_id');
     }
 
+    /**
+     * Obtener embed_url desde el campo o desde metadata
+     */
+    public function getEmbedUrlAttribute($value)
+    {
+        // Si el campo embed_url tiene valor, devolverlo
+        if (!empty($value)) {
+            return $value;
+        }
+
+        // Si no, intentar extraerlo del metadata
+        $metadata = $this->metadata;
+        if (is_string($metadata)) {
+            $metadata = json_decode($metadata, true);
+        }
+        
+        if (is_array($metadata) && isset($metadata['embed_url'])) {
+            $url = $metadata['embed_url'];
+            // Limpiar URLs escapadas
+            return str_replace('\/', '/', $url);
+        }
+
+        return null;
+    }
+
 }

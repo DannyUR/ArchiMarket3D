@@ -5,7 +5,6 @@ import {
     FiArrowLeft,
     FiCreditCard,
     FiShield,
-    FiTruck,
     FiCheckCircle,
     FiLock,
     FiUser,
@@ -23,16 +22,19 @@ import {
 } from 'react-icons/fi';
 import { HiOutlineCube } from 'react-icons/hi';
 import { useCart } from '../../context/CartContext';
+import { useNotification } from '../../context/NotificationContext';
 import { colors } from '../../styles/theme';
 
 const Checkout = () => {
     const navigate = useNavigate();
-    const { cartItems, getCartTotal, checkout, loading } = useCart();
+    const { cartItems, getCartTotal, checkout, loading, cartLoaded } = useCart();
+    const { showError, showInfo } = useNotification();
     const [step, setStep] = useState(1);
     const [orderComplete, setOrderComplete] = useState(false);
     const [processing, setProcessing] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
     const [isMobile, setIsMobile] = useState(false);
+    const [paymentMethod, setPaymentMethod] = useState('paypal');
 
     const [formData, setFormData] = useState({
         firstName: '',
@@ -57,6 +59,14 @@ const Checkout = () => {
         window.addEventListener('resize', checkMobile);
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
+
+    // Validar que el carrito no esté vacío
+    useEffect(() => {
+        if (cartLoaded && cartItems.length === 0) {
+            showError('⚠️ El carrito está vacío. Selecciona productos antes de hacer checkout.');
+            setTimeout(() => navigate('/cart'), 2000);
+        }
+    }, [cartLoaded, cartItems.length, navigate, showError]);
 
     const handleInputChange = (e) => {
         setFormData({
@@ -87,16 +97,11 @@ const Checkout = () => {
         try {
             const result = await checkout();
             console.log('Resultado del checkout:', result);
-            setOrderComplete(true);
-
-            setTimeout(() => {
-                navigate('/purchases');
-            }, 3000);
-
         } catch (error) {
             console.error('Error en checkout:', error);
             setErrorMessage(
                 error.response?.data?.message ||
+                error.message ||
                 'Error al procesar el pago. Intenta de nuevo.'
             );
         } finally {
@@ -116,6 +121,100 @@ const Checkout = () => {
     const subtotal = getCartTotal();
     const tax = subtotal * 0.16;
     const total = subtotal + tax;
+
+    // Métodos de pago disponibles
+    const paymentMethods = [
+        {
+            id: 'paypal',
+            name: 'PayPal',
+            icon: '💳',
+            description: 'Paga con tu cuenta PayPal o tarjeta',
+            available: true,
+            color: '#003087'
+        },
+        {
+            id: 'stripe',
+            name: 'Tarjeta de crédito/débito',
+            icon: '💳',
+            description: 'Visa, Mastercard, American Express',
+            available: false,
+            color: '#635BFF',
+            comingSoon: true
+        },
+        {
+            id: 'mercadopago',
+            name: 'MercadoPago',
+            icon: '🪙',
+            description: 'Paga con saldo, Oxxo o transferencia',
+            available: false,
+            color: '#00B1EA',
+            comingSoon: true
+        },
+        {
+            id: 'bank',
+            name: 'Transferencia bancaria',
+            icon: '🏦',
+            description: 'Para empresas (requiere validación)',
+            available: false,
+            color: '#2E7D32',
+            comingSoon: true
+        }
+    ];
+
+    // Estilos para métodos de pago
+    const paymentMethodStyles = {
+        container: {
+            display: 'grid',
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+            gap: '1rem',
+            marginBottom: '2rem',
+            marginTop: '1rem'
+        },
+        card: {
+            padding: '1.5rem',
+            borderRadius: '16px',
+            border: '2px solid #e2e8f0',
+            cursor: 'pointer',
+            transition: 'all 0.2s',
+            position: 'relative',
+            backgroundColor: 'white'
+        },
+        cardSelected: {
+            borderColor: colors.primary,
+            boxShadow: `0 0 0 3px ${colors.primary}20`
+        },
+        cardDisabled: {
+            opacity: 0.7,
+            cursor: 'not-allowed',
+            backgroundColor: '#f8fafc'
+        },
+        comingSoonBadge: {
+            position: 'absolute',
+            top: '0.5rem',
+            right: '0.5rem',
+            backgroundColor: '#FFE5E5',
+            color: '#FF4444',
+            padding: '0.25rem 0.75rem',
+            borderRadius: '30px',
+            fontSize: '0.7rem',
+            fontWeight: '600',
+            border: '1px solid #FF4444'
+        },
+        icon: {
+            fontSize: '2rem',
+            marginBottom: '0.5rem'
+        },
+        name: {
+            fontWeight: '600',
+            fontSize: '1rem',
+            marginBottom: '0.25rem',
+            color: colors.dark
+        },
+        description: {
+            fontSize: '0.85rem',
+            color: '#64748b'
+        }
+    };
 
     const styles = {
         container: {
@@ -164,18 +263,6 @@ const Checkout = () => {
             fontWeight: '700',
             color: colors.dark,
             margin: 0
-        },
-        demoBadge: {
-            backgroundColor: '#FFE5E5',
-            color: '#FF4444',
-            padding: '0.5rem 1.5rem',
-            borderRadius: '30px',
-            fontSize: '0.9rem',
-            fontWeight: '600',
-            border: '1px solid #FF4444',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '0.5rem'
         },
         steps: {
             display: 'flex',
@@ -298,26 +385,6 @@ const Checkout = () => {
                 borderColor: colors.primary,
                 boxShadow: `0 0 0 4px ${colors.primary}20`
             }
-        },
-        // Demo banners
-        demoBanner: {
-            backgroundColor: '#E3F2FD',
-            border: '1px solid #2196F3',
-            borderRadius: '16px',
-            padding: '1rem',
-            marginBottom: '2rem',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '1rem',
-            flexWrap: 'wrap'
-        },
-        demoDisclaimer: {
-            marginTop: '1rem',
-            padding: '1rem',
-            backgroundColor: '#FFF3E0',
-            borderRadius: '12px',
-            border: '1px dashed #FF9800',
-            textAlign: 'center'
         },
         // Botones
         buttonGroup: {
@@ -506,9 +573,6 @@ const Checkout = () => {
                 </div>
                 <div style={styles.headerRight}>
                     <h1 style={styles.title}>Finalizar compra</h1>
-                    <span style={styles.demoBadge}>
-                        <FiInfo /> MODO DEMO
-                    </span>
                 </div>
             </div>
 
@@ -549,14 +613,6 @@ const Checkout = () => {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: 20 }}
                             >
-                                {/* Banner demo */}
-                                <div style={styles.demoBanner}>
-                                    <FiInfo color="#2196F3" size={24} />
-                                    <span style={{ color: '#0D47A1', fontSize: '0.95rem', flex: 1 }}>
-                                        <strong>Modo demostración:</strong> Todos los datos ingresados son de prueba
-                                    </span>
-                                </div>
-
                                 <h2 style={styles.formTitle}>
                                     <FiUser /> Información de contacto
                                 </h2>
@@ -708,78 +764,106 @@ const Checkout = () => {
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: 20 }}
                             >
-                                {/* Banner demo */}
-                                <div style={styles.demoBanner}>
-                                    <FiInfo color="#2196F3" size={24} />
-                                    <span style={{ color: '#0D47A1', fontSize: '0.95rem', flex: 1 }}>
-                                        <strong>Modo demostración:</strong> Usa 4242 4242 4242 4242 (cualquier fecha/CVV)
-                                    </span>
-                                </div>
-
                                 <h2 style={styles.formTitle}>
-                                    <FiCreditCard /> Información de pago
+                                    <FiCreditCard /> Método de pago
                                 </h2>
 
-                                <div style={styles.formGroup}>
-                                    <label style={styles.label}>Número de tarjeta</label>
-                                    <div style={styles.inputWrapper}>
-                                        <FiCreditCard style={styles.inputIcon} />
-                                        <input
-                                            type="text"
-                                            name="cardNumber"
-                                            placeholder="4242 4242 4242 4242"
-                                            style={styles.input}
-                                            value={formData.cardNumber}
-                                            onChange={handleInputChange}
-                                            onFocus={(e) => e.target.style.borderColor = colors.primary}
-                                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                                        />
-                                    </div>
+                                {/* Selector de métodos de pago */}
+                                <div style={paymentMethodStyles.container}>
+                                    {paymentMethods.map(method => (
+                                        <motion.div
+                                            key={method.id}
+                                            style={{
+                                                ...paymentMethodStyles.card,
+                                                ...(paymentMethod === method.id ? paymentMethodStyles.cardSelected : {}),
+                                                ...(!method.available ? paymentMethodStyles.cardDisabled : {})
+                                            }}
+                                            whileHover={method.available ? { scale: 1.02, y: -2 } : {}}
+                                            onClick={() => {
+                                                if (method.available) {
+                                                    setPaymentMethod(method.id);
+                                                } else {
+                                                    showInfo('🚧 Este método estará disponible próximamente. Por ahora, usa PayPal.');
+                                                }
+                                            }}
+                                        >
+                                            {method.comingSoon && (
+                                                <div style={paymentMethodStyles.comingSoonBadge}>
+                                                    🚧 Próximamente
+                                                </div>
+                                            )}
+                                            <div style={paymentMethodStyles.icon}>{method.icon}</div>
+                                            <div style={paymentMethodStyles.name}>{method.name}</div>
+                                            <div style={paymentMethodStyles.description}>{method.description}</div>
+                                        </motion.div>
+                                    ))}
                                 </div>
 
-                                <div style={styles.formGroup}>
-                                    <label style={styles.label}>Nombre en la tarjeta</label>
-                                    <input
-                                        type="text"
-                                        name="cardName"
-                                        placeholder="JUAN PEREZ"
-                                        style={styles.input}
-                                        value={formData.cardName}
-                                        onChange={handleInputChange}
-                                        onFocus={(e) => e.target.style.borderColor = colors.primary}
-                                        onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                                    />
-                                </div>
+                                {/* Solo mostramos los campos de tarjeta si es PayPal (por ahora) */}
+                                {paymentMethod === 'paypal' && (
+                                    <>
+                                        <div style={styles.formGroup}>
+                                            <label style={styles.label}>Número de tarjeta</label>
+                                            <div style={styles.inputWrapper}>
+                                                <FiCreditCard style={styles.inputIcon} />
+                                                <input
+                                                    type="text"
+                                                    name="cardNumber"
+                                                    placeholder="4242 4242 4242 4242"
+                                                    style={styles.input}
+                                                    value={formData.cardNumber}
+                                                    onChange={handleInputChange}
+                                                    onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                                />
+                                            </div>
+                                        </div>
 
-                                <div style={styles.formGrid}>
-                                    <div style={styles.formGroup}>
-                                        <label style={styles.label}>Fecha exp.</label>
-                                        <input
-                                            type="text"
-                                            name="expiryDate"
-                                            placeholder="MM/AA"
-                                            style={styles.input}
-                                            value={formData.expiryDate}
-                                            onChange={handleInputChange}
-                                            onFocus={(e) => e.target.style.borderColor = colors.primary}
-                                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                                        />
-                                    </div>
+                                        <div style={styles.formGroup}>
+                                            <label style={styles.label}>Nombre en la tarjeta</label>
+                                            <input
+                                                type="text"
+                                                name="cardName"
+                                                placeholder="JUAN PEREZ"
+                                                style={styles.input}
+                                                value={formData.cardName}
+                                                onChange={handleInputChange}
+                                                onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                                onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                            />
+                                        </div>
 
-                                    <div style={styles.formGroup}>
-                                        <label style={styles.label}>CVV</label>
-                                        <input
-                                            type="text"
-                                            name="cvv"
-                                            placeholder="123"
-                                            style={styles.input}
-                                            value={formData.cvv}
-                                            onChange={handleInputChange}
-                                            onFocus={(e) => e.target.style.borderColor = colors.primary}
-                                            onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
-                                        />
-                                    </div>
-                                </div>
+                                        <div style={styles.formGrid}>
+                                            <div style={styles.formGroup}>
+                                                <label style={styles.label}>Fecha exp.</label>
+                                                <input
+                                                    type="text"
+                                                    name="expiryDate"
+                                                    placeholder="MM/AA"
+                                                    style={styles.input}
+                                                    value={formData.expiryDate}
+                                                    onChange={handleInputChange}
+                                                    onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                                />
+                                            </div>
+
+                                            <div style={styles.formGroup}>
+                                                <label style={styles.label}>CVV</label>
+                                                <input
+                                                    type="text"
+                                                    name="cvv"
+                                                    placeholder="123"
+                                                    style={styles.input}
+                                                    value={formData.cvv}
+                                                    onChange={handleInputChange}
+                                                    onFocus={(e) => e.target.style.borderColor = colors.primary}
+                                                    onBlur={(e) => e.target.style.borderColor = '#e2e8f0'}
+                                                />
+                                            </div>
+                                        </div>
+                                    </>
+                                )}
 
                                 <div style={styles.secureBadge}>
                                     <FiLock /> Tus datos están seguros (SSL)
@@ -795,12 +879,23 @@ const Checkout = () => {
                                         Volver
                                     </motion.button>
                                     <motion.button
-                                        style={styles.primaryButton}
-                                        whileHover={{ scale: 1.02 }}
-                                        whileTap={{ scale: 0.98 }}
-                                        onClick={handleNextStep}
+                                        style={{
+                                            ...styles.primaryButton,
+                                            opacity: paymentMethod !== 'paypal' ? 0.6 : 1
+                                        }}
+                                        whileHover={{ scale: paymentMethod === 'paypal' ? 1.02 : 1 }}
+                                        whileTap={{ scale: paymentMethod === 'paypal' ? 0.98 : 1 }}
+                                        onClick={() => {
+                                            if (paymentMethod === 'paypal') {
+                                                handleNextStep();
+                                            } else {
+                                                showInfo('🚧 Este método estará disponible próximamente. Por ahora, usa PayPal.');
+                                            }
+                                        }}
                                     >
-                                        Revisar pedido
+                                        {paymentMethod === 'paypal' 
+                                            ? 'Revisar pedido' 
+                                            : 'Próximamente'}
                                     </motion.button>
                                 </div>
                             </motion.div>
@@ -847,12 +942,6 @@ const Checkout = () => {
                                     </div>
                                 )}
 
-                                <div style={styles.demoDisclaimer}>
-                                    <p style={{ color: '#E65100', fontSize: '0.95rem', margin: 0 }}>
-                                        🧪 <strong>Entorno de prueba</strong> - No se realizarán cargos reales
-                                    </p>
-                                </div>
-
                                 <div style={styles.buttonGroup}>
                                     <motion.button
                                         style={styles.secondaryButton}
@@ -863,19 +952,24 @@ const Checkout = () => {
                                         Volver
                                     </motion.button>
                                     <motion.button
-                                        style={styles.primaryButton}
+                                        style={{...styles.primaryButton, opacity: (!cartLoaded || processing) ? 0.6 : 1}}
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
                                         onClick={handleSubmitOrder}
-                                        disabled={processing}
+                                        disabled={!cartLoaded || processing}
                                     >
-                                        {processing ? (
+                                        {!cartLoaded ? (
                                             <>
                                                 <div style={styles.spinner} />
-                                                Procesando demo...
+                                                Cargando carrito...
+                                            </>
+                                        ) : processing ? (
+                                            <>
+                                                <div style={styles.spinner} />
+                                                Procesando...
                                             </>
                                         ) : (
-                                            'Confirmar pedido (demo)'
+                                            'Pagar con PayPal'
                                         )}
                                     </motion.button>
                                 </div>
@@ -910,11 +1004,6 @@ const Checkout = () => {
                     </div>
 
                     <div style={styles.summaryRow}>
-                        <span>Envío</span>
-                        <span style={{ color: colors.success }}>Gratis</span>
-                    </div>
-
-                    <div style={styles.summaryRow}>
                         <span>Impuestos (16%)</span>
                         <span>${tax.toFixed(2)}</span>
                     </div>
@@ -926,13 +1015,7 @@ const Checkout = () => {
 
                     <div style={styles.secureBadge}>
                         <span><FiShield /> Pago seguro</span>
-                        <span><FiLock /> Demo</span>
-                    </div>
-
-                    <div style={styles.demoDisclaimer}>
-                        <p style={{ color: '#E65100', fontSize: '0.85rem', margin: 0 }}>
-                            🧪 Flujo de demostración para validación
-                        </p>
+                        <span><FiLock /> SSL</span>
                     </div>
                 </div>
             </div>
