@@ -114,6 +114,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/reviews', [UserController::class, 'profileReviews']);
     });
     
+    // Ruta alternativa para POST (compatible con frontend)
+    Route::post('user/profile', [UserController::class, 'updateProfile']);
+    
     // Mis licencias
     Route::get('my-licenses', [UserController::class, 'myLicenses']);
     
@@ -167,6 +170,9 @@ Route::middleware('auth:sanctum')->group(function () {
 Route::prefix('shopping')->group(function () {
     Route::get('/execute-paypal-payment', [ShoppingController::class, 'executePayPalPayment'])->name('shopping.execute-paypal');
 });
+
+// Confirmación de compra (Sin autenticación)
+Route::post('/purchases/confirm', [ShoppingController::class, 'confirmPurchase']);
 
 /*
 |--------------------------------------------------------------------------

@@ -21,7 +21,7 @@ const API_URL = isWeb ? LOCAL_URL : NGROK_URL;
 console.log('🔧 API_URL:', API_URL);
 console.log('📱 Plataforma:', isWeb ? 'Web' : 'Móvil');
 
-const apiClient = axios.create({
+const api = axios.create({
   baseURL: API_URL,
   timeout: 30000,
   headers: {
@@ -31,15 +31,36 @@ const apiClient = axios.create({
   },
 });
 
-apiClient.interceptors.request.use(
+// Interceptor para agregar el token a TODAS las peticiones
+api.interceptors.request.use(
   async (config) => {
-    const token = await AsyncStorage.getItem('auth_token');
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    try {
+      const token = await AsyncStorage.getItem('@auth_token');
+      console.log('🔑 Token en request:', token ? 'Sí existe' : 'No existe');
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
+    } catch (error) {
+      console.error('Error getting token:', error);
     }
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    return Promise.reject(error);
+  }
 );
 
-export default apiClient;
+// Interceptor para manejar errores de autenticación
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      console.log('⚠️ Token expirado o inválido');
+      await AsyncStorage.multiRemove(['@auth_token', '@user_data']);
+      // Redirigir al login - puedes usar un event emitter o navigation ref
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default api;

@@ -14,7 +14,8 @@ class Shopping extends Model
         'total',
         'status',
         'payment_id',
-        'payment_provider'
+        'payment_provider',
+        'payment_confirmed_at'
     ];
 
     protected $casts = [

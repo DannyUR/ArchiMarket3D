@@ -10,6 +10,7 @@ class UserLicense extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'expires_at' => 'date',
+        'activated_at' => 'datetime',
         'price_paid' => 'decimal:2'
     ];
 
@@ -20,7 +21,8 @@ class UserLicense extends Model
         'license_type',
         'price_paid',
         'expires_at',
-        'is_active'
+        'is_active',
+        'activated_at'
     ];
 
     public function user()

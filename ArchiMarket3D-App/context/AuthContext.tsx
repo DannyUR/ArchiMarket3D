@@ -1,181 +1,330 @@
-// context/AuthContext.tsx
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+// context/AuthContext.tsx - VERSIÓN COMPLETA CON updateProfile
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import apiClient from '../api/client';
+import { router } from 'expo-router';
+import api from '../api/client';
 
 interface User {
     id: number;
     name: string;
     email: string;
-    role: string;
+    role?: string;
     user_type?: string;
+    phone?: string;
+    company?: string;
+    bio?: string;
+    avatar?: string;
+    created_at?: string;
+    updated_at?: string;
 }
 
 interface AuthContextType {
     user: User | null;
     token: string | null;
-    loading: boolean;
+    isLoading: boolean;
     isAuthenticated: boolean;
-    login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-    register: (data: any) => Promise<{ success: boolean; error?: string }>;
+    login: (email: string, password: string) => Promise<void>;
+    register: (name: string, email: string, password: string, role?: string) => Promise<void>;
     logout: () => Promise<void>;
+    updateProfile: (data: Partial<User>) => Promise<User>;
+    changePassword: (currentPassword: string, newPassword: string, newPasswordConfirmation: string) => Promise<void>;
+    deleteAccount: () => Promise<void>;
 }
 
-export const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const AuthProvider = ({ children }: { children: ReactNode }) => {
+export function useAuth() {
+    const context = useContext(AuthContext);
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider');
+    }
+    return context;
+}
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
-    const [loading, setLoading] = useState(true);
     const [token, setToken] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
 
+    const isAuthenticated = !!user && !!token;
+
+    // Cargar datos al iniciar
     useEffect(() => {
-        checkAuth();
+        loadStoredData();
     }, []);
 
-    const checkAuth = async () => {
-        console.log('🔍 checkAuth ejecutándose...');
+    const loadStoredData = async () => {
         try {
-            const storedToken = await AsyncStorage.getItem('auth_token');
-            console.log('📦 Token en AsyncStorage:', storedToken ? 'Sí' : 'No');
+            console.log('📦 Cargando datos almacenados...');
+            const storedToken = await AsyncStorage.getItem('@auth_token');
+            const storedUser = await AsyncStorage.getItem('@user_data');
 
-            if (storedToken) {
-                setToken(storedToken);
-                console.log('📡 Llamando a /auth/me...');
-                const response = await apiClient.get('/auth/me');
-                console.log('✅ Respuesta de /auth/me:', response.data);
+            console.log('Token:', storedToken ? 'Sí' : 'No');
+            console.log('User:', storedUser ? 'Sí' : 'No');
 
-                // Tu backend probablemente también devuelve { success, data: { user } }
-                let userData = response.data;
-                if (userData.data) {
-                    userData = userData.data;
+            if (storedToken && storedUser) {
+                let userData;
+                try {
+                    userData = JSON.parse(storedUser);
+                    console.log('✅ Usuario parseado:', userData);
+                } catch (parseError) {
+                    console.error('Error parsing user data');
+                    await AsyncStorage.multiRemove(['@auth_token', '@user_data']);
+                    setIsLoading(false);
+                    return;
                 }
 
+                setToken(storedToken);
                 setUser(userData);
-                console.log('👤 Usuario cargado:', userData?.name);
+                api.defaults.headers.common['Authorization'] = `Bearer ${storedToken}`;
+                console.log('✅ Usuario cargado correctamente:', userData.name);
             } else {
-                console.log('⚠️ No hay token guardado');
+                console.log('ℹ️ No hay sesión guardada');
             }
-        } catch (error: any) {
-            console.error('❌ Error en checkAuth:', error.response?.data || error.message);
-            await AsyncStorage.removeItem('auth_token');
+        } catch (error) {
+            console.error('Error loading auth data:', error);
         } finally {
-            setLoading(false);
-            console.log('🏁 checkAuth finalizado');
+            setIsLoading(false);
         }
     };
-
-    // context/AuthContext.tsx (con logs de depuración)
 
     const login = async (email: string, password: string) => {
-        console.log('🔐 Intentando login con:', email);
         try {
-            const response = await apiClient.post('/auth/login', { email, password });
-            console.log('✅ Respuesta del servidor:', response.data);
+            setIsLoading(true);
+            console.log('📡 Enviando login request...');
 
-            // 🔴 IMPORTANTE: Tu backend devuelve { success, message, data: { token, user } }
-            const responseData = response.data;
+            const response = await api.post('/auth/login', { email, password });
 
-            // Extraer token y user según el formato de tu backend
-            let token, user;
+            console.log('📥 Respuesta completa:', JSON.stringify(response.data, null, 2));
 
-            if (responseData.data) {
-                // Formato: { success, message, data: { token, user } }
-                token = responseData.data.token;
-                user = responseData.data.user;
+            // ✅ Extraer datos correctamente (adaptado a la respuesta del backend)
+            let newToken, userData;
+
+            if (response.data.data) {
+                // Formato: { success: true, data: { token, user } }
+                newToken = response.data.data.token;
+                userData = response.data.data.user;
+            } else if (response.data.token) {
+                // Formato directo
+                newToken = response.data.token;
+                userData = response.data.user;
             } else {
-                // Formato alternativo: { token, user }
-                token = responseData.token;
-                user = responseData.user;
+                throw new Error('Formato de respuesta inválido');
             }
 
-            console.log('📝 Token extraído:', token ? 'Sí' : 'No');
-            console.log('👤 Usuario extraído:', user ? user.name : 'No');
+            console.log('✅ Token obtenido:', newToken ? 'Sí' : 'No');
+            console.log('✅ Usuario obtenido:', userData);
 
-            if (!token || !user) {
-                console.error('❌ Formato de respuesta inesperado:', responseData);
-                return {
-                    success: false,
-                    error: 'Formato de respuesta inválido'
-                };
-            }
+            // Guardar en storage
+            await AsyncStorage.setItem('@auth_token', newToken);
+            await AsyncStorage.setItem('@user_data', JSON.stringify(userData));
 
-            await AsyncStorage.setItem('auth_token', token);
-            console.log('💾 Token guardado en AsyncStorage');
+            // Actualizar estado
+            setToken(newToken);
+            setUser(userData);
+            api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
 
-            setToken(token);
-            setUser(user);
-            console.log('✅ Estado actualizado: user =', user?.name);
+            console.log('✅ Login exitoso, redirigiendo a home...');
 
-            return { success: true };
+            // Redirigir manualmente
+            router.replace('/(tabs)');
+
         } catch (error: any) {
-            console.error('❌ Error en login:', error.response?.data || error.message);
-            return {
-                success: false,
-                error: error.response?.data?.message || 'Error al iniciar sesión'
-            };
+            console.error('❌ Login error:', error);
+            console.error('Detalles:', error.response?.data);
+            throw error;
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const register = async (userData: any) => {
-        console.log('📝 Intentando registro...');
+    const register = async (name: string, email: string, password: string, role: string = 'architect') => {
         try {
-            const response = await apiClient.post('/auth/register', userData);
-            console.log('✅ Respuesta registro:', response.data);
+            setIsLoading(true);
+            console.log('📡 Enviando registro request...');
 
-            const responseData = response.data;
-            let token, user;
+            const response = await api.post('/auth/register', {
+                name,
+                email,
+                password,
+                password_confirmation: password,
+                user_type: role
+            });
 
-            if (responseData.data) {
-                token = responseData.data.token;
-                user = responseData.data.user;
+            console.log('📥 Respuesta registro:', response.data);
+
+            let newToken, userData;
+
+            if (response.data.data) {
+                newToken = response.data.data.token;
+                userData = response.data.data.user;
+            } else if (response.data.token) {
+                newToken = response.data.token;
+                userData = response.data.user;
             } else {
-                token = responseData.token;
-                user = responseData.user;
+                throw new Error('Formato de respuesta inválido');
             }
 
-            if (!token || !user) {
-                return { success: false, error: 'Formato de respuesta inválido' };
-            }
+            await AsyncStorage.setItem('@auth_token', newToken);
+            await AsyncStorage.setItem('@user_data', JSON.stringify(userData));
 
-            await AsyncStorage.setItem('auth_token', token);
-            setToken(token);
-            setUser(user);
-            console.log('✅ Registro exitoso:', user.name);
+            setToken(newToken);
+            setUser(userData);
+            api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
 
-            return { success: true };
+            console.log('✅ Registro exitoso, redirigiendo a home...');
+            router.replace('/(tabs)');
+
         } catch (error: any) {
-            console.error('❌ Error en registro:', error.response?.data || error.message);
-            return {
-                success: false,
-                error: error.response?.data?.message || 'Error al registrarse'
-            };
+            console.error('❌ Register error:', error);
+            throw error;
+        } finally {
+            setIsLoading(false);
         }
     };
 
+    // context/AuthContext.tsx - Verifica el logout
     const logout = async () => {
         try {
-            // ✅ RUTA CORRECTA: /api/auth/logout
-            await apiClient.post('/auth/logout');
-        } catch (error) {
-            console.error('Error logging out:', error);
-        } finally {
-            await AsyncStorage.removeItem('auth_token');
+            console.log('🚪 Iniciando logout...');
+
+            try {
+                await api.post('/auth/logout');
+            } catch (error) {
+                console.log('Backend logout no necesario');
+            }
+
+            delete api.defaults.headers.common['Authorization'];
+            await AsyncStorage.multiRemove(['@auth_token', '@user_data']);
             setToken(null);
             setUser(null);
+
+            console.log('✅ Estado limpiado, redirigiendo a login...');
+
+            // ✅ Redirigir a LOGIN, no a index
+            router.replace('/auth/login');
+
+        } catch (error) {
+            console.error('Logout error:', error);
+            delete api.defaults.headers.common['Authorization'];
+            await AsyncStorage.multiRemove(['@auth_token', '@user_data']);
+            setToken(null);
+            setUser(null);
+            router.replace('/auth/login');
         }
+    };
+
+    // context/AuthContext.tsx - Modificar la función updateProfile
+
+    const updateProfile = async (data: Partial<User>): Promise<User> => {
+        try {
+            setIsLoading(true);
+            console.log('📡 Enviando actualización de perfil...');
+            console.log('📦 Datos a enviar:', data);
+
+            // ✅ Usar POST en lugar de PUT si el backend no tiene PUT configurado
+            const response = await api.post('/user/profile', data);
+
+            console.log('📥 Respuesta actualización:', response.data);
+
+            let updatedUser;
+            if (response.data.data) {
+                updatedUser = response.data.data;
+            } else if (response.data.user) {
+                updatedUser = response.data.user;
+            } else {
+                updatedUser = response.data;
+            }
+
+            // Actualizar estado local
+            setUser(updatedUser);
+
+            // Actualizar storage
+            await AsyncStorage.setItem('@user_data', JSON.stringify(updatedUser));
+
+            console.log('✅ Perfil actualizado correctamente');
+
+            // ✅ IMPORTANTE: NO hacer router.replace ni ninguna redirección aquí
+            // Solo retornar el usuario actualizado
+
+            return updatedUser;
+
+        } catch (error: any) {
+            console.error('❌ Update profile error:', error);
+            console.error('Detalles:', error.response?.data);
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // ✅ CAMBIAR CONTRASEÑA
+    const changePassword = async (
+        currentPassword: string,
+        newPassword: string,
+        newPasswordConfirmation: string
+    ): Promise<void> => {
+        try {
+            setIsLoading(true);
+            console.log('📡 Enviando cambio de contraseña...');
+
+            await api.post('/auth/change-password', {
+                current_password: currentPassword,
+                password: newPassword,
+                password_confirmation: newPasswordConfirmation
+            });
+
+            console.log('✅ Contraseña actualizada correctamente');
+
+        } catch (error: any) {
+            console.error('❌ Change password error:', error);
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // ✅ ELIMINAR CUENTA
+    const deleteAccount = async (): Promise<void> => {
+        try {
+            setIsLoading(true);
+            console.log('📡 Eliminando cuenta...');
+
+            await api.delete('/user/account');
+
+            // Limpiar todo
+            await AsyncStorage.multiRemove(['@auth_token', '@user_data']);
+            setToken(null);
+            setUser(null);
+            delete api.defaults.headers.common['Authorization'];
+
+            console.log('✅ Cuenta eliminada correctamente');
+            router.replace('/auth/register');
+
+        } catch (error: any) {
+            console.error('❌ Delete account error:', error);
+            throw error;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const value = {
+        user,
+        token,
+        isLoading,
+        isAuthenticated: !!user && !!token,
+        login,
+        register,
+        logout,
+        updateProfile,
+        changePassword,
+        deleteAccount
     };
 
     return (
-        <AuthContext.Provider value={{
-            user,
-            token,
-            loading,
-            isAuthenticated: !!user,
-            login,
-            register,
-            logout
-        }}>
+        <AuthContext.Provider value={value}>
             {children}
         </AuthContext.Provider>
     );
-};
+}

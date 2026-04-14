@@ -1,12 +1,13 @@
+// app/auth/register.tsx
 import { View, Text, TextInput, TouchableOpacity, Alert, ActivityIndicator, StyleSheet, ScrollView } from 'react-native';
 import { useState } from 'react';
-import { useAuth } from '../../hooks/useAuth';
+import { useAuth } from '../../context/AuthContext';
 import { router } from 'expo-router';
 
 export default function RegisterScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [userType, setUserType] = useState('architect'); // architect, engineer, company
+  const [userType, setUserType] = useState('architect');
   const [password, setPassword] = useState('');
   const [passwordConfirmation, setPasswordConfirmation] = useState('');
   const [loading, setLoading] = useState(false);
@@ -17,29 +18,49 @@ export default function RegisterScreen() {
       Alert.alert('Error', 'Completa todos los campos');
       return;
     }
+    
     if (password !== passwordConfirmation) {
       Alert.alert('Error', 'Las contraseñas no coinciden');
       return;
     }
+    
     if (password.length < 6) {
       Alert.alert('Error', 'La contraseña debe tener al menos 6 caracteres');
       return;
     }
 
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert('Error', 'Ingresa un correo electrónico válido');
+      return;
+    }
+
     setLoading(true);
-    const result = await register({ 
-      name, 
-      email, 
-      password, 
-      password_confirmation: passwordConfirmation,
-      role: userType 
-    });
-    setLoading(false);
     
-    if (result.success) {
+    try {
+      console.log('🚀 Ejecutando registro...');
+      await register(name, email, password, userType);
+      console.log('✅ Registro exitoso, redirigiendo...');
+      // ✅ Redirigir manualmente después del registro
       router.replace('/(tabs)');
-    } else {
-      Alert.alert('Error', result.error || 'Error al registrarse');
+    } catch (error: any) {
+      console.log('❌ Registro fallido:', error);
+      
+      let errorMessage = 'Error al registrarse';
+      
+      if (error.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        const firstError = Object.values(errors)[0];
+        errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -48,15 +69,14 @@ export default function RegisterScreen() {
       <Text style={styles.title}>ArchiMarket3D</Text>
       <Text style={styles.subtitle}>Crea una nueva cuenta</Text>
 
-      {/* Nombre completo */}
       <TextInput
         style={styles.input}
         placeholder="Nombre completo"
         value={name}
         onChangeText={setName}
+        editable={!loading}
       />
 
-      {/* Email */}
       <TextInput
         style={styles.input}
         placeholder="Correo electrónico"
@@ -64,14 +84,15 @@ export default function RegisterScreen() {
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
+        editable={!loading}
       />
 
-      {/* Tipo de usuario */}
       <Text style={styles.label}>Tipo de usuario</Text>
       <View style={styles.userTypeContainer}>
         <TouchableOpacity
           style={[styles.userTypeButton, userType === 'architect' && styles.userTypeActive]}
           onPress={() => setUserType('architect')}
+          disabled={loading}
         >
           <Text style={[styles.userTypeText, userType === 'architect' && styles.userTypeTextActive]}>
             🏛️ Arquitecto
@@ -81,6 +102,7 @@ export default function RegisterScreen() {
         <TouchableOpacity
           style={[styles.userTypeButton, userType === 'engineer' && styles.userTypeActive]}
           onPress={() => setUserType('engineer')}
+          disabled={loading}
         >
           <Text style={[styles.userTypeText, userType === 'engineer' && styles.userTypeTextActive]}>
             🔧 Ingeniero
@@ -90,6 +112,7 @@ export default function RegisterScreen() {
         <TouchableOpacity
           style={[styles.userTypeButton, userType === 'company' && styles.userTypeActive]}
           onPress={() => setUserType('company')}
+          disabled={loading}
         >
           <Text style={[styles.userTypeText, userType === 'company' && styles.userTypeTextActive]}>
             🏢 Empresa
@@ -97,26 +120,26 @@ export default function RegisterScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Contraseña */}
       <TextInput
         style={styles.input}
         placeholder="Contraseña"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        editable={!loading}
       />
 
-      {/* Confirmar contraseña */}
       <TextInput
         style={styles.input}
         placeholder="Confirmar contraseña"
         value={passwordConfirmation}
         onChangeText={setPasswordConfirmation}
         secureTextEntry
+        editable={!loading}
       />
 
       <TouchableOpacity
-        style={styles.button}
+        style={[styles.button, loading && styles.buttonDisabled]}
         onPress={handleRegister}
         disabled={loading}
       >
@@ -127,7 +150,7 @@ export default function RegisterScreen() {
         )}
       </TouchableOpacity>
 
-      <TouchableOpacity onPress={() => router.push('/auth/login')}>
+      <TouchableOpacity onPress={() => router.push('/auth/login')} disabled={loading}>
         <Text style={styles.link}>¿Ya tienes cuenta? Inicia sesión</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -162,6 +185,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: '#e5e7eb',
+    fontSize: 16,
   },
   label: {
     fontSize: 14,
@@ -203,6 +227,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 8,
   },
+  buttonDisabled: {
+    backgroundColor: '#93c5fd',
+    opacity: 0.7
+  },
   buttonText: {
     color: 'white',
     fontWeight: 'bold',
@@ -212,5 +240,6 @@ const styles = StyleSheet.create({
     color: '#2563eb',
     textAlign: 'center',
     marginTop: 20,
+    fontSize: 14,
   },
 });

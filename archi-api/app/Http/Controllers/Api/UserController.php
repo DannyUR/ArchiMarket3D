@@ -103,7 +103,11 @@ class UserController extends Controller
 
         $validator = Validator::make($request->all(), [
             'name' => 'sometimes|string|max:255',
+            'email' => 'sometimes|email|unique:users,email,' . $user->id,
             'company' => 'nullable|string|max:255',
+            'phone' => 'nullable|string|max:20',
+            'bio' => 'nullable|string|max:1000',
+            'avatar' => 'nullable|string|max:500',
             'current_password' => 'required_with:new_password|string',
             'new_password' => 'nullable|string|min:8|confirmed'
         ]);
@@ -122,6 +126,18 @@ class UserController extends Controller
 
         if ($request->has('company')) {
             $user->company = $request->company;
+        }
+
+        if ($request->has('phone')) {
+            $user->phone = $request->phone;
+        }
+
+        if ($request->has('bio')) {
+            $user->bio = $request->bio;
+        }
+
+        if ($request->has('avatar')) {
+            $user->avatar = $request->avatar;
         }
 
         // Cambiar contraseña
@@ -146,7 +162,10 @@ class UserController extends Controller
                 'name' => $user->name,
                 'email' => $user->email,
                 'user_type' => $user->user_type,
-                'company' => $user->company
+                'company' => $user->company,
+                'phone' => $user->phone,
+                'bio' => $user->bio,
+                'avatar' => $user->avatar
             ]
         ]);
     }

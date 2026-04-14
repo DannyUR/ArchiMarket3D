@@ -466,10 +466,9 @@ class ShoppingController extends Controller
 
             DB::commit();
 
-            // URLs de retorno - USANDO NGROK
-            $ngrokUrl = 'https://housewifely-quadrophonics-audrianna.ngrok-free.dev'; // Tu URL de ngrok
-            $returnUrl = $ngrokUrl . '/api/shopping/execute-paypal-payment?shopping_id=' . $shopping->id;
-            $cancelUrl = $ngrokUrl . '/cart';
+            // URLs de retorno del request o fallback
+            $returnUrl = $request->input('return_url', 'http://localhost:8081/purchases/success') . '?shopping_id=' . $shopping->id . '&payment_success=true';
+            $cancelUrl = $request->input('cancel_url', 'http://localhost:8081/checkout');
 
             // Crear orden en PayPal usando el servicio
             $paypalService = app(\App\Services\PayPalService::class);
@@ -617,6 +616,116 @@ class ShoppingController extends Controller
             
             $frontendUrl = 'http://localhost:3000/cart?error=payment_failed&message=' . urlencode($e->getMessage());
             return redirect()->to($frontendUrl);
+        }
+    }
+    
+    /**
+     * Confirmar compra después de pago exitoso (SIN autenticación)
+     * Valida por shopping_id que debe estar en estado 'pending' y creado recientemente
+     */
+    public function confirmPurchase(Request $request)
+    {
+        try {
+            \Log::info('=== CONFIRMAR COMPRA (Sin Auth) ===');
+            \Log::info('Request data:', $request->all());
+            
+            $validator = Validator::make($request->all(), [
+                'shopping_id' => 'required|integer|exists:shopping,id'
+            ]);
+
+            if ($validator->fails()) {
+                \Log::error('Validación falló', $validator->errors()->toArray());
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Datos inválidos',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $shopping = Shopping::find($request->shopping_id);
+
+            if (!$shopping) {
+                \Log::error('Compra no encontrada', ['shopping_id' => $request->shopping_id]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Compra no encontrada'
+                ], 404);
+            }
+
+            // Validar que la compra está en estado 'pending' (no completada aún)
+            if ($shopping->status !== 'pending') {
+                \Log::error('Compra no está en estado pending', [
+                    'shopping_id' => $shopping->id,
+                    'current_status' => $shopping->status
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Esta compra ya fue procesada o está en estado inválido'
+                ], 400);
+            }
+
+            // Validar que la compra fue creada hace poco (dentro de las últimas 24h)
+            $createdAt = $shopping->created_at;
+            $now = now();
+            $hoursAgo = $createdAt->diffInHours($now);
+            
+            if ($hoursAgo > 24) {
+                \Log::error('Compra demasiado antigua', [
+                    'shopping_id' => $shopping->id,
+                    'created_at' => $createdAt,
+                    'hours_ago' => $hoursAgo
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'La compra expiró. Por favor, crea una nueva'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            \Log::info('Actualizando estado de compra');
+            // Actualizar estado a completado
+            $shopping->update([
+                'status' => 'completed',
+                'payment_confirmed_at' => now()
+            ]);
+
+            \Log::info('Activando licencias');
+            // Activar todas las licencias inactivas de esta compra
+            UserLicense::where('shopping_id', $shopping->id)
+                ->where('is_active', false)
+                ->update([
+                    'is_active' => true,
+                    'activated_at' => now()
+                ]);
+
+            DB::commit();
+
+            \Log::info('✅ Compra confirmada', [
+                'shopping_id' => $shopping->id,
+                'user_id' => $shopping->user_id
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Compra confirmada correctamente',
+                'data' => [
+                    'shopping_id' => $shopping->id,
+                    'status' => $shopping->status,
+                    'total' => $shopping->total
+                ]
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('❌ Error confirmando compra: ' . $e->getMessage());
+            \Log::error('Stack trace: ' . $e->getTraceAsString());
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al confirmar la compra',
+                'error' => $e->getMessage()
+            ], 500);
         }
     }
 }
