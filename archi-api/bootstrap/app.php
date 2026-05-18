@@ -14,9 +14,9 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // 👇 AGREGAR ESTO PARA HABILITAR CORS
-        $middleware->api(prepend: [
-            \Illuminate\Http\Middleware\HandleCors::class,
+        // 👇 Middleware CORS personalizado para todas las solicitudes
+        $middleware->use([
+            \App\Http\Middleware\CorsMiddleware::class,
         ]);
 
         $middleware->alias([

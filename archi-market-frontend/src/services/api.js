@@ -17,36 +17,31 @@ const getBaseURL = () => {
     const hostname = window.location.hostname;
     const isProduction = process.env.NODE_ENV === 'production';
 
-    // 1. Si es producción, usar URL de producción
     if (isProduction) {
         return ENVIRONMENTS.production.url;
     }
 
-    // 2. Si estamos en ngrok (la URL contiene ngrok)
     if (hostname.includes('ngrok')) {
         return ENVIRONMENTS.development.ngrok;
     }
 
-    // 3. Si estamos en localhost
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
         return ENVIRONMENTS.development.local;
     }
 
-    // 4. Si estamos en IP local (red)
     if (hostname.match(/^192\.168\.\d+\.\d+$/)) {
         return ENVIRONMENTS.development.network;
     }
 
-    // 5. Por defecto, intentar con local
     console.warn('⚠️ No se pudo determinar el entorno, usando localhost por defecto');
     return ENVIRONMENTS.development.local;
 };
 
-// Crear instancia de axios
+// ✅ Usar la función getBaseURL() en lugar de un valor fijo
 const API = axios.create({
-    baseURL: 'http://127.0.0.1:8000/api', // URL completa del servidor Laravel
+    baseURL: getBaseURL(), // ← CAMBIADO: usa la función en lugar del valor fijo
     withCredentials: true,
-    timeout: 30000, // 30 segundos de timeout
+    timeout: 30000,
     headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',

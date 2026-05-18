@@ -72,20 +72,20 @@ const Categories = () => {
     };
 
     const fetchRealModelCounts = async (categoriesList) => {
-        const counts = {};
-        const promises = categoriesList.map(async (category) => {
-            try {
-                const response = await API.get(`/categories/${category.id}/models`);
-                const modelsData = response.data.data?.data || response.data.models || [];
-                counts[category.id] = modelsData.length;
-            } catch (error) {
-                console.error(`Error cargando modelos para categoría ${category.name}:`, error);
-                counts[category.id] = 0;
-            }
-        });
-        
-        await Promise.all(promises);
-        setRealModelCounts(counts);
+        try {
+            // ⚡ NEW: Single request for all category counts (replaces 20+ parallel requests)
+            const response = await API.get('/categories/counts');
+            console.log('📊 Conteos de categorías:', response.data);
+            setRealModelCounts(response.data.data || {});
+        } catch (error) {
+            console.error('Error cargando conteos de categorías:', error);
+            // Fallback: set all counts to 0
+            const counts = {};
+            categoriesList.forEach(cat => {
+                counts[cat.id] = 0;
+            });
+            setRealModelCounts(counts);
+        }
     };
 
     const fetchCategoryModels = async (categoryId) => {

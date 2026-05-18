@@ -117,6 +117,10 @@ Route::middleware('auth:sanctum')->group(function () {
     // Ruta alternativa para POST (compatible con frontend)
     Route::post('user/profile', [UserController::class, 'updateProfile']);
     
+    // ✅ GAMIFICACIÓN: Ruta para obtener estadísticas de gamificación
+    Route::get('user/gamification', [UserController::class, 'gamificationStats']);
+    Route::post('/user/reset-gamification', [UserController::class, 'resetGamification']);
+    
     // Mis licencias
     Route::get('my-licenses', [UserController::class, 'myLicenses']);
     
@@ -201,6 +205,7 @@ Route::get('/proxy/image', [App\Http\Controllers\Api\ProxyController::class, 'im
 // Categorías
 Route::prefix('categories')->group(function () {
     Route::get('/', [CategoryController::class, 'index']);
+    Route::get('/counts', [CategoryController::class, 'counts']);  // ⚡ Lightweight endpoint for all counts
     Route::get('/{id}', [CategoryController::class, 'show']);
     Route::get('/{id}/models', [CategoryController::class, 'models']);
 });

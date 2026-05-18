@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use App\Events\NewReview;
 use App\Events\NewUserRegistered;
 use App\Helpers\NotificationHelper;
+use App\Services\GamificationService;
 
 class ReviewController extends Controller
 {
@@ -151,9 +152,17 @@ class ReviewController extends Controller
             'rating' => $request->rating,
             'comment' => $request->comment
         ]);
+        
         NotificationHelper::newReview($review);
-
         event(new NewReview($review));
+
+        // ✅ GAMIFICACIÓN: Registrar la reseña para XP y logros
+        try {
+            GamificationService::recordReview($user);
+            \Log::info('✅ Gamificación: Reseña registrada para usuario ' . $user->id . ' (modelo: ' . $modelId . ')');
+        } catch (\Exception $gamifyError) {
+            \Log::warning('⚠️ Error en gamificación al crear reseña (no afecta la reseña): ' . $gamifyError->getMessage());
+        }
 
         return response()->json([
             'message' => 'Reseña creada exitosamente',

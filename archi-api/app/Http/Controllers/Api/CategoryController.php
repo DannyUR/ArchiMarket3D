@@ -35,6 +35,25 @@ class CategoryController extends Controller
     }
 
     /**
+     * Obtener el conteo de modelos para TODAS las categorías (lightweight)
+     * ⚡ Reemplaza 20+ requests paralelos por 1 solo request
+     */
+    public function counts()
+    {
+        $counts = Category::withCount('models')
+            ->get(['id', 'models_count'])
+            ->keyBy('id')
+            ->map(function($category) {
+                return $category->models_count;
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => $counts
+        ]);
+    }
+
+    /**
      * Mostrar categoría específica
      */
     public function show($id)

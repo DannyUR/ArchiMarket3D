@@ -1,0 +1,27 @@
+# Dependencies and build outputs
+node_modules/
+.env
+.env.local
+.DS_Store
+*.log
+
+# Backend (no needed for React Native mobile build)
+archi-api/vendor/
+archi-api/storage/
+archi-api/.env
+archi-api/.env.local
+archi-api/bootstrap/cache/
+
+# Frontend build outputs
+archi-market-frontend/build/
+archi-market-frontend/node_modules/
+
+# Mobile app build outputs
+ArchiMarket3D-App/build/
+ArchiMarket3D-App/node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo

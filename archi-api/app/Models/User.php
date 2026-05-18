@@ -12,6 +12,8 @@ use App\Models\Shopping;
 use App\Models\Model3D;
 use App\Models\Review;
 use App\Models\UserLicense;
+use App\Models\UserStat;
+use App\Models\Achievement;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
@@ -82,6 +84,18 @@ class User extends Authenticatable implements MustVerifyEmail
     public function licenses()
     {
         return $this->hasMany(\App\Models\UserLicense::class);
+    }
+
+    public function stats()
+    {
+        return $this->hasOne(UserStats::class);
+    }
+
+    public function achievements()
+    {
+        return $this->belongsToMany(Achievement::class, 'user_achievements')
+                    ->withPivot('unlocked_at')
+                    ->withTimestamps();
     }
 
     public function getActiveLicenses()

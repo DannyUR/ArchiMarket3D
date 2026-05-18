@@ -5,6 +5,7 @@ import { CartProvider } from '../context/CartContext';
 import { SettingsProvider } from '../context/SettingsContext';
 import { useEffect, useRef } from 'react';
 import { View, ActivityIndicator } from 'react-native';
+import { GamificationProvider } from '../context/GamificationContext';
 
 // Componente que maneja la protección de rutas
 function RootLayoutNav() {
@@ -124,7 +125,9 @@ export default function RootLayout() {
         <AuthProvider>
             <SettingsProvider>
                 <CartProvider>
-                    <RootLayoutNav />
+                    <GamificationProvider>
+                        <RootLayoutNav />
+                    </GamificationProvider>
                 </CartProvider>
             </SettingsProvider>
         </AuthProvider>

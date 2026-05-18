@@ -8,6 +8,7 @@ use App\Models\ReviewLike;
 use App\Models\ReviewReply;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Services\GamificationService; // ✅ GAMIFICACIÓN: Importar el servicio
 
 class ReviewLikeController extends Controller
 {
@@ -47,6 +48,15 @@ class ReviewLikeController extends Controller
         if ($existingLike) {
             // Remover like
             $existingLike->delete();
+            
+            // ✅ GAMIFICACIÓN: Cuando se remueve un like, NO se resta XP
+            // (Para evitar que los usuarios abusen dando y quitando likes)
+            \Log::info('Like removido - sin cambios en XP', [
+                'review_owner_id' => $review->user_id,
+                'user_who_liked' => $user->id,
+                'review_id' => $reviewId
+            ]);
+            
             return response()->json([
                 'message' => 'Like removido',
                 'liked' => false,
@@ -58,6 +68,23 @@ class ReviewLikeController extends Controller
                 'review_id' => $reviewId,
                 'user_id' => $user->id
             ]);
+            
+            // ✅ GAMIFICACIÓN: Dar XP al dueño de la reseña por recibir like
+            try {
+                $reviewOwner = $review->user;
+                if ($reviewOwner) {
+                    GamificationService::recordLikeReceived($reviewOwner);
+                    \Log::info('✅ Gamificación: Like registrado para el dueño de la reseña', [
+                        'review_owner_id' => $reviewOwner->id,
+                        'review_owner_name' => $reviewOwner->name,
+                        'user_who_liked' => $user->id,
+                        'review_id' => $reviewId
+                    ]);
+                }
+            } catch (\Exception $gamifyError) {
+                \Log::warning('⚠️ Error en gamificación al dar like (no afecta el like): ' . $gamifyError->getMessage());
+            }
+            
             return response()->json([
                 'message' => 'Like agregado',
                 'liked' => true,

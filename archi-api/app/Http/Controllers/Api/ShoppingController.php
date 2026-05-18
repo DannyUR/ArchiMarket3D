@@ -16,6 +16,7 @@ use App\Events\NewPurchase;
 use App\Events\NewUserRegistered;
 use App\Helpers\NotificationHelper;
 use App\Services\PayPalService;
+use App\Services\GamificationService; // ✅ GAMIFICACIÓN: Importar el servicio
 
 
 class ShoppingController extends Controller
@@ -192,6 +193,15 @@ class ShoppingController extends Controller
             DB::commit();
             NotificationHelper::newPurchase($shopping, $user);
             event(new NewPurchase($shopping, $user));
+            
+            // ✅ GAMIFICACIÓN: Registrar la compra para XP y logros
+            try {
+                GamificationService::recordPurchase($user);
+                \Log::info('✅ Gamificación: Compra registrada para usuario ' . $user->id);
+            } catch (\Exception $gamifyError) {
+                \Log::warning('⚠️ Error en gamificación (no afecta compra): ' . $gamifyError->getMessage());
+            }
+            
             \Log::info('=== CHECKOUT EXITOSO ===');
 
             return response()->json([
@@ -320,6 +330,17 @@ class ShoppingController extends Controller
         UserLicense::where('shopping_id', $shopping->id)
             ->update(['is_active' => true]);
 
+        // ✅ GAMIFICACIÓN: Registrar la compra para XP y logros
+        try {
+            $user = $shopping->user;
+            if ($user) {
+                GamificationService::recordPurchase($user);
+                \Log::info('✅ Gamificación: Compra registrada para usuario ' . $user->id);
+            }
+        } catch (\Exception $gamifyError) {
+            \Log::warning('⚠️ Error en gamificación: ' . $gamifyError->getMessage());
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Pago simulado correctamente'
@@ -327,8 +348,8 @@ class ShoppingController extends Controller
     }
 
     /**
- * Procesar pago (separado de la compra)
- */
+     * Procesar pago (separado de la compra)
+     */
     public function processPayment(Request $request, $shoppingId)
     {
         try {
@@ -348,6 +369,17 @@ class ShoppingController extends Controller
 
             // ✅ DISPARAR EVENTO DE PAGO AQUÍ
             event(new PaymentProcessed($shopping));
+            
+            // ✅ GAMIFICACIÓN: Registrar la compra para XP y logros
+            try {
+                $user = $shopping->user;
+                if ($user) {
+                    GamificationService::recordPurchase($user);
+                    \Log::info('✅ Gamificación: Compra registrada para usuario ' . $user->id);
+                }
+            } catch (\Exception $gamifyError) {
+                \Log::warning('⚠️ Error en gamificación: ' . $gamifyError->getMessage());
+            }
 
             return response()->json([
                 'success' => true,
@@ -584,6 +616,17 @@ class ShoppingController extends Controller
 
             DB::commit();
 
+            // ✅ GAMIFICACIÓN: Registrar la compra exitosa para XP y logros
+            try {
+                $user = $shopping->user;
+                if ($user) {
+                    GamificationService::recordPurchase($user);
+                    \Log::info('✅ Gamificación: Compra registrada para usuario ' . $user->id);
+                }
+            } catch (\Exception $gamifyError) {
+                \Log::warning('⚠️ Error en gamificación (no afecta pago): ' . $gamifyError->getMessage());
+            }
+
             // Disparar eventos Y CREAR NOTIFICACIONES (con protección contra errores)
             $user = $shopping->user;
             try {
@@ -700,6 +743,17 @@ class ShoppingController extends Controller
                 ]);
 
             DB::commit();
+
+            // ✅ GAMIFICACIÓN: Registrar la compra confirmada para XP y logros
+            try {
+                $user = $shopping->user;
+                if ($user) {
+                    GamificationService::recordPurchase($user);
+                    \Log::info('✅ Gamificación: Compra confirmada registrada para usuario ' . $user->id);
+                }
+            } catch (\Exception $gamifyError) {
+                \Log::warning('⚠️ Error en gamificación (no afecta confirmación): ' . $gamifyError->getMessage());
+            }
 
             \Log::info('✅ Compra confirmada', [
                 'shopping_id' => $shopping->id,

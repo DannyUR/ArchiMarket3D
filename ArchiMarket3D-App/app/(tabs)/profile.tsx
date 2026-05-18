@@ -14,6 +14,9 @@ import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../api/client';
+import { useGamification } from '../../context/GamificationContext';
+import { LevelProgressBar } from '../../components/gamification/LevelProgressBar';
+import { AchievementBadge } from '../../components/gamification/AchievementBadge';
 
 interface License {
     id: number;
@@ -66,7 +69,7 @@ interface DownloadInfo {
 export default function ProfileScreen() {
     const { user, logout, updateProfile } = useAuth();
     const { settings, updateSetting } = useSettings();
-    const [activeTab, setActiveTab] = useState<'profile' | 'licenses' | 'purchases' | 'settings'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'licenses' | 'purchases' | 'settings' | 'achievements'>('profile');
     const [loading, setLoading] = useState(false);
     const [editMode, setEditMode] = useState(false);
 
@@ -102,6 +105,10 @@ export default function ProfileScreen() {
 
     const [languageModalVisible, setLanguageModalVisible] = useState(false);
     const [qualityModalVisible, setQualityModalVisible] = useState(false);
+
+    // ✅ Gamificación
+    const { data: gamification, loading: gamificationLoading, refresh: refreshGamification } = useGamification();
+    const [showAllAchievements, setShowAllAchievements] = useState(false);
 
     // Cambiar idioma
     const changeLanguage = async (locale: string) => {
@@ -411,6 +418,7 @@ export default function ProfileScreen() {
         setRefreshing(true);
         if (activeTab === 'licenses') await fetchLicenses();
         if (activeTab === 'purchases') await fetchPurchases();
+        await refreshGamification();
         setRefreshing(false);
     }, [activeTab]);
 
@@ -445,6 +453,9 @@ export default function ProfileScreen() {
 
             // ✅ Solo salir del modo edición, NO redirigir
             setEditMode(false);
+            
+            // Recargar gamificación
+            await refreshGamification();
 
         } catch (error: any) {
             console.error('❌ Error actualizando perfil:', error);
@@ -559,6 +570,10 @@ export default function ProfileScreen() {
         return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
     };
 
+    // Calcular logros desbloqueados
+    const unlockedAchievements = gamification?.achievements?.filter(a => a.unlocked_at) || [];
+    const totalAchievements = gamification?.achievements?.length || 0;
+
     return (
         <View style={styles.container}>
             {/* Header */}
@@ -588,7 +603,8 @@ export default function ProfileScreen() {
                     { key: 'profile', label: 'Perfil', icon: 'person-outline' },
                     { key: 'licenses', label: 'Licencias', icon: 'document-text-outline' },
                     { key: 'purchases', label: 'Compras', icon: 'cart-outline' },
-                    { key: 'settings', label: 'Ajustes', icon: 'settings-outline' }
+                    { key: 'settings', label: 'Ajustes', icon: 'settings-outline' },
+                    { key: 'achievements', label: 'Logros', icon: 'trophy-outline' }
                 ].map((tab) => (
                     <TouchableOpacity key={tab.key} style={[styles.tab, activeTab === tab.key && styles.tabActive]} onPress={() => setActiveTab(tab.key as any)}>
                         <Ionicons name={tab.icon as any} size={22} color={activeTab === tab.key ? '#2563eb' : '#94a3b8'} />
@@ -1143,6 +1159,83 @@ export default function ProfileScreen() {
                             </TouchableOpacity>
                         </View>
                     )}
+
+                    {/* ✅ TAB LOGROS (GAMIFICACIÓN) */}
+                    {activeTab === 'achievements' && (
+                        <View style={styles.section}>
+                            <View style={styles.achievementsHeader}>
+                                <Text style={styles.sectionTitle}>
+                                    <Ionicons name="trophy-outline" size={20} /> Mis Logros
+                                </Text>
+                                <Text style={styles.achievementsCount}>
+                                    {unlockedAchievements.length}/{totalAchievements}
+                                </Text>
+                            </View>
+
+                            {gamificationLoading ? (
+                                <View style={styles.centerContainer}>
+                                    <ActivityIndicator size="large" color="#2563eb" />
+                                    <Text style={styles.loadingText}>Cargando logros...</Text>
+                                </View>
+                            ) : !gamification || gamification.achievements?.length === 0 ? (
+                                <View style={styles.emptyState}>
+                                    <Ionicons name="trophy-outline" size={64} color="#cbd5e1" />
+                                    <Text style={styles.emptyTitle}>No hay logros aún</Text>
+                                    <Text style={styles.emptyText}>Completa compras y escribe reseñas para desbloquear logros</Text>
+                                </View>
+                            ) : (
+                                <>
+                                    {/* Barra de progreso de nivel */}
+                                    <LevelProgressBar
+                                        level={gamification.level}
+                                        levelIcon={gamification.level_icon}
+                                        levelTitle={gamification.level_title}
+                                        progress={gamification.progress}
+                                        currentXP={gamification.xp}
+                                        nextXP={gamification.xp_next_level}
+                                        discount={gamification.discount}
+                                    />
+
+                                    {/* Grid de logros */}
+                                    <View style={styles.achievementsGrid}>
+                                        {(showAllAchievements ? gamification.achievements : gamification.achievements.slice(0, 6)).map((achievement, index) => (
+                                            <AchievementBadge
+                                                key={`${achievement.id}-${achievement.unlocked_at ? 'unlocked' : 'locked'}-${index}`}
+                                                icon={achievement.icon}
+                                                name={achievement.name}
+                                                description={achievement.description}
+                                                unlocked={!!achievement.unlocked_at}
+                                                unlockedAt={achievement.unlocked_at}
+                                            />
+                                        ))}
+                                    </View>
+
+                                    {gamification.achievements.length > 6 && (
+                                        <TouchableOpacity
+                                            style={styles.viewAllButton}
+                                            onPress={() => setShowAllAchievements(!showAllAchievements)}
+                                        >
+                                            <Text style={styles.viewAllButtonText}>
+                                                {showAllAchievements ? 'Ver menos' : 'Ver todos'}
+                                            </Text>
+                                            <Ionicons name={showAllAchievements ? 'chevron-up' : 'chevron-down'} size={16} color="#2563eb" />
+                                        </TouchableOpacity>
+                                    )}
+
+                                    {/* Próximo nivel */}
+                                    <View style={styles.nextLevelContainer}>
+                                        <Ionicons name="trending-up" size={20} color="#2563eb" />
+                                        <Text style={styles.nextLevelText}>
+                                            Siguiente nivel: {gamification.level + 1}
+                                        </Text>
+                                        <Text style={styles.nextLevelXp}>
+                                            🎯 {Math.ceil(gamification.xp_next_level - gamification.xp)} XP para subir
+                                        </Text>
+                                    </View>
+                                </>
+                            )}
+                        </View>
+                    )}
                 </View>
             </ScrollView>
 
@@ -1544,4 +1637,57 @@ const styles = StyleSheet.create({
     emptyFormats: { alignItems: 'center', padding: 40 },
     emptyFormatsTitle: { fontSize: 16, fontWeight: '600', color: '#1e293b', marginTop: 12 },
     emptyFormatsText: { fontSize: 13, color: '#64748b', textAlign: 'center', marginTop: 4 },
+    // ✅ Estilos de gamificación
+    achievementsHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    achievementsCount: {
+        fontSize: 14,
+        color: '#64748b',
+        backgroundColor: '#f1f5f9',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    achievementsGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+        gap: 12,
+        marginTop: 16,
+    },
+    viewAllButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 8,
+        paddingVertical: 12,
+        marginTop: 16,
+    },
+    viewAllButtonText: {
+        color: '#2563eb',
+        fontSize: 14,
+        fontWeight: '500',
+    },
+    nextLevelContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        backgroundColor: '#f8fafc',
+        padding: 12,
+        borderRadius: 12,
+        marginTop: 16,
+    },
+    nextLevelText: {
+        fontSize: 13,
+        color: '#64748b',
+    },
+    nextLevelXp: {
+        fontSize: 12,
+        color: '#94a3b8',
+        marginLeft: 'auto',
+    },
 });
