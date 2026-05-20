@@ -14,7 +14,11 @@ use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Support\Str;
 use App\Events\NewUserRegistered;
 use App\Helpers\NotificationHelper;
-
+use App\Notifications\WelcomeEmailNotification;
+use App\Notifications\PasswordResetNotification;
+use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class AuthController extends Controller
 {
@@ -62,6 +66,22 @@ class AuthController extends Controller
 
             NotificationHelper::newUserRegistered($user);
             event(new NewUserRegistered($user));
+
+            // ✅ ENVIAR CORREO DE BIENVENIDA
+            try {
+                $verificationUrl = URL::temporarySignedRoute(
+                    'verification.verify',
+                    now()->addMinutes(60),
+                    ['id' => $user->id, 'hash' => sha1($user->email)]
+                );
+                
+                $user->notify(new WelcomeEmailNotification($user, $verificationUrl));
+                
+                Log::info('📧 Correo de bienvenida enviado a: ' . $user->email);
+            } catch (\Exception $e) {
+                Log::error('❌ Error enviando correo de bienvenida: ' . $e->getMessage());
+                // No interrumpir el registro si falla el correo
+            }
 
             // 🔥 SOLUCIÓN: Auto-verificar en desarrollo
             if (app()->environment('local')) {
@@ -174,6 +194,7 @@ class AuthController extends Controller
             ]
         ]);
     }
+    
     /**
      * Obtener usuario autenticado
      */
@@ -276,8 +297,11 @@ class AuthController extends Controller
     /**
      * Enviar link de restablecimiento de contraseña
      */
+/**
+ * Enviar link de restablecimiento de contraseña
+ */
     public function forgotPassword(Request $request)
-{
+    {
     $validator = Validator::make($request->all(), [
         'email' => 'required|email|exists:users,email'
     ]);
@@ -290,33 +314,57 @@ class AuthController extends Controller
     }
 
     try {
-        $status = PasswordFacade::sendResetLink(
-            $request->only('email')
-        );
-
-        // 👇 AGREGAR ESTO PARA VER QUÉ DEVUELVE
-        \Log::info('Password reset status: ' . $status);
-
-        if ($status === PasswordFacade::RESET_LINK_SENT) {
+        $user = User::where('email', $request->email)->first();
+        
+        if (!$user) {
             return response()->json([
-                'success' => true, 
-                'message' => 'Hemos enviado un link de restablecimiento a tu email'
-            ]);
+                'success' => false,
+                'message' => 'Usuario no encontrado'
+            ], 404);
         }
 
-        // Si no es RESET_LINK_SENT, devolvemos el status
-        return response()->json([
-            'success' => false, 
-            'message' => 'Error al enviar el link',
-            'status' => $status  // 👈 VER QUÉ STATUS DEVUELVE
-        ], 400);
+        // Generar token manualmente
+        $token = Str::random(64);
+        
+        // Guardar token en la tabla password_reset_tokens
+        DB::table('password_reset_tokens')->updateOrInsert(
+            ['email' => $request->email],
+            ['token' => $token, 'created_at' => now()]
+        );
+        
+        Log::info('🔐 Token de recuperación generado', [
+            'email' => $request->email,
+            'token' => $token
+        ]);
+        
+        // ✅ ENVIAR CORREO DE RECUPERACIÓN
+        try {
+            $user->notify(new PasswordResetNotification($token, $request->email));
+            Log::info('📧 Correo de recuperación enviado a: ' . $request->email);
+            
+            // Siempre devolver éxito aunque no exista el email (por seguridad)
+            return response()->json([
+                'success' => true,
+                'message' => 'Si el email existe en nuestro sistema, recibirás un enlace para restablecer tu contraseña'
+            ]);
+            
+        } catch (\Exception $e) {
+            Log::error('❌ Error enviando correo de recuperación: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al enviar el correo de recuperación. Intenta nuevamente más tarde.'
+            ], 500);
+        }
 
     } catch (\Exception $e) {
-        \Log::error('Password reset error: ' . $e->getMessage());
+        Log::error('Password reset error: ' . $e->getMessage());
+        Log::error($e->getTraceAsString());
         
         return response()->json([
             'success' => false,
-            'message' => 'Error del servidor: ' . $e->getMessage()
+            'message' => 'Error del servidor al procesar la solicitud'
         ], 500);
     }
 }
@@ -339,28 +387,43 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $status = PasswordFacade::reset(
-            $request->only('email', 'password', 'password_confirmation', 'token'),
-            function ($user, $password) {
-                $user->forceFill([
-                    'password' => Hash::make($password)
-                ])->setRememberToken(Str::random(60));
+        // Verificar token manualmente
+        $resetRecord = \DB::table('password_reset_tokens')
+            ->where('email', $request->email)
+            ->where('token', $request->token)
+            ->first();
 
-                $user->save();
-
-                event(new PasswordReset($user));
-            }
-        );
-
-        return $status === PasswordFacade::PASSWORD_RESET
-            ? response()->json([
-                'success' => true, 
-                'message' => 'Contraseña restablecida correctamente'
-            ])
-            : response()->json([
-                'success' => false, 
+        if (!$resetRecord) {
+            return response()->json([
+                'success' => false,
                 'message' => 'Token inválido o expirado'
             ], 400);
+        }
+
+        // Verificar expiración (60 minutos)
+        $createdAt = \Carbon\Carbon::parse($resetRecord->created_at);
+        if ($createdAt->diffInMinutes(now()) > 60) {
+            return response()->json([
+                'success' => false,
+                'message' => 'El enlace ha expirado. Solicita un nuevo restablecimiento.'
+            ], 400);
+        }
+
+        // Actualizar contraseña
+        $user = User::where('email', $request->email)->first();
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        // Eliminar token usado
+        \DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
+        // Opcional: revocar todos los tokens del usuario
+        $user->tokens()->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Contraseña restablecida correctamente'
+        ]);
     }
 
     /**
@@ -388,38 +451,33 @@ class AuthController extends Controller
     /**
      * Verificar email
      */
+    // app/Http/Controllers/Api/AuthController.php
+
+/**
+ * Verificar email
+ */
     public function verifyEmail(Request $request, $id, $hash)
     {
         $user = User::find($id);
 
         if (!$user) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Usuario no encontrado'
-            ], 404);
+            // Redirigir a login con error
+            return redirect(config('app.frontend_url') . '/login?error=user_not_found&message=Usuario+no+encontrado');
         }
 
         if (!hash_equals((string) $hash, sha1($user->getEmailForVerification()))) {
-            return response()->json([
-                'success' => false, 
-                'message' => 'Link de verificación inválido'
-            ], 400);
+            return redirect(config('app.frontend_url') . '/login?error=invalid_hash&message=Enlace+inválido');
         }
 
         if ($user->hasVerifiedEmail()) {
-            return response()->json([
-                'success' => true, 
-                'message' => 'Email ya verificado'
-            ]);
+            return redirect(config('app.frontend_url') . '/login?message=Email+ya+verificado');
         }
 
         $user->markEmailAsVerified();
         event(new Verified($user));
 
-        return response()->json([
-            'success' => true, 
-            'message' => 'Email verificado correctamente'
-        ]);
+        // Redirigir al login con mensaje de éxito
+        return redirect(config('app.frontend_url') . '/login?verified=true&message=Email+verificado+correctamente.+Ya+puedes+iniciar+sesión');
     }
 
     /**
@@ -446,8 +504,8 @@ class AuthController extends Controller
     }
 
     /**
- * Mostrar formulario de reset (opcional - para el link del email)
- */
+     * Mostrar formulario de reset (opcional - para el link del email)
+     */
     public function showResetForm($token)
     {
         return response()->json([

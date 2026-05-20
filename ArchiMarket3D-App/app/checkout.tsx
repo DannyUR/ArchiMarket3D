@@ -32,7 +32,7 @@ export default function CheckoutScreen() {
         zipCode: '',
     });
 
-    // Cargar datos del usuario si está autenticado
+    // Cargar datos del usuario
     useEffect(() => {
         if (user) {
             const nameParts = (user.name || '').split(' ');
@@ -62,7 +62,6 @@ export default function CheckoutScreen() {
     };
 
     const handleNextStep = () => {
-        // Validar paso 1
         if (step === 1) {
             if (!formData.firstName || !formData.lastName || !formData.email || !formData.address) {
                 Alert.alert('Campos incompletos', 'Por favor completa todos los campos obligatorios.');
@@ -81,7 +80,6 @@ export default function CheckoutScreen() {
         setErrorMessage('');
 
         try {
-            // Preparar los items del carrito
             const items = cartItems.map(item => ({
                 model_id: item.model.id,
                 license_type: item.license,
@@ -89,7 +87,7 @@ export default function CheckoutScreen() {
                 price: item.price
             }));
 
-            // Crear la orden en el backend
+            const backendOrigin = api.defaults.baseURL?.replace(/\/api\/?$/, '') || 'http://localhost:8000';
             const response = await api.post('/shopping/create-paypal-order', {
                 items: items,
                 total: getCartTotal(),
@@ -102,17 +100,19 @@ export default function CheckoutScreen() {
                     city: formData.city,
                     zip_code: formData.zipCode
                 },
-                return_url: 'http://localhost:8081/purchases/success',
-                cancel_url: 'http://localhost:8081/checkout'
+                return_url: Platform.OS === 'web'
+                    ? `${backendOrigin}/api/shopping/execute-paypal-payment`
+                    : 'archimarket3d://purchases/success',
+                cancel_url: Platform.OS === 'web'
+                    ? `${window.location.origin}/checkout`
+                    : 'archimarket3d://checkout'
             });
 
-            const { approval_url, order_id } = response.data;
+            const { approval_url } = response.data;
 
-            // ✅ Redirigir a PayPal en la misma ventana
             if (Platform.OS === 'web') {
                 window.location.href = approval_url;
             } else {
-                // Para móvil, abrir en navegador
                 const { Linking } = await import('react-native');
                 await Linking.openURL(approval_url);
             }
@@ -136,16 +136,29 @@ export default function CheckoutScreen() {
         return labels[license] || license;
     };
 
-    const total = getCartTotal();
+    const subtotal = getCartTotal();
+    const iva = subtotal * 0.16;
+    const total = subtotal + iva;
 
     if (cartItems.length === 0 && cartLoaded) {
         return (
             <View style={styles.emptyContainer}>
-                <Ionicons name="cart-outline" size={80} color="#cbd5e1" />
+                <LinearGradient
+                    colors={['#f1f5f9', '#e2e8f0']}
+                    style={styles.emptyIconBg}
+                >
+                    <Ionicons name="cart-outline" size={60} color="#94a3b8" />
+                </LinearGradient>
                 <Text style={styles.emptyTitle}>Carrito vacío</Text>
                 <Text style={styles.emptyText}>No hay productos para procesar</Text>
                 <TouchableOpacity style={styles.exploreButton} onPress={() => router.push('/(tabs)/models')}>
-                    <Text style={styles.exploreButtonText}>Explorar modelos</Text>
+                    <LinearGradient
+                        colors={['#4f46e5', '#7c3aed']}
+                        style={styles.exploreButtonGradient}
+                    >
+                        <Ionicons name="search-outline" size={18} color="#fff" />
+                        <Text style={styles.exploreButtonText}>Explorar modelos</Text>
+                    </LinearGradient>
                 </TouchableOpacity>
             </View>
         );
@@ -153,14 +166,20 @@ export default function CheckoutScreen() {
 
     return (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity onPress={() => router.replace('/(tabs)/cart')} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#2563eb" />
-                </TouchableOpacity>
-                <Text style={styles.headerTitle}>Finalizar compra</Text>
-                <View style={{ width: 40 }} />
-            </View>
+            {/* Header con gradiente */}
+            <LinearGradient
+                colors={['#4f46e5', '#7c3aed']}
+                style={styles.header}
+            >
+                <View style={styles.headerContent}>
+                    <TouchableOpacity onPress={() => router.replace('/(tabs)/cart')} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={24} color="#fff" />
+                    </TouchableOpacity>
+                    <Text style={styles.headerTitle}>Finalizar compra</Text>
+                    <View style={{ width: 40 }} />
+                </View>
+                <Text style={styles.headerSubtitle}>Completa tus datos para continuar</Text>
+            </LinearGradient>
 
             {/* Steps */}
             <View style={styles.stepsContainer}>
@@ -176,7 +195,7 @@ export default function CheckoutScreen() {
                             step === s.number && styles.stepActive
                         ]}>
                             {step > s.number ? (
-                                <Ionicons name="checkmark" size={20} color="#fff" />
+                                <Ionicons name="checkmark" size={18} color="#fff" />
                             ) : (
                                 <Text style={[
                                     styles.stepNumber,
@@ -196,7 +215,7 @@ export default function CheckoutScreen() {
             {step === 1 && (
                 <View style={styles.formSection}>
                     <Text style={styles.sectionTitle}>
-                        <Ionicons name="person-outline" size={20} /> Información de contacto
+                        <Ionicons name="person-outline" size={20} color="#4f46e5" /> Información de contacto
                     </Text>
 
                     <View style={styles.row}>
@@ -205,6 +224,7 @@ export default function CheckoutScreen() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Juan"
+                                placeholderTextColor="#94a3b8"
                                 value={formData.firstName}
                                 onChangeText={(v) => handleInputChange('firstName', v)}
                             />
@@ -214,6 +234,7 @@ export default function CheckoutScreen() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Pérez"
+                                placeholderTextColor="#94a3b8"
                                 value={formData.lastName}
                                 onChangeText={(v) => handleInputChange('lastName', v)}
                             />
@@ -225,6 +246,7 @@ export default function CheckoutScreen() {
                         <TextInput
                             style={styles.input}
                             placeholder="juan@email.com"
+                            placeholderTextColor="#94a3b8"
                             keyboardType="email-address"
                             autoCapitalize="none"
                             value={formData.email}
@@ -237,6 +259,7 @@ export default function CheckoutScreen() {
                         <TextInput
                             style={styles.input}
                             placeholder="+52 123 456 7890"
+                            placeholderTextColor="#94a3b8"
                             keyboardType="phone-pad"
                             value={formData.phone}
                             onChangeText={(v) => handleInputChange('phone', v)}
@@ -244,7 +267,7 @@ export default function CheckoutScreen() {
                     </View>
 
                     <Text style={[styles.sectionTitle, { marginTop: 20 }]}>
-                        <Ionicons name="home-outline" size={20} /> Dirección de facturación
+                        <Ionicons name="home-outline" size={20} color="#4f46e5" /> Dirección de facturación
                     </Text>
 
                     <View style={styles.inputGroup}>
@@ -252,6 +275,7 @@ export default function CheckoutScreen() {
                         <TextInput
                             style={styles.input}
                             placeholder="Calle, número, colonia"
+                            placeholderTextColor="#94a3b8"
                             value={formData.address}
                             onChangeText={(v) => handleInputChange('address', v)}
                         />
@@ -263,6 +287,7 @@ export default function CheckoutScreen() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Ciudad"
+                                placeholderTextColor="#94a3b8"
                                 value={formData.city}
                                 onChangeText={(v) => handleInputChange('city', v)}
                             />
@@ -272,6 +297,7 @@ export default function CheckoutScreen() {
                             <TextInput
                                 style={styles.input}
                                 placeholder="Código postal"
+                                placeholderTextColor="#94a3b8"
                                 keyboardType="numeric"
                                 value={formData.zipCode}
                                 onChangeText={(v) => handleInputChange('zipCode', v)}
@@ -284,8 +310,13 @@ export default function CheckoutScreen() {
                             <Text style={styles.cancelButtonText}>Cancelar</Text>
                         </TouchableOpacity>
                         <TouchableOpacity style={styles.nextButton} onPress={handleNextStep}>
-                            <Text style={styles.nextButtonText}>Continuar al pago</Text>
-                            <Ionicons name="arrow-forward" size={18} color="#fff" />
+                            <LinearGradient
+                                colors={['#4f46e5', '#7c3aed']}
+                                style={styles.nextButtonGradient}
+                            >
+                                <Text style={styles.nextButtonText}>Continuar al pago</Text>
+                                <Ionicons name="arrow-forward" size={18} color="#fff" />
+                            </LinearGradient>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -295,9 +326,10 @@ export default function CheckoutScreen() {
             {step === 2 && (
                 <View style={styles.formSection}>
                     <Text style={styles.sectionTitle}>
-                        <Ionicons name="card-outline" size={20} /> Método de pago
+                        <Ionicons name="card-outline" size={20} color="#4f46e5" /> Método de pago
                     </Text>
 
+                    {/* PayPal - ACTIVO */}
                     <TouchableOpacity
                         style={[
                             styles.paymentOption,
@@ -306,25 +338,80 @@ export default function CheckoutScreen() {
                         onPress={() => setPaymentMethod('paypal')}
                     >
                         <View style={styles.paymentOptionLeft}>
-                            <Text style={styles.paymentIcon}>💰</Text>
+                            <View style={styles.paymentIconContainer}>
+                                <Text style={styles.paymentIcon}>💰</Text>
+                            </View>
                             <View>
                                 <Text style={styles.paymentName}>PayPal</Text>
                                 <Text style={styles.paymentDesc}>Paga con tu cuenta PayPal o tarjeta</Text>
                             </View>
                         </View>
-                        {paymentMethod === 'paypal' && (
-                            <Ionicons name="checkmark-circle" size={24} color="#2563eb" />
-                        )}
+                        <View style={styles.paymentStatus}>
+                            <View style={styles.paymentBadgeActive}>
+                                <Text style={styles.paymentBadgeText}>Disponible</Text>
+                            </View>
+                            {paymentMethod === 'paypal' && (
+                                <Ionicons name="checkmark-circle" size={22} color="#10b981" style={styles.paymentCheck} />
+                            )}
+                        </View>
+                    </TouchableOpacity>
+
+                    {/* Tarjeta - PRÓXIMAMENTE */}
+                    <TouchableOpacity
+                        style={[
+                            styles.paymentOption,
+                            styles.paymentOptionDisabled
+                        ]}
+                        onPress={() => setShowPaymentModal(true)}
+                    >
+                        <View style={styles.paymentOptionLeft}>
+                            <View style={[styles.paymentIconContainer, styles.paymentIconDisabled]}>
+                                <Text style={styles.paymentIcon}>💳</Text>
+                            </View>
+                            <View>
+                                <Text style={styles.paymentName}>Tarjeta de crédito/débito</Text>
+                                <Text style={styles.paymentDesc}>Visa, Mastercard, American Express</Text>
+                            </View>
+                        </View>
+                        <View style={styles.paymentStatus}>
+                            <View style={styles.paymentBadgeSoon}>
+                                <Text style={styles.paymentBadgeSoonText}>Próximamente</Text>
+                            </View>
+                        </View>
+                    </TouchableOpacity>
+
+                    {/* Transferencia - PRÓXIMAMENTE */}
+                    <TouchableOpacity
+                        style={[
+                            styles.paymentOption,
+                            styles.paymentOptionDisabled
+                        ]}
+                        onPress={() => setShowPaymentModal(true)}
+                    >
+                        <View style={styles.paymentOptionLeft}>
+                            <View style={[styles.paymentIconContainer, styles.paymentIconDisabled]}>
+                                <Text style={styles.paymentIcon}>🏦</Text>
+                            </View>
+                            <View>
+                                <Text style={styles.paymentName}>Transferencia bancaria</Text>
+                                <Text style={styles.paymentDesc}>SPEI / Transferencia directa</Text>
+                            </View>
+                        </View>
+                        <View style={styles.paymentStatus}>
+                            <View style={styles.paymentBadgeSoon}>
+                                <Text style={styles.paymentBadgeSoonText}>Próximamente</Text>
+                            </View>
+                        </View>
                     </TouchableOpacity>
 
                     <View style={styles.secureBadge}>
-                        <Ionicons name="lock-closed" size={14} color="#94a3b8" />
+                        <Ionicons name="shield-checkmark" size={16} color="#4f46e5" />
                         <Text style={styles.secureText}>Tus datos están seguros (SSL)</Text>
                     </View>
 
                     <View style={styles.buttonRow}>
                         <TouchableOpacity style={styles.backButtonOutline} onPress={handlePrevStep}>
-                            <Ionicons name="arrow-back" size={18} color="#2563eb" />
+                            <Ionicons name="arrow-back" size={18} color="#4f46e5" />
                             <Text style={styles.backButtonOutlineText}>Volver</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -332,8 +419,13 @@ export default function CheckoutScreen() {
                             onPress={handleNextStep}
                             disabled={paymentMethod !== 'paypal'}
                         >
-                            <Text style={styles.nextButtonText}>Revisar pedido</Text>
-                            <Ionicons name="arrow-forward" size={18} color="#fff" />
+                            <LinearGradient
+                                colors={paymentMethod === 'paypal' ? ['#4f46e5', '#7c3aed'] : ['#cbd5e1', '#cbd5e1']}
+                                style={styles.nextButtonGradient}
+                            >
+                                <Text style={styles.nextButtonText}>Revisar pedido</Text>
+                                <Ionicons name="arrow-forward" size={18} color="#fff" />
+                            </LinearGradient>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -343,7 +435,7 @@ export default function CheckoutScreen() {
             {step === 3 && (
                 <View style={styles.formSection}>
                     <Text style={styles.sectionTitle}>
-                        <Ionicons name="checkmark-circle-outline" size={20} /> Confirmar pedido
+                        <Ionicons name="checkmark-circle-outline" size={20} color="#4f46e5" /> Confirmar pedido
                     </Text>
 
                     {cartItems.map((item, index) => (
@@ -355,16 +447,26 @@ export default function CheckoutScreen() {
                                 </Text>
                             </View>
                             <Text style={styles.orderItemPrice}>
-                                ${(item.price * item.quantity).toFixed(2)} MXN
+                                ${(item.price * item.quantity).toFixed(2)}
                             </Text>
                         </View>
                     ))}
 
                     <View style={styles.divider} />
 
-                    <View style={styles.totalRow}>
-                        <Text style={styles.totalLabel}>Total a pagar</Text>
-                        <Text style={styles.totalValue}>${total.toFixed(2)} MXN</Text>
+                    <View style={styles.totalsContainer}>
+                        <View style={styles.totalRow}>
+                            <Text style={styles.totalLabel}>Subtotal</Text>
+                            <Text style={styles.totalValue}>${subtotal.toFixed(2)}</Text>
+                        </View>
+                        <View style={styles.totalRow}>
+                            <Text style={styles.totalLabel}>IVA (16%)</Text>
+                            <Text style={styles.totalValue}>${iva.toFixed(2)}</Text>
+                        </View>
+                        <View style={styles.totalRowTotal}>
+                            <Text style={styles.totalLabelTotal}>Total</Text>
+                            <Text style={styles.totalValueTotal}>${total.toFixed(2)} MXN</Text>
+                        </View>
                     </View>
 
                     {errorMessage ? (
@@ -376,7 +478,7 @@ export default function CheckoutScreen() {
 
                     <View style={styles.buttonRow}>
                         <TouchableOpacity style={styles.backButtonOutline} onPress={handlePrevStep}>
-                            <Ionicons name="arrow-back" size={18} color="#2563eb" />
+                            <Ionicons name="arrow-back" size={18} color="#4f46e5" />
                             <Text style={styles.backButtonOutlineText}>Volver</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
@@ -384,45 +486,55 @@ export default function CheckoutScreen() {
                             onPress={handleSubmitOrder}
                             disabled={processing || cartLoading}
                         >
-                            {processing ? (
-                                <ActivityIndicator color="#fff" size="small" />
-                            ) : (
-                                <>
-                                    <Text style={styles.payButtonText}>Pagar con PayPal</Text>
-                                    <Ionicons name="logo-paypal" size={18} color="#fff" />
-                                </>
-                            )}
+                            <LinearGradient
+                                colors={['#4f46e5', '#7c3aed']}
+                                style={styles.payButtonGradient}
+                            >
+                                {processing ? (
+                                    <ActivityIndicator color="#fff" size="small" />
+                                ) : (
+                                    <>
+                                        <Text style={styles.payButtonText}>Pagar con PayPal</Text>
+                                        <Ionicons name="logo-paypal" size={18} color="#fff" />
+                                    </>
+                                )}
+                            </LinearGradient>
                         </TouchableOpacity>
                     </View>
                 </View>
             )}
 
-            {/* Resumen lateral (siempre visible) */}
+            {/* Resumen lateral */}
             <View style={styles.summaryCard}>
-                <Text style={styles.summaryCardTitle}>
-                    <Ionicons name="cube-outline" size={18} /> Resumen del pedido
-                </Text>
+                <LinearGradient
+                    colors={['#f8fafc', '#f1f5f9']}
+                    style={styles.summaryGradient}
+                >
+                    <Text style={styles.summaryCardTitle}>
+                        <Ionicons name="cube-outline" size={18} color="#4f46e5" /> Resumen del pedido
+                    </Text>
 
-                {cartItems.slice(0, 2).map((item, index) => (
-                    <View key={index} style={styles.summaryCardItem}>
-                        <Text style={styles.summaryCardItemName} numberOfLines={1}>
-                            {item.model.name}
-                        </Text>
-                        <Text style={styles.summaryCardItemPrice}>
-                            ${(item.price * item.quantity).toFixed(2)} MXN
-                        </Text>
+                    {cartItems.slice(0, 2).map((item, index) => (
+                        <View key={index} style={styles.summaryCardItem}>
+                            <Text style={styles.summaryCardItemName} numberOfLines={1}>
+                                {item.model.name}
+                            </Text>
+                            <Text style={styles.summaryCardItemPrice}>
+                                ${(item.price * item.quantity).toFixed(2)}
+                            </Text>
+                        </View>
+                    ))}
+                    {cartItems.length > 2 && (
+                        <Text style={styles.summaryCardMore}>+{cartItems.length - 2} más</Text>
+                    )}
+
+                    <View style={styles.summaryCardDivider} />
+
+                    <View style={styles.summaryCardTotal}>
+                        <Text style={styles.summaryCardTotalLabel}>Total a pagar</Text>
+                        <Text style={styles.summaryCardTotalValue}>${total.toFixed(2)} MXN</Text>
                     </View>
-                ))}
-                {cartItems.length > 2 && (
-                    <Text style={styles.summaryCardMore}>+{cartItems.length - 2} más</Text>
-                )}
-
-                <View style={styles.summaryCardDivider} />
-
-                <View style={styles.summaryCardTotal}>
-                    <Text style={styles.summaryCardTotalLabel}>Total</Text>
-                    <Text style={styles.summaryCardTotalValue}>${total.toFixed(2)} MXN</Text>
-                </View>
+                </LinearGradient>
             </View>
         </ScrollView>
     );
@@ -440,9 +552,17 @@ const styles = StyleSheet.create({
         padding: 32,
         backgroundColor: '#f8fafc',
     },
+    emptyIconBg: {
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 24,
+    },
     emptyTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontSize: 22,
+        fontWeight: '700',
         color: '#1e293b',
         marginTop: 16,
     },
@@ -453,61 +573,88 @@ const styles = StyleSheet.create({
         marginBottom: 24,
     },
     exploreButton: {
-        backgroundColor: '#2563eb',
-        paddingHorizontal: 24,
-        paddingVertical: 12,
         borderRadius: 40,
+        overflow: 'hidden',
+    },
+    exploreButtonGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 28,
+        paddingVertical: 14,
     },
     exploreButtonText: {
         color: '#fff',
+        fontSize: 16,
         fontWeight: '600',
     },
+    // Header
     header: {
+        paddingTop: 55,
+        paddingBottom: 20,
+        paddingHorizontal: 20,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+    },
+    headerContent: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: 60,
-        paddingBottom: 20,
-        backgroundColor: '#fff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#e2e8f0',
+        marginBottom: 8,
     },
     backButton: {
-        padding: 8,
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     headerTitle: {
-        fontSize: 18,
-        fontWeight: '600',
-        color: '#1e293b',
+        fontSize: 20,
+        fontWeight: '700',
+        color: '#fff',
     },
+    headerSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.85)',
+        marginLeft: 8,
+    },
+    // Steps
     stepsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-around',
         paddingHorizontal: 40,
         paddingVertical: 24,
         backgroundColor: '#fff',
+        marginHorizontal: 16,
+        marginTop: 16,
+        borderRadius: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 2,
     },
     stepItem: {
         alignItems: 'center',
     },
     stepCircle: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: 38,
+        height: 38,
+        borderRadius: 19,
         backgroundColor: '#e2e8f0',
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
     },
     stepActive: {
-        backgroundColor: '#2563eb',
+        backgroundColor: '#4f46e5',
     },
     stepCompleted: {
         backgroundColor: '#10b981',
     },
     stepNumber: {
-        fontSize: 16,
+        fontSize: 15,
         fontWeight: '600',
         color: '#64748b',
     },
@@ -515,13 +662,14 @@ const styles = StyleSheet.create({
         color: '#fff',
     },
     stepLabel: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#64748b',
     },
     stepLabelActive: {
-        color: '#2563eb',
+        color: '#4f46e5',
         fontWeight: '500',
     },
+    // Formulario
     formSection: {
         backgroundColor: '#fff',
         margin: 16,
@@ -560,7 +708,8 @@ const styles = StyleSheet.create({
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 12,
-        fontSize: 16,
+        fontSize: 15,
+        color: '#1e293b',
     },
     buttonRow: {
         flexDirection: 'row',
@@ -582,13 +731,15 @@ const styles = StyleSheet.create({
     },
     nextButton: {
         flex: 2,
-        backgroundColor: '#2563eb',
+        borderRadius: 40,
+        overflow: 'hidden',
+    },
+    nextButtonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
         paddingVertical: 14,
-        borderRadius: 40,
     },
     nextButtonText: {
         color: '#fff',
@@ -602,14 +753,15 @@ const styles = StyleSheet.create({
         gap: 8,
         backgroundColor: '#fff',
         borderWidth: 1,
-        borderColor: '#2563eb',
+        borderColor: '#4f46e5',
         paddingVertical: 14,
         borderRadius: 40,
     },
     backButtonOutlineText: {
-        color: '#2563eb',
+        color: '#4f46e5',
         fontWeight: '500',
     },
+    // Métodos de pago
     paymentOption: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -622,26 +774,69 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
     },
     paymentOptionSelected: {
-        borderColor: '#2563eb',
-        backgroundColor: '#eff6ff',
+        borderColor: '#4f46e5',
+        backgroundColor: '#e0e7ff',
+    },
+    paymentOptionDisabled: {
+        opacity: 0.7,
     },
     paymentOptionLeft: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 14,
+    },
+    paymentIconContainer: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#e0e7ff',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    paymentIconDisabled: {
+        backgroundColor: '#e2e8f0',
     },
     paymentIcon: {
-        fontSize: 28,
+        fontSize: 24,
     },
     paymentName: {
-        fontSize: 14,
+        fontSize: 15,
         fontWeight: '600',
         color: '#1e293b',
     },
     paymentDesc: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#64748b',
         marginTop: 2,
+    },
+    paymentStatus: {
+        alignItems: 'flex-end',
+        gap: 6,
+    },
+    paymentBadgeActive: {
+        backgroundColor: '#dcfce7',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    paymentBadgeText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#10b981',
+    },
+    paymentBadgeSoon: {
+        backgroundColor: '#fef3c7',
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    paymentBadgeSoonText: {
+        fontSize: 10,
+        fontWeight: '600',
+        color: '#d97706',
+    },
+    paymentCheck: {
+        marginTop: 4,
     },
     secureBadge: {
         flexDirection: 'row',
@@ -653,20 +848,23 @@ const styles = StyleSheet.create({
     },
     secureText: {
         fontSize: 12,
-        color: '#94a3b8',
+        color: '#64748b',
     },
     disabledButton: {
-        opacity: 0.6,
+        opacity: 0.5,
     },
+    // Confirmación
     payButton: {
         flex: 2,
-        backgroundColor: '#2563eb',
+        borderRadius: 40,
+        overflow: 'hidden',
+    },
+    payButtonGradient: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         gap: 8,
         paddingVertical: 14,
-        borderRadius: 40,
     },
     payButtonText: {
         color: '#fff',
@@ -678,7 +876,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingVertical: 12,
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
+        borderBottomColor: '#f1f5f9',
     },
     orderItemInfo: {
         flex: 1,
@@ -689,21 +887,39 @@ const styles = StyleSheet.create({
         color: '#1e293b',
     },
     orderItemMeta: {
-        fontSize: 12,
+        fontSize: 11,
         color: '#64748b',
         marginTop: 2,
     },
     orderItemPrice: {
         fontSize: 14,
         fontWeight: '600',
-        color: '#2563eb',
+        color: '#4f46e5',
     },
     divider: {
         height: 1,
         backgroundColor: '#e2e8f0',
         marginVertical: 16,
     },
+    totalsContainer: {
+        marginTop: 4,
+    },
     totalRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+    },
+    totalLabel: {
+        fontSize: 14,
+        color: '#64748b',
+    },
+    totalValue: {
+        fontSize: 14,
+        fontWeight: '500',
+        color: '#1e293b',
+    },
+    totalRowTotal: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
@@ -712,15 +928,15 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#e2e8f0',
     },
-    totalLabel: {
+    totalLabelTotal: {
         fontSize: 16,
-        fontWeight: '600',
+        fontWeight: '700',
         color: '#1e293b',
     },
-    totalValue: {
+    totalValueTotal: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#2563eb',
+        color: '#4f46e5',
     },
     errorBox: {
         flexDirection: 'row',
@@ -736,17 +952,21 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#ef4444',
     },
+    // Resumen
     summaryCard: {
-        backgroundColor: '#fff',
         margin: 16,
         marginTop: 8,
-        padding: 20,
+        marginBottom: 30,
         borderRadius: 24,
+        overflow: 'hidden',
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.05,
         shadowRadius: 8,
         elevation: 2,
+    },
+    summaryGradient: {
+        padding: 20,
     },
     summaryCardTitle: {
         fontSize: 16,
@@ -793,6 +1013,6 @@ const styles = StyleSheet.create({
     summaryCardTotalValue: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#2563eb',
+        color: '#4f46e5',
     },
 });

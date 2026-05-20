@@ -16,7 +16,7 @@ export const CartProvider = ({ children }) => {
     const [cartItems, setCartItems] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [cartLoaded, setCartLoaded] = useState(false); // Track if cart has been loaded
+    const [cartLoaded, setCartLoaded] = useState(false);
     const { showSuccess, showError, showInfo } = useNotification();
 
     // Cargar carrito del localStorage al iniciar
@@ -34,24 +34,22 @@ export const CartProvider = ({ children }) => {
         } else {
             console.log('ℹ️ No hay carrito guardado en localStorage');
         }
-        setCartLoaded(true); // Mark cart as loaded
+        setCartLoaded(true);
     }, []);
 
     // Guardar carrito en localStorage cuando cambie
     useEffect(() => {
-        if (cartLoaded) { // Only save after initial load
+        if (cartLoaded) {
             localStorage.setItem('cart', JSON.stringify(cartItems));
             console.log('💾 Carrito guardado en localStorage');
         }
     }, [cartItems, cartLoaded]);
 
     const addToCart = (model, license, quantity = 1) => {
-        // Buscar si el modelo ya existe (con cualquier licencia)
         const existingItemIndex = cartItems.findIndex(item => item.model.id === model.id);
         const existingItem = existingItemIndex >= 0 ? cartItems[existingItemIndex] : null;
 
         if (existingItem && existingItem.license === license) {
-            // Mismo modelo, misma licencia → aumentar cantidad
             setCartItems(prev =>
                 prev.map(item =>
                     item.model.id === model.id && item.license === license
@@ -61,7 +59,6 @@ export const CartProvider = ({ children }) => {
             );
             showSuccess(`🛒 Se actualizó la cantidad de ${model.name}`);
         } else if (existingItem && existingItem.license !== license) {
-            // Mismo modelo, DIFERENTE licencia → actualizar licencia
             setCartItems(prev =>
                 prev.map((item, idx) =>
                     idx === existingItemIndex
@@ -71,7 +68,6 @@ export const CartProvider = ({ children }) => {
             );
             showSuccess(`🛒 Se cambió la licencia de ${model.name} a ${license}`);
         } else {
-            // Modelo nuevo → agregar
             setCartItems(prev => [...prev, {
                 model,
                 license,
@@ -86,7 +82,7 @@ export const CartProvider = ({ children }) => {
         setCartItems(prev =>
             prev.filter(item => !(item.model.id === modelId && item.license === license))
         );
-        showInfo(`🗑️ ${modelName} eliminado del carrito`); // ✅ NOTIFICACIÓN
+        showInfo(`🗑️ ${modelName} eliminado del carrito`);
     };
 
     const updateQuantity = (modelId, license, quantity, modelName) => {
@@ -106,7 +102,7 @@ export const CartProvider = ({ children }) => {
 
     const clearCart = () => {
         setCartItems([]);
-        localStorage.removeItem('cart'); // ✅ LIMPIAR TAMBIÉN DEL LOCALSTORAGE
+        localStorage.removeItem('cart');
         console.log('✅ Carrito limpiado completamente');
     };
 
@@ -129,12 +125,11 @@ export const CartProvider = ({ children }) => {
         return cartItems.reduce((count, item) => count + item.quantity, 0);
     };
 
-
+    // ✅ CHECKOUT CORREGIDO - AHORA CON URLs CORRECTAS
     const checkout = async () => {
         try {
             setLoading(true);
 
-            // Verificar que el carrito no esté vacío
             if (!cartItems || cartItems.length === 0) {
                 const error = new Error('El carrito está vacío. Por favor, agrega productos antes de hacer checkout.');
                 console.error('❌ Carrito vacío:', error.message);
@@ -150,8 +145,20 @@ export const CartProvider = ({ children }) => {
             console.log('📦 Carrito antes de checkout:', JSON.stringify(cartItems, null, 2));
             console.log('📦 Items enviados al servidor:', JSON.stringify(items, null, 2));
 
-            // Usar la nueva ruta de PayPal
-            const response = await API.post('/shopping/create-paypal-order', { items });
+            // ✅ URLS DE RETORNO CORRECTAS
+            const currentOrigin = window.location.origin; // http://localhost:3000 o http://localhost:8081
+            const returnUrl = `${currentOrigin}/purchases/success`;
+            const cancelUrl = `${currentOrigin}/checkout`;
+
+            console.log('📍 URL de retorno:', returnUrl);
+            console.log('📍 URL de cancelación:', cancelUrl);
+
+            // Usar la nueva ruta de PayPal con URLs correctas
+            const response = await API.post('/shopping/create-paypal-order', { 
+                items,
+                return_url: returnUrl,
+                cancel_url: cancelUrl
+            });
 
             if (response.data.success) {
                 // Redirigir a PayPal

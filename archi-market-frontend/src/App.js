@@ -22,19 +22,28 @@ import AdminDashboard from './components/admin/Dashboard';
 import Success from './pages/Success';
 import Home from './pages/Home';
 
+// 🔥 IMPORTAR NUEVOS COMPONENTES
+import ResetPassword from './pages/ResetPassword';
+import EmailVerified from './pages/EmailVerified';
+import ForgotPassword from './pages/ForgotPassword';
+
 import 'bootstrap/dist/css/bootstrap.min.css';
 
 const AppContent = () => {
     const location = useLocation();
-    const hideNavbarPaths = ['/', '/login', '/register', '/admin'];
+    // 🔥 Agregar las nuevas rutas donde NO se muestra el navbar
+    const hideNavbarPaths = ['/', '/login', '/register', '/admin', '/reset-password', '/email-verified', '/verification-error', '/forgot-password'];
     const shouldShowNavbar = !hideNavbarPaths.includes(location.pathname);
 
     const PrivateRoute = ({ children, adminOnly = false }) => {
         const token = localStorage.getItem('token');
         const user = JSON.parse(localStorage.getItem('user') || '{}');
 
-        // Si está en login, no redirigir
-        if (location.pathname === '/login') {
+        // Si está en login o rutas públicas de auth, no redirigir
+        if (location.pathname === '/login' || 
+            location.pathname === '/register' || 
+            location.pathname === '/forgot-password' || 
+            location.pathname === '/reset-password') {
             return children;
         }
 
@@ -63,6 +72,13 @@ const AppContent = () => {
                 <Route path="/models/:id" element={<ModelDetail />} />
                 <Route path="/categories" element={<Categories />} />
                 <Route path="/licenses" element={<PublicLicenses />} />
+
+                {/* ✅ Rutas de autenticación (públicas) */}
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+                <Route path="/email-verified" element={<EmailVerified />} />
+                <Route path="/verification-error" element={<EmailVerified />} />
+                <Route path="/verification-already-done" element={<EmailVerified />} />
 
                 {/* ✅ Ruta de éxito (pública para recibir el callback de PayPal) */}
                 <Route path="/purchases/success" element={<Success />} />

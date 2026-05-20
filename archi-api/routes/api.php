@@ -173,7 +173,12 @@ Route::middleware('auth:sanctum')->group(function () {
 */
 Route::prefix('shopping')->group(function () {
     Route::get('/execute-paypal-payment', [ShoppingController::class, 'executePayPalPayment'])->name('shopping.execute-paypal');
+    // Public endpoint to confirm purchases (used by frontend after PayPal redirect)
+    Route::post('/confirm-purchase', [ShoppingController::class, 'confirmPurchase']);
 });
+
+// 🔥 RUTA PARA APP MÓVIL - Capturar orden de PayPal
+Route::post('/paypal/capture-order', [ShoppingController::class, 'capturePayPalOrder']);
 
 // Confirmación de compra (Sin autenticación)
 Route::post('/purchases/confirm', [ShoppingController::class, 'confirmPurchase']);

@@ -12,9 +12,7 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.archimarket3d.app"
@@ -24,19 +22,28 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.archimarket3d.app"
+      "package": "com.archimarket3d.app",
+      "permissions": ["INTERNET"],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "data": [
+            {
+              "scheme": "archimarket3d",
+              "host": "*"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-router",
-      "expo-sharing",
-      "expo-localization",
-      "expo-mail-composer"
+      "expo-router"
     ],
     "extra": {
-      "router": {},
       "eas": {
         "projectId": "2bef0d86-cd06-4810-bc8f-b48f6465cd08"
       }

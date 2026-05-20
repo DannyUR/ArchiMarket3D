@@ -69,7 +69,6 @@ export default function ExploreScreen() {
         }
     };
 
-    // Cargar TODOS los modelos usando paginación automática
     const fetchAllModels = async () => {
         setLoading(true);
         try {
@@ -108,8 +107,6 @@ export default function ExploreScreen() {
             
             console.log(`✅ Total modelos cargados: ${allModelsList.length}`);
             setAllModels(allModelsList);
-            
-            // Cargar información de descargas para todos los modelos
             await loadDownloadInfoForModels(allModelsList);
             
         } catch (error) {
@@ -120,7 +117,6 @@ export default function ExploreScreen() {
         }
     };
 
-    // Cargar TODOS los modelos de una categoría
     const fetchCategoryModels = async (categoryId: number) => {
         setModelsLoading(true);
         try {
@@ -159,8 +155,6 @@ export default function ExploreScreen() {
             
             console.log(`✅ Total modelos categoría: ${allCategoryModels.length}`);
             setCategoryModels(allCategoryModels);
-            
-            // Cargar información de descargas para los modelos de la categoría
             await loadDownloadInfoForModels(allCategoryModels);
             
         } catch (error) {
@@ -171,7 +165,6 @@ export default function ExploreScreen() {
         }
     };
 
-    // Cargar información de descargas para un array de modelos
     const loadDownloadInfoForModels = async (models: Model[]) => {
         if (models.length === 0) return;
         
@@ -247,36 +240,22 @@ export default function ExploreScreen() {
         return icons[categoryName] || '📦';
     };
 
-    const getCategoryColor = (categoryName: string): string => {
-        const colorMap: Record<string, string> = {
-            'Estructuras de Acero': '#3b82f6',
-            'Estructuras de Concreto': '#3b82f6',
-            'Cimentaciones': '#3b82f6',
-            'Elementos Portantes': '#3b82f6',
-            'Arquitectura Residencial': '#22c55e',
-            'Arquitectura Comercial': '#22c55e',
-            'Fachadas y Cerramientos': '#22c55e',
-            'Cubiertas y Azoteas': '#22c55e',
-            'Sistemas Eléctricos': '#eab308',
-            'Fontanería y Tuberías': '#eab308',
-            'HVAC (Climatización)': '#eab308',
-            'Protección Contra Incendios': '#eab308',
-            'Mobiliario de Oficina': '#a855f7',
-            'Mobiliario Residencial': '#a855f7',
-            'Mobiliario Urbano': '#a855f7',
-            'Equipamiento': '#a855f7',
-            'Equipo Pesado': '#ef4444',
-            'Maquinaria Industrial': '#ef4444',
-            'Equipo de Construcción': '#ef4444',
-            'Infraestructura Vial': '#06b6d4',
-            'Espacios Públicos': '#06b6d4',
-            'Paisajismo': '#06b6d4',
-            'Redes de Servicio': '#06b6d4'
+    const getCategoryColor = (categoryName: string): string[] => {
+        const colorMap: Record<string, string[]> = {
+            'Estructuras de Acero': ['#3b82f6', '#2563eb'],
+            'Estructuras de Concreto': ['#3b82f6', '#2563eb'],
+            'Arquitectura Residencial': ['#22c55e', '#16a34a'],
+            'Arquitectura Comercial': ['#22c55e', '#16a34a'],
+            'Sistemas Eléctricos': ['#eab308', '#ca8a04'],
+            'Mobiliario de Oficina': ['#a855f7', '#9333ea'],
+            'Mobiliario Residencial': ['#a855f7', '#9333ea'],
+            'Equipo Pesado': ['#ef4444', '#dc2626'],
+            'Infraestructura Vial': ['#06b6d4', '#0891b2'],
+            'Paisajismo': ['#10b981', '#059669'],
         };
-        return colorMap[categoryName] || '#2563eb';
+        return colorMap[categoryName] || ['#4f46e5', '#7c3aed'];
     };
 
-    // Get current display models based on selection
     const getCurrentModels = (): Model[] => {
         const models = selectedCategoryId === 'all' ? allModels : categoryModels;
         if (searchTerm === '') return models;
@@ -301,7 +280,7 @@ export default function ExploreScreen() {
         const categoryName = typeof item.category === 'object' 
             ? item.category?.name 
             : selectedCategoryId === 'all' ? 'Modelo 3D' : categories.find(c => c.id === selectedCategoryId)?.name;
-        const categoryColor = getCategoryColor(categoryName || '');
+        const categoryColors = getCategoryColor(categoryName || '');
         const emoji = getCategoryEmoji(categoryName || '');
         const modelDownloadInfo = downloadInfo[item.id];
 
@@ -312,16 +291,15 @@ export default function ExploreScreen() {
                 activeOpacity={0.9}
             >
                 <LinearGradient
-                    colors={[categoryColor + '15', categoryColor + '05']}
+                    colors={[categoryColors[0] + '15', categoryColors[0] + '05']}
                     style={styles.modelImage}
                 >
                     <Text style={styles.modelEmoji}>{emoji}</Text>
-                    <View style={styles.modelBadge}>
-                        <Ionicons name="eye-outline" size={10} color={categoryColor} />
-                        <Text style={[styles.modelBadgeText, { color: categoryColor }]}>3D</Text>
+                    <View style={[styles.modelBadge, { backgroundColor: categoryColors[0] + '20' }]}>
+                        <Ionicons name="eye-outline" size={10} color={categoryColors[0]} />
+                        <Text style={[styles.modelBadgeText, { color: categoryColors[0] }]}>3D</Text>
                     </View>
                     
-                    {/* ✅ Badge de descargas disponibles */}
                     {modelDownloadInfo && (
                         <View style={[
                             styles.downloadBadge,
@@ -344,7 +322,7 @@ export default function ExploreScreen() {
                     )}
                 </LinearGradient>
                 <View style={styles.modelInfo}>
-                    <Text style={[styles.modelCategory, { color: categoryColor }]}>
+                    <Text style={[styles.modelCategory, { color: categoryColors[0] }]}>
                         {categoryName || 'Modelo 3D'}
                     </Text>
                     <Text style={styles.modelName} numberOfLines={2}>
@@ -361,9 +339,16 @@ export default function ExploreScreen() {
                         </View>
                     </View>
                     <View style={styles.modelFooter}>
-                        <Text style={styles.modelPrice}>{formatPrice(item.price)}</Text>
+                        <LinearGradient
+                            colors={categoryColors}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.priceBadge}
+                        >
+                            <Text style={styles.modelPrice}>{formatPrice(item.price)}</Text>
+                        </LinearGradient>
                         <View style={styles.modelStats}>
-                            <Ionicons name="star" size={12} color="#fbbf24" />
+                            <Ionicons name="star" size={10} color="#fbbf24" />
                             <Text style={styles.modelStatsText}>4.5</Text>
                             <View style={styles.statsDivider} />
                             <Ionicons name="download-outline" size={10} color="#64748b" />
@@ -384,7 +369,7 @@ export default function ExploreScreen() {
     if (loading && categories.length === 0) {
         return (
             <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color="#2563eb" />
+                <ActivityIndicator size="large" color="#4f46e5" />
                 <Text style={styles.loadingText}>Cargando...</Text>
             </View>
         );
@@ -392,33 +377,44 @@ export default function ExploreScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
+            {/* HEADER */}
             <LinearGradient
-                colors={['#1e40af', '#3b82f6', '#60a5fa']}
+                colors={['#4f46e5', '#7c3aed', '#a855f7']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.header}
             >
-                <Text style={styles.headerTitle}>Explorar</Text>
+                <View style={styles.headerContent}>
+                    <View style={styles.headerLeft}>
+                        <Text style={styles.headerBadge}>✨ Catálogo</Text>
+                        <Text style={styles.headerTitle}>Explorar</Text>
+                    </View>
+                    <View style={styles.headerRight}>
+                        <Ionicons name="grid" size={24} color="rgba(255,255,255,0.8)" />
+                    </View>
+                </View>
                 <Text style={styles.headerSubtitle}>
                     Descubre modelos 3D profesionales
                 </Text>
             </LinearGradient>
 
-            {/* Search Bar */}
+            {/* 🔥 SEPARADOR - Espacio entre header y buscador */}
+            <View style={styles.spacer} />
+
+            {/* SEARCH BAR - Con margen superior e inferior */}
             <View style={styles.searchContainer}>
                 <View style={styles.searchBox}>
-                    <Ionicons name="search-outline" size={20} color="#94a3b8" />
+                    <Ionicons name="search-outline" size={22} color="#4f46e5" />
                     <TextInput
                         style={styles.searchInput}
-                        placeholder="Buscar modelos..."
+                        placeholder="¿Qué modelo buscas?"
                         placeholderTextColor="#94a3b8"
                         value={searchTerm}
                         onChangeText={setSearchTerm}
                     />
                     {searchTerm !== '' && (
-                        <TouchableOpacity onPress={() => setSearchTerm('')}>
-                            <Ionicons name="close-circle" size={18} color="#94a3b8" />
+                        <TouchableOpacity onPress={() => setSearchTerm('')} style={styles.clearButton}>
+                            <Ionicons name="close-circle" size={20} color="#94a3b8" />
                         </TouchableOpacity>
                     )}
                 </View>
@@ -431,7 +427,6 @@ export default function ExploreScreen() {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={styles.categoriesScroll}
                 >
-                    {/* "Todos" option */}
                     <TouchableOpacity
                         style={[
                             styles.horizontalCategoryChip,
@@ -439,17 +434,26 @@ export default function ExploreScreen() {
                         ]}
                         onPress={() => handleCategorySelect('all')}
                     >
-                        <Text style={styles.horizontalCategoryEmoji}>📦</Text>
-                        <Text style={[
-                            styles.horizontalCategoryName,
-                            selectedCategoryId === 'all' && styles.horizontalCategoryNameActive
-                        ]}>
-                            Todos ({allModels.length})
-                        </Text>
-                        {selectedCategoryId === 'all' && <View style={styles.activeDot} />}
+                        <LinearGradient
+                            colors={selectedCategoryId === 'all' ? ['#4f46e5', '#7c3aed'] : ['#fff', '#fff']}
+                            style={styles.chipGradient}
+                        >
+                            <Text style={styles.horizontalCategoryEmoji}>📦</Text>
+                            <Text style={[
+                                styles.horizontalCategoryName,
+                                selectedCategoryId === 'all' && styles.horizontalCategoryNameActive
+                            ]}>
+                                Todos
+                            </Text>
+                            <Text style={[
+                                styles.horizontalCategoryCount,
+                                selectedCategoryId === 'all' && styles.horizontalCategoryCountActive
+                            ]}>
+                                ({allModels.length})
+                            </Text>
+                        </LinearGradient>
                     </TouchableOpacity>
 
-                    {/* Individual Categories */}
                     {categories.map((category) => (
                         <TouchableOpacity
                             key={category.id}
@@ -459,16 +463,28 @@ export default function ExploreScreen() {
                             ]}
                             onPress={() => handleCategorySelect(category.id)}
                         >
-                            <Text style={styles.horizontalCategoryEmoji}>
-                                {getCategoryEmoji(category.name)}
-                            </Text>
-                            <Text style={[
-                                styles.horizontalCategoryName,
-                                selectedCategoryId === category.id && styles.horizontalCategoryNameActive
-                            ]}>
-                                {category.name.length > 12 ? category.name.substring(0, 10) + '...' : category.name}
-                            </Text>
-                            {selectedCategoryId === category.id && <View style={styles.activeDot} />}
+                            <LinearGradient
+                                colors={selectedCategoryId === category.id 
+                                    ? getCategoryColor(category.name) 
+                                    : ['#fff', '#fff']}
+                                style={styles.chipGradient}
+                            >
+                                <Text style={styles.horizontalCategoryEmoji}>
+                                    {getCategoryEmoji(category.name)}
+                                </Text>
+                                <Text style={[
+                                    styles.horizontalCategoryName,
+                                    selectedCategoryId === category.id && styles.horizontalCategoryNameActive
+                                ]}>
+                                    {category.name.length > 15 ? category.name.substring(0, 12) + '...' : category.name}
+                                </Text>
+                                <Text style={[
+                                    styles.horizontalCategoryCount,
+                                    selectedCategoryId === category.id && styles.horizontalCategoryCountActive
+                                ]}>
+                                    ({category.models_count})
+                                </Text>
+                            </LinearGradient>
                         </TouchableOpacity>
                     ))}
                 </ScrollView>
@@ -478,12 +494,17 @@ export default function ExploreScreen() {
             <View style={styles.modelsContainer}>
                 {isLoading ? (
                     <View style={styles.centerContainer}>
-                        <ActivityIndicator size="large" color="#2563eb" />
+                        <ActivityIndicator size="large" color="#4f46e5" />
                         <Text style={styles.loadingText}>Cargando modelos...</Text>
                     </View>
                 ) : currentModels.length === 0 ? (
                     <View style={styles.emptyState}>
-                        <Ionicons name="cube-outline" size={64} color="#cbd5e1" />
+                        <LinearGradient
+                            colors={['#f1f5f9', '#e2e8f0']}
+                            style={styles.emptyIconBg}
+                        >
+                            <Ionicons name="cube-outline" size={48} color="#94a3b8" />
+                        </LinearGradient>
                         <Text style={styles.emptyTitle}>No hay modelos</Text>
                         <Text style={styles.emptyText}>
                             {searchTerm !== '' 
@@ -501,7 +522,7 @@ export default function ExploreScreen() {
                         columnWrapperStyle={styles.columnWrapper}
                         showsVerticalScrollIndicator={false}
                         refreshControl={
-                            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4f46e5" />
                         }
                         contentContainerStyle={styles.modelsList}
                         ListHeaderComponent={
@@ -542,48 +563,79 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: '#64748b',
     },
+    // Header
     header: {
-        paddingTop: 60,
+        paddingTop: 55,
         paddingBottom: 20,
         paddingHorizontal: 20,
-        borderBottomLeftRadius: 32,
-        borderBottomRightRadius: 32,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+    },
+    headerContent: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    headerLeft: {
+        flex: 1,
+    },
+    headerRight: {
+        width: 40,
+        height: 40,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    headerBadge: {
+        fontSize: 12,
+        fontWeight: '500',
+        color: '#fbbf24',
+        marginBottom: 4,
     },
     headerTitle: {
-        fontSize: 28,
+        fontSize: 32,
         fontWeight: '700',
         color: '#fff',
-        marginBottom: 4,
     },
     headerSubtitle: {
         fontSize: 14,
-        color: 'rgba(255,255,255,0.8)',
+        color: 'rgba(255,255,255,0.85)',
+        marginTop: 4,
     },
+    // 🔥 ESPACIADOR ENTRE HEADER Y BUSCADOR
+    spacer: {
+        height: 16,
+    },
+    // 🔥 SEARCH BAR - CON MÁS ESPACIO
     searchContainer: {
         paddingHorizontal: 16,
-        marginTop: -16,
-        marginBottom: 12,
+        marginBottom: 20,
     },
     searchBox: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#fff',
-        borderRadius: 40,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        borderRadius: 30,
+        paddingHorizontal: 18,
+        paddingVertical: 14,
+        gap: 10,
+        shadowColor: '#4f46e5',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 5,
         borderWidth: 1,
         borderColor: '#e2e8f0',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
     },
     searchInput: {
         flex: 1,
-        marginLeft: 8,
-        fontSize: 14,
+        fontSize: 15,
         color: '#1e293b',
+    },
+    clearButton: {
+        padding: 2,
     },
     categoriesContainer: {
         marginBottom: 8,
@@ -591,46 +643,50 @@ const styles = StyleSheet.create({
     categoriesScroll: {
         paddingHorizontal: 16,
         paddingVertical: 8,
-        gap: 8,
+        gap: 10,
     },
     horizontalCategoryChip: {
+        borderRadius: 40,
+        overflow: 'hidden',
+        marginRight: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    chipGradient: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 40,
-        backgroundColor: '#fff',
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
-        marginRight: 8,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
         gap: 6,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.03,
-        shadowRadius: 2,
-        elevation: 1,
     },
     horizontalCategoryChipActive: {
-        backgroundColor: '#2563eb',
-        borderColor: '#2563eb',
+        shadowColor: '#4f46e5',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 4,
     },
     horizontalCategoryEmoji: {
         fontSize: 16,
     },
     horizontalCategoryName: {
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: '500',
         color: '#1e293b',
     },
     horizontalCategoryNameActive: {
         color: '#fff',
     },
-    activeDot: {
-        width: 4,
-        height: 4,
-        borderRadius: 2,
-        backgroundColor: '#fff',
-        marginLeft: 2,
+    horizontalCategoryCount: {
+        fontSize: 11,
+        color: '#94a3b8',
+        fontWeight: '500',
+    },
+    horizontalCategoryCountActive: {
+        color: 'rgba(255,255,255,0.8)',
     },
     modelsContainer: {
         flex: 1,
@@ -648,32 +704,29 @@ const styles = StyleSheet.create({
         backgroundColor: '#fff',
         borderRadius: 20,
         overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#f0f0f0',
         marginBottom: 12,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.03,
-        shadowRadius: 4,
-        elevation: 2,
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
     },
     modelImage: {
-        height: 120,
+        height: 130,
         justifyContent: 'center',
         alignItems: 'center',
         position: 'relative',
     },
     modelEmoji: {
-        fontSize: 48,
+        fontSize: 52,
     },
     modelBadge: {
         position: 'absolute',
-        top: 8,
-        right: 8,
+        top: 10,
+        right: 10,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
-        backgroundColor: 'rgba(255,255,255,0.9)',
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 20,
@@ -684,25 +737,21 @@ const styles = StyleSheet.create({
     },
     downloadBadge: {
         position: 'absolute',
-        bottom: 8,
-        left: 8,
+        bottom: 10,
+        left: 10,
         flexDirection: 'row',
         alignItems: 'center',
         gap: 4,
         paddingHorizontal: 8,
         paddingVertical: 4,
         borderRadius: 20,
-        backgroundColor: 'rgba(255,255,255,0.9)',
+        backgroundColor: 'rgba(255,255,255,0.95)',
     },
     downloadBadgeAvailable: {
         backgroundColor: '#ecfdf5',
-        borderWidth: 1,
-        borderColor: '#a7f3d0',
     },
     downloadBadgeUnavailable: {
-        backgroundColor: '#fef3c7',
-        borderWidth: 1,
-        borderColor: '#fcd34d',
+        backgroundColor: '#fffbeb',
     },
     downloadBadgeText: {
         fontSize: 9,
@@ -733,7 +782,7 @@ const styles = StyleSheet.create({
     modelMeta: {
         flexDirection: 'row',
         gap: 8,
-        marginBottom: 8,
+        marginBottom: 10,
     },
     modelMetaItem: {
         flexDirection: 'row',
@@ -741,7 +790,7 @@ const styles = StyleSheet.create({
         gap: 4,
         backgroundColor: '#f8fafc',
         paddingHorizontal: 8,
-        paddingVertical: 2,
+        paddingVertical: 4,
         borderRadius: 20,
     },
     modelMetaText: {
@@ -753,10 +802,15 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
     },
+    priceBadge: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
     modelPrice: {
-        fontSize: 16,
+        fontSize: 13,
         fontWeight: '700',
-        color: '#2563eb',
+        color: '#fff',
     },
     modelStats: {
         flexDirection: 'row',
@@ -764,7 +818,7 @@ const styles = StyleSheet.create({
         gap: 4,
         backgroundColor: '#f8fafc',
         paddingHorizontal: 8,
-        paddingVertical: 2,
+        paddingVertical: 4,
         borderRadius: 20,
     },
     modelStatsText: {
@@ -779,10 +833,18 @@ const styles = StyleSheet.create({
     },
     emptyState: {
         alignItems: 'center',
-        paddingTop: 60,
+        paddingTop: 80,
+    },
+    emptyIconBg: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 16,
     },
     emptyTitle: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '600',
         color: '#1e293b',
         marginTop: 12,

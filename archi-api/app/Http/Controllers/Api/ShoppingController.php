@@ -16,7 +16,8 @@ use App\Events\NewPurchase;
 use App\Events\NewUserRegistered;
 use App\Helpers\NotificationHelper;
 use App\Services\PayPalService;
-use App\Services\GamificationService; // ✅ GAMIFICACIÓN: Importar el servicio
+use App\Services\GamificationService;
+use App\Notifications\PurchaseConfirmation;
 
 
 class ShoppingController extends Controller
@@ -281,9 +282,9 @@ class ShoppingController extends Controller
     private function getLicenseExpiration($licenseType)
     {
         return match($licenseType) {
-            'personal' => now()->addYear(), // 1 año
-            'business' => now()->addYears(3), // 3 años
-            'unlimited' => null, // No expira
+            'personal' => now()->addYear(),
+            'business' => now()->addYears(3),
+            'unlimited' => null,
             default => now()->addYear()
         };
     }
@@ -492,28 +493,43 @@ class ShoppingController extends Controller
                     'license_type' => $item['license_type'],
                     'price_paid' => $price,
                     'expires_at' => $this->getLicenseExpiration($item['license_type']),
-                    'is_active' => false // Inactiva hasta confirmar pago
+                    'is_active' => false
                 ]);
             }
 
             DB::commit();
 
-            // URLs de retorno del request o fallback
-            $returnUrl = $request->input('return_url', 'http://localhost:8081/purchases/success') . '?shopping_id=' . $shopping->id . '&payment_success=true';
-            $cancelUrl = $request->input('cancel_url', 'http://localhost:8081/checkout');
+            $returnUrl = $request->input('return_url');
+            $cancelUrl = $request->input('cancel_url');
 
-            // Crear orden en PayPal usando el servicio
-            $paypalService = app(\App\Services\PayPalService::class);
-            
+            if (!$returnUrl) {
+                // 🔥 CAMBIO IMPORTANTE: Debe apuntar a tu BACKEND
+                $returnUrl = url('/api/shopping/execute-paypal-payment');
+            }
+            if (!$cancelUrl) {
+                $cancelUrl = 'archimarket3d://checkout';
+            }
+
+            // Añadir el shopping_id a las URLs para que el frontend lo reciba al regresar desde PayPal
+            try {
+                $returnSeparator = parse_url($returnUrl, PHP_URL_QUERY) ? '&' : '?';
+                $returnUrl = $returnUrl . $returnSeparator . 'shopping_id=' . $shopping->id;
+
+                $cancelSeparator = parse_url($cancelUrl, PHP_URL_QUERY) ? '&' : '?';
+                $cancelUrl = $cancelUrl . $cancelSeparator . 'shopping_id=' . $shopping->id;
+            } catch (\Exception $urlEx) {
+                \Log::warning('No se pudo anexar shopping_id a las URLs: ' . $urlEx->getMessage());
+            }
+
             \Log::info('📊 PARÁMETROS QUE ENVÍO A PAYPAL:', [
                 'shopping_id' => $shopping->id,
                 'total' => $total,
-                'total_type' => gettype($total),
                 'items_count' => count($items),
-                'items' => $items,
                 'returnUrl' => $returnUrl,
                 'cancelUrl' => $cancelUrl
             ]);
+            
+            $paypalService = app(\App\Services\PayPalService::class);
             
             $result = $paypalService->createOrder(
                 $shopping->id,
@@ -527,6 +543,9 @@ class ShoppingController extends Controller
             if (!$result['success']) {
                 throw new \Exception($result['message']);
             }
+
+            $shopping->paypal_order_id = $result['payment_id'];
+            $shopping->save();
 
             \Log::info('✅ Orden PayPal creada', ['payment_id' => $result['payment_id']]);
 
@@ -551,120 +570,198 @@ class ShoppingController extends Controller
     }
 
     /**
-     * Ejecutar pago de PayPal (callback)
+     * Ejecutar pago de PayPal (callback después del pago)
+     * Esta función es llamada por PayPal después de que el usuario paga
      */
     public function executePayPalPayment(Request $request)
     {
         try {
-            \Log::info('=== EJECUTAR PAGO PAYPAL ===');
-            \Log::info('Request:', $request->all());
-
-            $paymentId = $request->paymentId;
-            $payerId = $request->PayerID;
-            $shoppingId = $request->shopping_id;
-
-            if (!$paymentId || !$payerId || !$shoppingId) {
-                \Log::error('❌ Faltan parámetros: ', [
-                    'paymentId' => $paymentId,
-                    'payerId' => $payerId,
-                    'shoppingId' => $shoppingId
-                ]);
-                throw new \Exception('Faltan parámetros requeridos');
+            \Log::info('=== EJECUTAR PAGO PAYPAL (CALLBACK) ===');
+            \Log::info('Todos los parámetros recibidos:', $request->all());
+            
+            // PayPal devuelve: paymentId, PayerID
+            $paymentId = $request->query('paymentId');
+            $payerId = $request->query('PayerID');
+            $shoppingId = $request->query('shopping_id');
+            
+            \Log::info('Parámetros:', [
+                'paymentId' => $paymentId,
+                'payerId' => $payerId,
+                'shoppingId' => $shoppingId
+            ]);
+            
+            // Buscar la compra
+            $shopping = null;
+            if ($shoppingId) {
+                $shopping = Shopping::find($shoppingId);
             }
-
-            $shopping = Shopping::find($shoppingId);
+            
+            if (!$shopping && $paymentId) {
+                $shopping = Shopping::where('paypal_order_id', $paymentId)->first();
+            }
+            
             if (!$shopping) {
-                throw new \Exception('Compra no encontrada: ' . $shoppingId);
+                $user = auth()->user();
+                if ($user) {
+                    $shopping = Shopping::where('user_id', $user->id)
+                        ->where('status', 'pending')
+                        ->latest()
+                        ->first();
+                }
             }
-
+            
+            if (!$shopping) {
+                throw new \Exception('Compra no encontrada');
+            }
+            
+            \Log::info('Compra encontrada:', [
+                'id' => $shopping->id,
+                'status' => $shopping->status
+            ]);
+            
+            // Si ya está completada, redirigir según plataforma
+            if ($shopping->status === 'completed') {
+                \Log::info('⚠️ La compra ya estaba completada');
+                return $this->redirectAfterPayment($shopping->id, $request);
+            }
+            
             DB::beginTransaction();
-
-            // Validar el pago con PayPal
+            
+            // Verificar el pago con PayPal
             $paypalService = app(PayPalService::class);
             $result = $paypalService->executePayment($paymentId, $payerId);
-
+            
             if (!$result['success']) {
-                throw new \Exception('PayPal error: ' . $result['message']);
+                throw new \Exception('PayPal no validó el pago: ' . $result['message']);
             }
-
-            \Log::info('✅ PayPal validó el pago exitosamente');
-
+            
+            \Log::info('✅ PayPal validó el pago');
+            
             // Actualizar compra
             $shopping->status = 'completed';
             $shopping->payment_id = $paymentId;
+            $shopping->paid_at = now();
             $shopping->save();
-
+            
             \Log::info('✅ Compra actualizada a completed', ['shopping_id' => $shopping->id]);
-
-            // Activar SOLO las licencias de esta compra
-            $licenses = UserLicense::where('shopping_id', $shoppingId)->get();
             
-            \Log::info('📊 Licencias encontradas:', [
-                'count' => $licenses->count(),
-                'details' => $licenses->map(fn($l) => [
-                    'id' => $l->id,
-                    'user_id' => $l->user_id,
-                    'model_id' => $l->model_id,
-                    'is_active_before' => $l->is_active
-                ])->toArray()
-            ]);
-
-            $updated = UserLicense::where('shopping_id', $shoppingId)
-                ->update(['is_active' => true]);
+            // Activar licencias
+            $updated = UserLicense::where('shopping_id', $shopping->id)
+                ->update(['is_active' => true, 'activated_at' => now()]);
             
-            \Log::info('✅ Licencias activadas', ['count_updated' => $updated]);
-
+            \Log::info('✅ Licencias activadas', ['count' => $updated]);
+            
             DB::commit();
-
-            // ✅ GAMIFICACIÓN: Registrar la compra exitosa para XP y logros
+            
+            // Cargar relaciones para el correo
+            $shopping->load('models');
+            $user = $shopping->user;
+            
+            // Enviar correo de confirmación
+            $this->sendPurchaseConfirmation($shopping, $user);
+            
+            // Gamificación
             try {
-                $user = $shopping->user;
                 if ($user) {
                     GamificationService::recordPurchase($user);
-                    \Log::info('✅ Gamificación: Compra registrada para usuario ' . $user->id);
+                    \Log::info('✅ Gamificación registrada');
                 }
-            } catch (\Exception $gamifyError) {
-                \Log::warning('⚠️ Error en gamificación (no afecta pago): ' . $gamifyError->getMessage());
+            } catch (\Exception $e) {
+                \Log::warning('⚠️ Error en gamificación: ' . $e->getMessage());
             }
-
-            // Disparar eventos Y CREAR NOTIFICACIONES (con protección contra errores)
-            $user = $shopping->user;
+            
+            // Disparar eventos
             try {
                 NotificationHelper::newPurchase($shopping, $user);
-                \Log::info('✅ Notificaciones creadas exitosamente');
-            } catch (\Exception $notifError) {
-                // Si la notificación falla, LOG pero NO DETENER EL PAGO
-                \Log::warning('⚠️ Error creando notificación (no detiene pago): ' . $notifError->getMessage());
-            }
-            
-            try {
                 event(new NewPurchase($shopping, $user));
-                \Log::info('✅ Evento NewPurchase disparado');
-            } catch (\Exception $eventError) {
-                \Log::warning('⚠️ Error disparando evento: ' . $eventError->getMessage());
+            } catch (\Exception $e) {
+                \Log::warning('⚠️ Error en eventos: ' . $e->getMessage());
             }
-
-            \Log::info('✅ Pago ejecutado exitosamente');
-
-            // ✅ Redirigir al frontend con token para limpiar carrito
-            $frontendUrl = 'http://localhost:3000/purchases/success?shopping_id=' . $shoppingId . '&payment_success=true';
             
-            \Log::info('📍 Redirigiendo a: ' . $frontendUrl);
-            return redirect()->to($frontendUrl);
-
+            // 🔥 REDIRIGIR SEGÚN LA PLATAFORMA
+            return $this->redirectAfterPayment($shopping->id, $request);
+            
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('❌ Error en executePayPalPayment: ' . $e->getMessage());
-            \Log::error($e->getTraceAsString());
             
-            $frontendUrl = 'http://localhost:3000/cart?error=payment_failed&message=' . urlencode($e->getMessage());
-            return redirect()->to($frontendUrl);
+            $errorUrl = 'http://localhost:8083/cart?error=' . urlencode($e->getMessage());
+            return redirect()->to($errorUrl);
+        }
+    }
+
+    /**
+     * Redirigir después del pago exitoso según la plataforma
+     */
+    private function redirectAfterPayment($shoppingId, Request $request)
+    {
+        // Configuración de URLs
+        $expoWebUrl = 'http://192.168.1.20:8083'; // Cambia por tu IP
+        $deepLink = 'archimarket3d://purchases/success?shopping_id=' . $shoppingId . '&payment_success=true';
+        
+        // Detectar plataforma por User-Agent
+        $userAgent = $request->header('User-Agent', '');
+        
+        // Si viene de la app móvil (Expo o contiene archimarket3d)
+        $isMobileApp = str_contains($userAgent, 'Expo') || 
+                       str_contains($userAgent, 'archimarket3d') ||
+                       str_contains($userAgent, 'ReactNative');
+        
+        // Si viene de la web de Expo
+        $isExpoWeb = str_contains($userAgent, 'Expo') && !$isMobileApp;
+        
+        \Log::info('📍 Redirigiendo después de pago', [
+            'shopping_id' => $shoppingId,
+            'userAgent' => $userAgent,
+            'isMobileApp' => $isMobileApp,
+            'isExpoWeb' => $isExpoWeb
+        ]);
+        
+        if ($isMobileApp) {
+            // App móvil real - usar deep link
+            \Log::info('📱 Redirigiendo a deep link de app móvil: ' . $deepLink);
+            return redirect()->to($deepLink);
+        } else {
+            // Web (Expo) - redirigir a la web
+            $webUrl = $expoWebUrl . '/purchases/success?shopping_id=' . $shoppingId . '&payment_success=true';
+            \Log::info('🌐 Redirigiendo a web: ' . $webUrl);
+            return redirect()->to($webUrl);
+        }
+    }
+
+    /**
+     * Enviar correo de confirmación de compra
+     */
+    private function sendPurchaseConfirmation($shopping, $user)
+    {
+        try {
+            if (!$user || !$user->email) {
+                \Log::warning('⚠️ No se puede enviar correo: usuario sin email', ['user_id' => $user->id ?? null]);
+                return;
+            }
+            
+            // Cargar la relación models si no está cargada
+            if (!$shopping->relationLoaded('models')) {
+                $shopping->load('models');
+            }
+            
+            \Log::info('📧 Enviando correo de confirmación', [
+                'to' => $user->email,
+                'shopping_id' => $shopping->id
+            ]);
+            
+            $user->notify(new PurchaseConfirmation($shopping, $user));
+            
+            \Log::info('✅ Correo enviado exitosamente');
+            
+        } catch (\Exception $e) {
+            \Log::error('❌ Error enviando correo: ' . $e->getMessage());
+            \Log::error($e->getTraceAsString());
         }
     }
     
     /**
      * Confirmar compra después de pago exitoso (SIN autenticación)
-     * Valida por shopping_id que debe estar en estado 'pending' y creado recientemente
      */
     public function confirmPurchase(Request $request)
     {
@@ -695,7 +792,6 @@ class ShoppingController extends Controller
                 ], 404);
             }
 
-            // Validar que la compra está en estado 'pending' (no completada aún)
             if ($shopping->status !== 'pending') {
                 \Log::error('Compra no está en estado pending', [
                     'shopping_id' => $shopping->id,
@@ -707,7 +803,6 @@ class ShoppingController extends Controller
                 ], 400);
             }
 
-            // Validar que la compra fue creada hace poco (dentro de las últimas 24h)
             $createdAt = $shopping->created_at;
             $now = now();
             $hoursAgo = $createdAt->diffInHours($now);
@@ -726,15 +821,11 @@ class ShoppingController extends Controller
 
             DB::beginTransaction();
 
-            \Log::info('Actualizando estado de compra');
-            // Actualizar estado a completado
             $shopping->update([
                 'status' => 'completed',
                 'payment_confirmed_at' => now()
             ]);
 
-            \Log::info('Activando licencias');
-            // Activar todas las licencias inactivas de esta compra
             UserLicense::where('shopping_id', $shopping->id)
                 ->where('is_active', false)
                 ->update([
@@ -744,15 +835,29 @@ class ShoppingController extends Controller
 
             DB::commit();
 
-            // ✅ GAMIFICACIÓN: Registrar la compra confirmada para XP y logros
+            // Cargar relación para gamificación
+            $shopping->load('models');
+            
+            $user = $shopping->user;
+
+            // Gamificación
             try {
-                $user = $shopping->user;
                 if ($user) {
                     GamificationService::recordPurchase($user);
                     \Log::info('✅ Gamificación: Compra confirmada registrada para usuario ' . $user->id);
                 }
             } catch (\Exception $gamifyError) {
                 \Log::warning('⚠️ Error en gamificación (no afecta confirmación): ' . $gamifyError->getMessage());
+            }
+
+            // Enviar correo de confirmación
+            try {
+                if ($user && $user->email) {
+                    $user->notify(new PurchaseConfirmation($shopping, $user));
+                    \Log::info('✅ Correo de confirmación enviado a: ' . $user->email);
+                }
+            } catch (\Exception $mailError) {
+                \Log::error('❌ Error enviando correo: ' . $mailError->getMessage());
             }
 
             \Log::info('✅ Compra confirmada', [
@@ -773,12 +878,115 @@ class ShoppingController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             \Log::error('❌ Error confirmando compra: ' . $e->getMessage());
-            \Log::error('Stack trace: ' . $e->getTraceAsString());
+            \Log::error($e->getTraceAsString());
 
             return response()->json([
                 'success' => false,
                 'message' => 'Error al confirmar la compra',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Capturar orden de PayPal (para app móvil)
+     * POST /api/paypal/capture-order
+     */
+    public function capturePayPalOrder(Request $request)
+    {
+        try {
+            \Log::info('=== CAPTURAR ORDEN PAYPAL (APP MÓVIL) ===');
+            \Log::info('Request data:', $request->all());
+            
+            $validator = Validator::make($request->all(), [
+                'order_id' => 'required|string',
+                'shopping_id' => 'required|integer|exists:shopping,id'
+            ]);
+            
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Datos inválidos',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+            
+            $orderId = $request->order_id;
+            $shoppingId = $request->shopping_id;
+            
+            $shopping = Shopping::find($shoppingId);
+            
+            if (!$shopping) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Compra no encontrada'
+                ], 404);
+            }
+            
+            if ($shopping->status === 'completed') {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'La compra ya estaba completada',
+                    'data' => ['shopping_id' => $shopping->id]
+                ]);
+            }
+            
+            DB::beginTransaction();
+            
+            // Capturar el pago con PayPal
+            $paypalService = app(PayPalService::class);
+            $result = $paypalService->captureOrder($orderId);
+            
+            if (!$result['success']) {
+                throw new \Exception($result['message']);
+            }
+            
+            // Actualizar compra
+            $shopping->status = 'completed';
+            $shopping->payment_id = $orderId;
+            $shopping->paypal_order_id = $orderId;
+            $shopping->paid_at = now();
+            $shopping->save();
+            
+            // Activar licencias
+            UserLicense::where('shopping_id', $shopping->id)
+                ->update(['is_active' => true, 'activated_at' => now()]);
+            
+            DB::commit();
+            
+            // Cargar relaciones para el correo
+            $shopping->load('models');
+            $user = $shopping->user;
+            
+            // Enviar correo de confirmación
+            $this->sendPurchaseConfirmation($shopping, $user);
+            
+            // Gamificación
+            try {
+                if ($user) {
+                    GamificationService::recordPurchase($user);
+                    \Log::info('✅ Gamificación registrada');
+                }
+            } catch (\Exception $e) {
+                \Log::warning('⚠️ Error en gamificación: ' . $e->getMessage());
+            }
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Pago capturado exitosamente',
+                'data' => [
+                    'shopping_id' => $shopping->id,
+                    'status' => $shopping->status
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('❌ Error capturando orden PayPal: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
             ], 500);
         }
     }

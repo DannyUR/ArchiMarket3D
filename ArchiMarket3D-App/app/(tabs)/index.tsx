@@ -1,5 +1,5 @@
 // app/(tabs)/index.tsx
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, ScrollView, RefreshControl, SafeAreaView, ActivityIndicator } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -92,15 +92,15 @@ export default function HomeScreen() {
 
     const getCategoryColor = (categoryName: string): string[] => {
         const colors: Record<string, string[]> = {
-            'Arquitectura Residencial': ['#1e40af', '#3b82f6'],
-            'Arquitectura Comercial': ['#1e40af', '#3b82f6'],
-            'Mobiliario': ['#b45309', '#f97316'],
-            'Vegetación': ['#15803d', '#22c55e'],
+            'Arquitectura Residencial': ['#4f46e5', '#7c3aed'],
+            'Arquitectura Comercial': ['#4f46e5', '#7c3aed'],
+            'Mobiliario': ['#ea580c', '#f97316'],
+            'Vegetación': ['#16a34a', '#22c55e'],
             'Iluminación': ['#ca8a04', '#eab308'],
             'Texturas': ['#7e22ce', '#a855f7'],
             'Instalaciones': ['#4b5563', '#6b7280'],
         };
-        return colors[categoryName] || ['#2563eb', '#3b82f6'];
+        return colors[categoryName] || ['#4f46e5', '#7c3aed'];
     };
 
     const formatPrice = (price: number) => {
@@ -111,6 +111,7 @@ export default function HomeScreen() {
     if (isLoading || !isClient) {
         return (
             <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#4f46e5" />
                 <Text style={styles.loadingText}>Cargando...</Text>
             </View>
         );
@@ -134,7 +135,7 @@ export default function HomeScreen() {
     />;
 }
 
-// 🎯 PANTALLA PARA USUARIOS AUTENTICADOS (SIN BOTÓN DE CERRAR SESIÓN)
+// 🎯 PANTALLA PARA USUARIOS AUTENTICADOS
 function AuthenticatedHome({ 
     user, featuredModels, trendingCategories, greeting, currentTime, onRefresh, refreshing,
     getCategoryEmoji, getCategoryColor, formatPrice
@@ -167,45 +168,54 @@ function AuthenticatedHome({
         <ScrollView 
             style={styles.container} 
             showsVerticalScrollIndicator={false}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4f46e5" />}
         >
-            {/* Header premium con hora - SIN BOTÓN DE CERRAR SESIÓN */}
-            <View style={styles.header}>
-                <View style={styles.greetingSection}>
-                    <Text style={styles.greeting}>
-                        {greeting}, <Text style={styles.userName}>{firstName}</Text>
-                    </Text>
-                    <View style={styles.roleBadge}>
-                        <Ionicons name="star" size={12} color="#fbbf24" />
-                        <Text style={styles.roleText}>{getRoleText(userRole)}</Text>
-                    </View>
-                    <View style={styles.timeBox}>
-                        <View style={styles.timeItem}>
-                            <Ionicons name="calendar-outline" size={14} color="#2563eb" />
-                            <Text style={styles.timeText}>{formatDate()}</Text>
-                        </View>
-                        <View style={styles.timeDivider} />
-                        <View style={styles.timeItem}>
-                            <Ionicons name="time-outline" size={14} color="#2563eb" />
-                            <Text style={styles.timeText}>{formatTime(currentTime)} hrs</Text>
-                        </View>
-                    </View>
-                </View>
-            </View>
-
-            {/* Banner principal */}
+            {/* 🔥 HEADER CON MÁS PADDING SUPERIOR */}
             <LinearGradient
-                colors={['#0A1929', '#1A2B3F']}
+                colors={['#4f46e5', '#7c3aed']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.headerGradient}
+            >
+                <SafeAreaView>
+                    <View style={styles.headerContent}>
+                        <View style={styles.welcomeSection}>
+                            <Text style={styles.greeting}>{greeting}</Text>
+                            <Text style={styles.userName}>{firstName}</Text>
+                            <View style={styles.roleBadge}>
+                                <Ionicons name="star" size={12} color="#fbbf24" />
+                                <Text style={styles.roleText}>{getRoleText(userRole)}</Text>
+                            </View>
+                        </View>
+                        <View style={styles.dateTimeSection}>
+                            <View style={styles.dateTimeItem}>
+                                <Ionicons name="calendar-outline" size={14} color="#c7d2fe" />
+                                <Text style={styles.dateTimeText}>{formatDate()}</Text>
+                            </View>
+                            <View style={styles.dateTimeDivider} />
+                            <View style={styles.dateTimeItem}>
+                                <Ionicons name="time-outline" size={14} color="#c7d2fe" />
+                                <Text style={styles.dateTimeText}>{formatTime(currentTime)} hrs</Text>
+                            </View>
+                        </View>
+                    </View>
+                </SafeAreaView>
+            </LinearGradient>
+
+            {/* Banner principal - con margen superior para separarlo del header */}
+            <LinearGradient
+                colors={['#1e1b4b', '#312e81']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.mainBanner}
             >
                 <View style={styles.bannerContent}>
                     <View style={styles.bannerTag}>
-                        <Text style={styles.bannerTagText}>✨ CURADOS PARA TI</Text>
+                        <Ionicons name="sparkles" size={14} color="#fbbf24" />
+                        <Text style={styles.bannerTagText}>CURADOS PARA TI</Text>
                     </View>
                     <Text style={styles.bannerTitle}>
-                        Modelos <Text style={styles.bannerHighlight}>Destacados</Text> por expertos
+                        Modelos <Text style={styles.bannerHighlight}>Destacados</Text>
                     </Text>
                     <Text style={styles.bannerText}>
                         Nuestro equipo selecciona los mejores modelos para garantizar calidad en tus proyectos.
@@ -215,30 +225,37 @@ function AuthenticatedHome({
                             <Text style={styles.bannerStatNumber}>{featuredModels.length}+</Text>
                             <Text style={styles.bannerStatLabel}>Destacados</Text>
                         </View>
+                        <View style={styles.bannerStatDivider} />
                         <View style={styles.bannerStat}>
                             <Text style={styles.bannerStatNumber}>236</Text>
                             <Text style={styles.bannerStatLabel}>Modelos totales</Text>
                         </View>
                     </View>
+                    <TouchableOpacity style={styles.bannerButton} onPress={() => router.push('/(tabs)/models')}>
+                        <LinearGradient
+                            colors={['#fbbf24', '#f59e0b']}
+                            style={styles.bannerButtonGradient}
+                        >
+                            <Text style={styles.bannerButtonText}>Explorar catálogo</Text>
+                            <Ionicons name="arrow-forward" size={18} color="#1e1b4b" />
+                        </LinearGradient>
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity style={styles.bannerButton} onPress={() => router.push('/(tabs)/models')}>
-                    <LinearGradient
-                        colors={['#2563eb', '#1d4ed8']}
-                        style={styles.bannerButtonGradient}
-                    >
-                        <Text style={styles.bannerButtonText}>Explorar catálogo</Text>
-                        <Ionicons name="arrow-forward" size={18} color="#fff" />
-                    </LinearGradient>
-                </TouchableOpacity>
             </LinearGradient>
 
             {/* Categorías populares */}
             <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                     <View style={styles.sectionTitle}>
-                        <Ionicons name="compass-outline" size={22} color="#2563eb" />
+                        <View style={styles.sectionIconBg}>
+                            <Ionicons name="compass" size={20} color="#4f46e5" />
+                        </View>
                         <Text style={styles.sectionTitleText}>Categorías populares</Text>
                     </View>
+                    <TouchableOpacity style={styles.viewAllLink} onPress={() => router.push('/(tabs)/models')}>
+                        <Text style={styles.viewAllText}>Ver todas</Text>
+                        <Ionicons name="arrow-forward" size={14} color="#4f46e5" />
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.categoriesGrid}>
@@ -248,16 +265,20 @@ function AuthenticatedHome({
                                 key={cat.id}
                                 style={styles.categoryCard}
                                 onPress={() => router.push(`/(tabs)/models?category=${cat.name}`)}
+                                activeOpacity={0.9}
                             >
                                 <LinearGradient
                                     colors={getCategoryColor(cat.name)}
+                                    start={{ x: 0, y: 0 }}
+                                    end={{ x: 1, y: 1 }}
                                     style={styles.categoryGradient}
                                 >
                                     <Text style={styles.categoryEmoji}>{getCategoryEmoji(cat.name)}</Text>
                                     <Text style={styles.categoryName}>{cat.name}</Text>
                                     <Text style={styles.categoryCount}>{cat.models_count} modelos</Text>
                                     <View style={styles.categoryTrend}>
-                                        <Text style={styles.categoryTrendText}>🔥 Popular</Text>
+                                        <Ionicons name="trending-up" size={12} color="#fff" />
+                                        <Text style={styles.categoryTrendText}>Popular</Text>
                                     </View>
                                 </LinearGradient>
                             </TouchableOpacity>
@@ -274,12 +295,14 @@ function AuthenticatedHome({
             <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                     <View style={styles.sectionTitle}>
-                        <Ionicons name="trophy-outline" size={22} color="#2563eb" />
+                        <View style={styles.sectionIconBg}>
+                            <Ionicons name="trophy" size={20} color="#4f46e5" />
+                        </View>
                         <Text style={styles.sectionTitleText}>Modelos Destacados</Text>
                     </View>
                     <TouchableOpacity style={styles.viewAllLink} onPress={() => router.push('/(tabs)/models')}>
                         <Text style={styles.viewAllText}>Ver todos</Text>
-                        <Ionicons name="arrow-forward" size={14} color="#2563eb" />
+                        <Ionicons name="arrow-forward" size={14} color="#4f46e5" />
                     </TouchableOpacity>
                 </View>
 
@@ -296,19 +319,26 @@ function AuthenticatedHome({
                                     key={model.id}
                                     style={styles.modelCard}
                                     onPress={() => router.push(`/models/${model.id}`)}
+                                    activeOpacity={0.8}
                                 >
-                                    <View style={styles.modelImage}>
+                                    <LinearGradient
+                                        colors={['#f8fafc', '#f1f5f9']}
+                                        style={styles.modelImage}
+                                    >
                                         <Text style={styles.modelEmoji}>{emoji}</Text>
                                         <View style={styles.featuredBadge}>
                                             <Ionicons name="flash" size={10} color="#fff" />
                                             <Text style={styles.featuredBadgeText}>Destacado</Text>
                                         </View>
-                                    </View>
+                                    </LinearGradient>
                                     <View style={styles.modelInfo}>
                                         <Text style={styles.modelCategory}>{categoryName}</Text>
                                         <Text style={styles.modelName} numberOfLines={2}>{model.name}</Text>
                                         <View style={styles.modelMeta}>
-                                            <Text style={styles.modelFormat}>{model.format || 'GLTF'}</Text>
+                                            <View style={styles.modelFormatBadge}>
+                                                <Ionicons name="cube-outline" size={10} color="#6b7280" />
+                                                <Text style={styles.modelFormat}>{model.format || 'GLTF'}</Text>
+                                            </View>
                                             <Text style={styles.modelPrice}>{formatPrice(model.price)}</Text>
                                         </View>
                                     </View>
@@ -317,25 +347,38 @@ function AuthenticatedHome({
                         })
                     ) : (
                         <View style={styles.emptyModels}>
-                            <Text style={styles.emptyEmoji}>✨</Text>
-                            <Text style={styles.emptyTitle}>Próximamente modelos destacados</Text>
-                            <Text style={styles.emptyText}>Explora nuestro catálogo completo</Text>
-                            <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/(tabs)/models')}>
-                                <Text style={styles.emptyButtonText}>Explorar catálogo</Text>
-                            </TouchableOpacity>
+                            <LinearGradient
+                                colors={['#f8fafc', '#f1f5f9']}
+                                style={styles.emptyModelsGradient}
+                            >
+                                <Ionicons name="sparkles" size={48} color="#c7d2fe" />
+                                <Text style={styles.emptyTitle}>Próximamente modelos destacados</Text>
+                                <Text style={styles.emptyText}>Explora nuestro catálogo completo</Text>
+                                <TouchableOpacity style={styles.emptyButton} onPress={() => router.push('/(tabs)/models')}>
+                                    <Text style={styles.emptyButtonText}>Explorar catálogo</Text>
+                                </TouchableOpacity>
+                            </LinearGradient>
                         </View>
                     )}
                 </ScrollView>
             </View>
 
             {/* Banner de licencias */}
-            <LinearGradient colors={['#1e293b', '#0f172a']} style={styles.promoBanner}>
+            <LinearGradient
+                colors={['#1e293b', '#0f172a']}
+                style={styles.promoBanner}
+            >
                 <View style={styles.promoContent}>
-                    <Text style={styles.promoTitle}>🚀 ¿Buscas algo específico?</Text>
-                    <Text style={styles.promoText}>Accede a todos los modelos con una licencia profesional</Text>
+                    <View style={styles.promoIcon}>
+                        <Ionicons name="rocket" size={28} color="#fbbf24" />
+                    </View>
+                    <View style={styles.promoTextContent}>
+                        <Text style={styles.promoTitle}>🚀 ¿Buscas algo específico?</Text>
+                        <Text style={styles.promoText}>Accede a todos los modelos con una licencia profesional</Text>
+                    </View>
                     <TouchableOpacity style={styles.promoButton} onPress={() => router.push('/(tabs)/licenses')}>
                         <Text style={styles.promoButtonText}>Ver licencias</Text>
-                        <Ionicons name="arrow-forward" size={14} color="#facc15" />
+                        <Ionicons name="arrow-forward" size={16} color="#fbbf24" />
                     </TouchableOpacity>
                 </View>
             </LinearGradient>
@@ -347,7 +390,7 @@ function AuthenticatedHome({
 function UnauthenticatedHome() {
     return (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-            <LinearGradient colors={['#0f172a', '#1e293b', '#334155']} style={styles.heroSection}>
+            <LinearGradient colors={['#4f46e5', '#7c3aed', '#c026d3']} style={styles.heroSection}>
                 <Text style={styles.heroBadge}>✨ Plataforma profesional</Text>
                 <Text style={styles.heroTitle}>
                     Modelos 3D para{' '}
@@ -360,7 +403,7 @@ function UnauthenticatedHome() {
                 
                 <View style={styles.heroButtons}>
                     <TouchableOpacity style={styles.heroPrimaryButton} onPress={() => router.push('/auth/register')}>
-                        <LinearGradient colors={['#facc15', '#eab308']} style={styles.heroPrimaryGradient}>
+                        <LinearGradient colors={['#fbbf24', '#f59e0b']} style={styles.heroPrimaryGradient}>
                             <Text style={styles.heroPrimaryText}>Comenzar gratis</Text>
                         </LinearGradient>
                     </TouchableOpacity>
@@ -372,13 +415,13 @@ function UnauthenticatedHome() {
 
             <View style={styles.featuresGrid}>
                 {[
-                    { title: '236+ modelos', desc: 'Arquitectura, mobiliario, vegetación y más', icon: 'cube-outline', color: '#3b82f6', bg: '#eff6ff' },
-                    { title: 'Descarga real', desc: 'Archivos GLB, GLTF, USDZ listos para usar', icon: 'cloud-download-outline', color: '#f97316', bg: '#fff7ed' },
-                    { title: 'Licencias flexibles', desc: 'Personal, empresarial e ilimitada', icon: 'document-text-outline', color: '#10b981', bg: '#f0fdf4' },
-                    { title: 'Calificaciones reales', desc: 'Reseñas verificadas de usuarios', icon: 'star-outline', color: '#eab308', bg: '#fefce8' }
+                    { title: '236+ modelos', desc: 'Arquitectura, mobiliario, vegetación y más', icon: 'cube-outline', color: '#4f46e5', bg: '#e0e7ff' },
+                    { title: 'Descarga real', desc: 'Archivos GLB, GLTF, USDZ listos para usar', icon: 'cloud-download-outline', color: '#ea580c', bg: '#fff7ed' },
+                    { title: 'Licencias flexibles', desc: 'Personal, empresarial e ilimitada', icon: 'document-text-outline', color: '#16a34a', bg: '#f0fdf4' },
+                    { title: 'Calificaciones reales', desc: 'Reseñas verificadas de usuarios', icon: 'star-outline', color: '#ca8a04', bg: '#fefce8' }
                 ].map((feature, i) => (
                     <View key={i} style={[styles.featureItem, { backgroundColor: feature.bg }]}>
-                        <View style={[styles.featureIcon, { backgroundColor: feature.color + '20' }]}>
+                        <View style={[styles.featureIcon, { backgroundColor: feature.color + '15' }]}>
                             <Ionicons name={feature.icon as any} size={28} color={feature.color} />
                         </View>
                         <Text style={styles.featureTitle}>{feature.title}</Text>
@@ -387,12 +430,12 @@ function UnauthenticatedHome() {
                 ))}
             </View>
 
-            <LinearGradient colors={['#facc15', '#eab308', '#f59e0b']} style={styles.ctaSection}>
+            <LinearGradient colors={['#fbbf24', '#f59e0b', '#ea580c']} style={styles.ctaSection}>
                 <Text style={styles.ctaTitle}>✨ ¿Listo para empezar?</Text>
                 <Text style={styles.ctaText}>Únete a más de 500 profesionales que ya usan ArchiMarket3D</Text>
                 <TouchableOpacity style={styles.ctaButton} onPress={() => router.push('/auth/register')}>
                     <Text style={styles.ctaButtonText}>Crear cuenta gratuita</Text>
-                    <Ionicons name="arrow-forward" size={16} color="#0f172a" />
+                    <Ionicons name="arrow-forward" size={16} color="#1e1b4b" />
                 </TouchableOpacity>
             </LinearGradient>
         </ScrollView>
@@ -402,117 +445,558 @@ function UnauthenticatedHome() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#f8fafc' },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f8fafc' },
-    loadingText: { fontSize: 16, color: '#2563eb' },
+    loadingText: { fontSize: 16, color: '#4f46e5', marginTop: 12 },
     
-    // Header premium
-    header: {
+    // 🔥 HEADER CON MÁS ESPACIO
+    headerGradient: {
+        paddingTop: 20,
+        paddingBottom: 28,
+        borderBottomLeftRadius: 28,
+        borderBottomRightRadius: 28,
+    },
+    headerContent: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         paddingHorizontal: 20,
-        paddingTop: 60,
-        paddingBottom: 20,
-        backgroundColor: '#fff',
     },
-    greetingSection: { flex: 1 },
-    greeting: { fontSize: 20, fontWeight: '700', color: '#1e293b', marginBottom: 8 },
-    userName: { color: '#2563eb' },
-    roleBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#eff6ff', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, alignSelf: 'flex-start', marginBottom: 12 },
-    roleText: { fontSize: 12, color: '#2563eb', fontWeight: '500' },
-    timeBox: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: '#f8fafc', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 30, alignSelf: 'flex-start' },
-    timeItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    timeText: { fontSize: 12, color: '#64748b' },
-    timeDivider: { width: 1, height: 16, backgroundColor: '#e2e8f0' },
+    welcomeSection: {
+        flex: 1,
+    },
+    greeting: {
+        fontSize: 14,
+        color: '#c7d2fe',
+        marginBottom: 4,
+    },
+    userName: {
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#fff',
+        marginBottom: 8,
+    },
+    roleBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 20,
+        alignSelf: 'flex-start',
+    },
+    roleText: {
+        fontSize: 12,
+        color: '#fbbf24',
+        fontWeight: '500',
+    },
+    dateTimeSection: {
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        borderRadius: 16,
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        alignItems: 'center',
+    },
+    dateTimeItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingVertical: 4,
+    },
+    dateTimeText: {
+        fontSize: 11,
+        color: '#c7d2fe',
+    },
+    dateTimeDivider: {
+        height: 1,
+        width: '100%',
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        marginVertical: 4,
+    },
     
-    // Banner principal
+    // Banner principal - CON MARGEN SUPERIOR
     mainBanner: {
         marginHorizontal: 16,
-        marginBottom: 24,
+        marginTop: 20,
+        marginBottom: 28,
         borderRadius: 24,
-        padding: 24,
         overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.1,
+        shadowRadius: 12,
+        elevation: 8,
     },
-    bannerContent: { marginBottom: 20 },
-    bannerTag: { alignSelf: 'flex-start', backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 30, marginBottom: 12 },
-    bannerTagText: { fontSize: 11, fontWeight: '600', color: '#fff' },
-    bannerTitle: { fontSize: 24, fontWeight: '700', color: '#fff', marginBottom: 8, lineHeight: 32 },
-    bannerHighlight: { color: '#3b82f6' },
-    bannerText: { fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 16, lineHeight: 18 },
-    bannerStats: { flexDirection: 'row', gap: 24 },
-    bannerStat: { alignItems: 'center' },
-    bannerStatNumber: { fontSize: 20, fontWeight: '700', color: '#fff' },
-    bannerStatLabel: { fontSize: 11, color: 'rgba(255,255,255,0.6)' },
-    bannerButton: { alignSelf: 'flex-start' },
-    bannerButtonGradient: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 20, paddingVertical: 12, borderRadius: 40 },
-    bannerButtonText: { color: '#fff', fontWeight: '600', fontSize: 14 },
+    bannerContent: {
+        padding: 24,
+    },
+    bannerTag: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 30,
+        alignSelf: 'flex-start',
+        marginBottom: 16,
+    },
+    bannerTagText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#fbbf24',
+    },
+    bannerTitle: {
+        fontSize: 28,
+        fontWeight: '700',
+        color: '#fff',
+        marginBottom: 12,
+        lineHeight: 36,
+    },
+    bannerHighlight: {
+        color: '#fbbf24',
+    },
+    bannerText: {
+        fontSize: 14,
+        color: 'rgba(255,255,255,0.7)',
+        marginBottom: 20,
+        lineHeight: 20,
+    },
+    bannerStats: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 16,
+        marginBottom: 24,
+    },
+    bannerStat: {
+        alignItems: 'center',
+    },
+    bannerStatNumber: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#fff',
+    },
+    bannerStatLabel: {
+        fontSize: 11,
+        color: 'rgba(255,255,255,0.6)',
+    },
+    bannerStatDivider: {
+        width: 1,
+        height: 30,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    bannerButton: {
+        alignSelf: 'flex-start',
+    },
+    bannerButtonGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 40,
+    },
+    bannerButtonText: {
+        color: '#1e1b4b',
+        fontWeight: '600',
+        fontSize: 14,
+    },
     
     // Secciones
-    section: { paddingHorizontal: 16, marginBottom: 32 },
-    sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-    sectionTitle: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-    sectionTitleText: { fontSize: 18, fontWeight: '600', color: '#1e293b' },
-    viewAllLink: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-    viewAllText: { fontSize: 13, color: '#2563eb', fontWeight: '500' },
+    section: {
+        paddingHorizontal: 16,
+        marginBottom: 32,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    sectionTitle: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    sectionIconBg: {
+        width: 32,
+        height: 32,
+        backgroundColor: '#e0e7ff',
+        borderRadius: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    sectionTitleText: {
+        fontSize: 18,
+        fontWeight: '600',
+        color: '#1e293b',
+    },
+    viewAllLink: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    viewAllText: {
+        fontSize: 13,
+        color: '#4f46e5',
+        fontWeight: '500',
+    },
     
     // Categorías
-    categoriesGrid: { gap: 12 },
-    categoryCard: { borderRadius: 20, overflow: 'hidden' },
-    categoryGradient: { padding: 20, alignItems: 'center' },
-    categoryEmoji: { fontSize: 40, marginBottom: 12 },
-    categoryName: { fontSize: 16, fontWeight: '600', color: '#fff', marginBottom: 4 },
-    categoryCount: { fontSize: 12, color: 'rgba(255,255,255,0.8)', marginBottom: 8 },
-    categoryTrend: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 30 },
-    categoryTrendText: { fontSize: 11, fontWeight: '600', color: '#fff' },
-    skeletonCategory: { height: 140, backgroundColor: '#f1f5f9', borderRadius: 20 },
+    categoriesGrid: {
+        gap: 12,
+    },
+    categoryCard: {
+        borderRadius: 20,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    categoryGradient: {
+        padding: 20,
+        alignItems: 'center',
+    },
+    categoryEmoji: {
+        fontSize: 44,
+        marginBottom: 12,
+    },
+    categoryName: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#fff',
+        marginBottom: 4,
+        textAlign: 'center',
+    },
+    categoryCount: {
+        fontSize: 12,
+        color: 'rgba(255,255,255,0.8)',
+        marginBottom: 10,
+    },
+    categoryTrend: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        borderRadius: 30,
+    },
+    categoryTrendText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    skeletonCategory: {
+        height: 140,
+        backgroundColor: '#f1f5f9',
+        borderRadius: 20,
+    },
     
     // Modelos destacados
-    modelsScroll: { marginHorizontal: -16, paddingHorizontal: 16 },
-    modelCard: { width: 150, marginRight: 12, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#f0f0f0' },
-    modelImage: { height: 120, backgroundColor: '#f8fafc', justifyContent: 'center', alignItems: 'center', position: 'relative' },
-    modelEmoji: { fontSize: 48 },
-    featuredBadge: { position: 'absolute', top: 8, left: 8, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#2563eb', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 20 },
-    featuredBadgeText: { fontSize: 9, fontWeight: '600', color: '#fff' },
-    modelInfo: { padding: 12 },
-    modelCategory: { fontSize: 10, color: '#2563eb', fontWeight: '600', textTransform: 'uppercase', marginBottom: 4 },
-    modelName: { fontSize: 13, fontWeight: '600', color: '#1e293b', marginBottom: 6, lineHeight: 16 },
-    modelMeta: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    modelFormat: { fontSize: 10, color: '#94a3b8' },
-    modelPrice: { fontSize: 13, fontWeight: '700', color: '#2563eb' },
-    emptyModels: { width: width - 32, alignItems: 'center', padding: 40, backgroundColor: '#f8fafc', borderRadius: 20 },
-    emptyEmoji: { fontSize: 48, marginBottom: 12 },
-    emptyTitle: { fontSize: 16, fontWeight: '600', color: '#1e293b', marginBottom: 4 },
-    emptyText: { fontSize: 13, color: '#64748b', marginBottom: 16 },
-    emptyButton: { backgroundColor: '#2563eb', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 40 },
-    emptyButtonText: { color: '#fff', fontWeight: '600', fontSize: 13 },
+    modelsScroll: {
+        marginHorizontal: -16,
+        paddingHorizontal: 16,
+    },
+    modelCard: {
+        width: 160,
+        marginRight: 14,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 8,
+        elevation: 3,
+    },
+    modelImage: {
+        height: 120,
+        justifyContent: 'center',
+        alignItems: 'center',
+        position: 'relative',
+    },
+    modelEmoji: {
+        fontSize: 48,
+    },
+    featuredBadge: {
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#4f46e5',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 20,
+    },
+    featuredBadgeText: {
+        fontSize: 9,
+        fontWeight: '600',
+        color: '#fff',
+    },
+    modelInfo: {
+        padding: 12,
+    },
+    modelCategory: {
+        fontSize: 10,
+        color: '#4f46e5',
+        fontWeight: '600',
+        textTransform: 'uppercase',
+        marginBottom: 4,
+    },
+    modelName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: '#1e293b',
+        marginBottom: 8,
+        lineHeight: 16,
+    },
+    modelMeta: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    modelFormatBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: '#f1f5f9',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    modelFormat: {
+        fontSize: 9,
+        color: '#6b7280',
+    },
+    modelPrice: {
+        fontSize: 14,
+        fontWeight: '700',
+        color: '#4f46e5',
+    },
+    emptyModels: {
+        width: width - 32,
+        alignItems: 'center',
+        overflow: 'hidden',
+        borderRadius: 20,
+    },
+    emptyModelsGradient: {
+        alignItems: 'center',
+        padding: 40,
+        width: '100%',
+    },
+    emptyTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#1e293b',
+        marginTop: 16,
+        marginBottom: 4,
+    },
+    emptyText: {
+        fontSize: 13,
+        color: '#64748b',
+        marginBottom: 20,
+    },
+    emptyButton: {
+        backgroundColor: '#4f46e5',
+        paddingHorizontal: 24,
+        paddingVertical: 10,
+        borderRadius: 40,
+    },
+    emptyButtonText: {
+        color: '#fff',
+        fontWeight: '600',
+        fontSize: 13,
+    },
     
     // Banner promocional
-    promoBanner: { marginHorizontal: 16, marginBottom: 32, borderRadius: 24, padding: 20 },
-    promoContent: { gap: 8 },
-    promoTitle: { fontSize: 16, fontWeight: '600', color: '#fff' },
-    promoText: { fontSize: 13, color: '#cbd5e1', lineHeight: 18 },
-    promoButton: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 8 },
-    promoButtonText: { fontSize: 13, fontWeight: '500', color: '#facc15' },
+    promoBanner: {
+        marginHorizontal: 16,
+        marginBottom: 32,
+        borderRadius: 24,
+        padding: 20,
+    },
+    promoContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 16,
+    },
+    promoIcon: {
+        width: 48,
+        height: 48,
+        backgroundColor: 'rgba(251, 191, 36, 0.15)',
+        borderRadius: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    promoTextContent: {
+        flex: 1,
+    },
+    promoTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#fff',
+        marginBottom: 4,
+    },
+    promoText: {
+        fontSize: 13,
+        color: '#cbd5e1',
+        lineHeight: 18,
+    },
+    promoButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        backgroundColor: 'rgba(251, 191, 36, 0.15)',
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        borderRadius: 40,
+    },
+    promoButtonText: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#fbbf24',
+    },
     
     // Hero invitados
-    heroSection: { paddingTop: 80, paddingBottom: 60, paddingHorizontal: 24, borderBottomLeftRadius: 40, borderBottomRightRadius: 40 },
-    heroBadge: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 40, fontSize: 12, color: '#facc15', fontWeight: '500', alignSelf: 'center', marginBottom: 24 },
-    heroTitle: { fontSize: 36, fontWeight: '700', color: 'white', textAlign: 'center', lineHeight: 48, marginBottom: 16 },
-    heroTitleAccent: { color: '#facc15' },
-    heroDescription: { fontSize: 15, color: '#cbd5e1', textAlign: 'center', lineHeight: 24, marginBottom: 32, paddingHorizontal: 20 },
-    heroButtons: { flexDirection: 'row', gap: 12, justifyContent: 'center' },
-    heroPrimaryButton: { borderRadius: 40, overflow: 'hidden' },
-    heroPrimaryGradient: { paddingVertical: 12, paddingHorizontal: 28 },
-    heroPrimaryText: { color: '#0f172a', fontWeight: '600', fontSize: 14 },
-    heroSecondaryButton: { paddingVertical: 12, paddingHorizontal: 28, borderRadius: 40, borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)' },
-    heroSecondaryText: { color: 'white', fontWeight: '500', fontSize: 14 },
-    featuresGrid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 24, gap: 16, marginVertical: 48 },
-    featureItem: { width: (width - 64) / 2, borderRadius: 24, padding: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-    featureIcon: { width: 56, height: 56, borderRadius: 28, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
-    featureTitle: { fontSize: 16, fontWeight: '600', color: '#0f172a', marginBottom: 4 },
-    featureDesc: { fontSize: 12, color: '#64748b', lineHeight: 18 },
-    ctaSection: { margin: 24, marginBottom: 40, borderRadius: 32, padding: 32, alignItems: 'center' },
-    ctaTitle: { fontSize: 24, fontWeight: '700', color: '#0f172a', marginBottom: 8 },
-    ctaText: { fontSize: 14, color: '#422006', textAlign: 'center', marginBottom: 24 },
-    ctaButton: { flexDirection: 'row', backgroundColor: '#0f172a', paddingVertical: 14, paddingHorizontal: 28, borderRadius: 40, alignItems: 'center', gap: 8 },
-    ctaButtonText: { color: '#facc15', fontWeight: '600', fontSize: 14 },
+    heroSection: {
+        paddingTop: 80,
+        paddingBottom: 60,
+        paddingHorizontal: 24,
+        borderBottomLeftRadius: 40,
+        borderBottomRightRadius: 40,
+    },
+    heroBadge: {
+        backgroundColor: 'rgba(255,255,255,0.2)',
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 40,
+        fontSize: 12,
+        color: '#fbbf24',
+        fontWeight: '500',
+        alignSelf: 'center',
+        marginBottom: 24,
+    },
+    heroTitle: {
+        fontSize: 36,
+        fontWeight: '700',
+        color: 'white',
+        textAlign: 'center',
+        lineHeight: 48,
+        marginBottom: 16,
+    },
+    heroTitleAccent: {
+        color: '#fbbf24',
+    },
+    heroDescription: {
+        fontSize: 15,
+        color: '#c7d2fe',
+        textAlign: 'center',
+        lineHeight: 24,
+        marginBottom: 32,
+        paddingHorizontal: 20,
+    },
+    heroButtons: {
+        flexDirection: 'row',
+        gap: 12,
+        justifyContent: 'center',
+    },
+    heroPrimaryButton: {
+        borderRadius: 40,
+        overflow: 'hidden',
+    },
+    heroPrimaryGradient: {
+        paddingVertical: 12,
+        paddingHorizontal: 28,
+    },
+    heroPrimaryText: {
+        color: '#1e1b4b',
+        fontWeight: '600',
+        fontSize: 14,
+    },
+    heroSecondaryButton: {
+        paddingVertical: 12,
+        paddingHorizontal: 28,
+        borderRadius: 40,
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.3)',
+    },
+    heroSecondaryText: {
+        color: 'white',
+        fontWeight: '500',
+        fontSize: 14,
+    },
+    featuresGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        paddingHorizontal: 24,
+        gap: 16,
+        marginVertical: 48,
+    },
+    featureItem: {
+        width: (width - 64) / 2,
+        borderRadius: 24,
+        padding: 20,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 4,
+        elevation: 2,
+    },
+    featureIcon: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: 16,
+    },
+    featureTitle: {
+        fontSize: 16,
+        fontWeight: '600',
+        color: '#0f172a',
+        marginBottom: 4,
+    },
+    featureDesc: {
+        fontSize: 12,
+        color: '#64748b',
+        lineHeight: 18,
+    },
+    ctaSection: {
+        margin: 24,
+        marginBottom: 40,
+        borderRadius: 32,
+        padding: 32,
+        alignItems: 'center',
+    },
+    ctaTitle: {
+        fontSize: 24,
+        fontWeight: '700',
+        color: '#1e1b4b',
+        marginBottom: 8,
+    },
+    ctaText: {
+        fontSize: 14,
+        color: '#422006',
+        textAlign: 'center',
+        marginBottom: 24,
+    },
+    ctaButton: {
+        flexDirection: 'row',
+        backgroundColor: '#1e1b4b',
+        paddingVertical: 14,
+        paddingHorizontal: 28,
+        borderRadius: 40,
+        alignItems: 'center',
+        gap: 8,
+    },
+    ctaButtonText: {
+        color: '#fbbf24',
+        fontWeight: '600',
+        fontSize: 14,
+    },
 });

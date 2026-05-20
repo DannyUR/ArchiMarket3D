@@ -3,9 +3,16 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { router } from 'expo-router';
 import * as Linking from 'expo-linking';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 import api from '../api/client';
 import { useAuth } from './AuthContext';
+
+// 🔥 CONFIGURACIÓN - CAMBIA ESTA IP POR LA TUYA
+// Ejecuta 'ipconfig' en Windows y busca "IPv4"
+const LOCAL_IP = '192.168.1.20'; // ← CAMBIA A TU IP REAL
+const BACKEND_PORT = '8000';
+const APP_SCHEME = 'archimarket3d';
+const EXPO_WEB_PORT = '8083'; // Puerto de la app Expo en web
 
 export interface Model {
     id: number;
@@ -56,8 +63,23 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [cartLoaded, setCartLoaded] = useState(false);
     const { isAuthenticated } = useAuth();
 
+    // Detectar plataforma
+    const isMobileApp = Platform.OS !== 'web'; // iOS o Android real
+    const isExpoWeb = Platform.OS === 'web'; // Expo en navegador (puerto 8083)
+    
+    // URLs según plataforma
+    const BACKEND_URL = `http://${LOCAL_IP}:${BACKEND_PORT}`;
+    const EXPO_WEB_URL = `http://${LOCAL_IP}:${EXPO_WEB_PORT}`;
+
     useEffect(() => {
         loadCart();
+        console.log('📱 ========== CART PROVIDER INICIALIZADO ==========');
+        console.log('📱 Plataforma:', Platform.OS);
+        console.log('📱 isMobileApp:', isMobileApp);
+        console.log('📱 isExpoWeb:', isExpoWeb);
+        console.log('🌐 Backend URL:', BACKEND_URL);
+        console.log('🌐 Expo Web URL:', EXPO_WEB_URL);
+        console.log('==================================================');
     }, []);
 
     useEffect(() => {
@@ -72,6 +94,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 setCartItems(parsed);
+                console.log('📦 Carrito cargado:', parsed.length, 'items');
             }
         } catch (error) {
             console.error('Error loading cart:', error);
@@ -170,6 +193,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
             setLoading(true);
             setError(null);
 
+            console.log('🛒 ========== INICIANDO CHECKOUT ==========');
+            console.log('📦 Items en carrito:', cartItems.length);
+            console.log('📱 Plataforma:', Platform.OS);
+            console.log('📱 isMobileApp:', isMobileApp);
+            console.log('📱 isExpoWeb:', isExpoWeb);
+
             if (!isAuthenticated) {
                 Alert.alert(
                     'Iniciar sesión requerido',
@@ -192,22 +221,59 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 license_type: item.license
             }));
 
-            const response = await api.post('/shopping/create-paypal-order', { items });
+            // 🔥 DETERMINAR return_url SEGÚN LA PLATAFORMA
+            let returnUrl;
+            let cancelUrl = `${APP_SCHEME}://checkout`;
+
+            if (isMobileApp) {
+                // App móvil REAL - PayPal redirige a deep link directamente
+                returnUrl = `${APP_SCHEME}://purchases/success`;
+                console.log('📱 Usando deep link para app móvil:', returnUrl);
+            } else {
+                // Web (Expo) - PayPal redirige al backend, luego backend redirige a web
+                returnUrl = `${BACKEND_URL}/api/shopping/execute-paypal-payment`;
+                cancelUrl = `${EXPO_WEB_URL}/checkout`;
+                console.log('🌐 Usando callback para web:', returnUrl);
+            }
+
+            console.log('📤 Enviando a PayPal:', { items });
+            console.log('🔗 Return URL:', returnUrl);
+            console.log('❌ Cancel URL:', cancelUrl);
+
+            // Crear orden en PayPal
+            const response = await api.post('/shopping/create-paypal-order', { 
+                items,
+                return_url: returnUrl,
+                cancel_url: cancelUrl
+            });
+
+            console.log('📥 Respuesta PayPal:', response.data);
 
             if (response.data.success && response.data.approval_url) {
+                console.log('🔗 Abriendo PayPal:', response.data.approval_url);
+                
                 const canOpen = await Linking.canOpenURL(response.data.approval_url);
                 
                 if (canOpen) {
                     await Linking.openURL(response.data.approval_url);
                 } else {
-                    Alert.alert('Error', 'No se pudo abrir PayPal');
+                    Alert.alert('Error', 'No se pudo abrir PayPal. Asegúrate de tener la app de PayPal instalada o usa el navegador.');
                 }
             } else {
                 throw new Error(response.data.message || 'Error al crear la orden');
             }
         } catch (error: any) {
-            console.error('Checkout error:', error);
-            const message = error.response?.data?.message || error.message || 'Error al procesar el pago';
+            console.error('❌ Checkout error:', error);
+            
+            let message = 'Error al procesar el pago';
+            if (error.response?.data?.message) {
+                message = error.response.data.message;
+            } else if (error.response?.data?.error) {
+                message = error.response.data.error;
+            } else if (error.message) {
+                message = error.message;
+            }
+            
             setError(message);
             Alert.alert('Error', message);
         } finally {

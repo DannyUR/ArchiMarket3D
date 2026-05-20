@@ -6,14 +6,14 @@ import {
 import { useLocalSearchParams, router } from 'expo-router';
 import { useState, useEffect } from 'react';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import apiClient from '../../api/client';
-import { useCart } from '../../context/CartContext'; // ✅ Cambiado
-import { useAuth } from '../../context/AuthContext'; // ✅ Cambiado
+import { useCart } from '../../context/CartContext';
+import { useAuth } from '../../context/AuthContext';
 
 // Importar WebView condicionalmente
 let WebView: any = null;
 if (Platform.OS !== 'web') {
-  // Solo importar en móvil
   const { WebView: NativeWebView } = require('react-native-webview');
   WebView = NativeWebView;
 }
@@ -70,8 +70,11 @@ const ModelViewer = ({ embedUrl, previewUrl }: { embedUrl: string | undefined; p
 
   if (!embedUrl) {
     return (
-      <View style={styles.placeholderViewer}>
-        <Ionicons name="cube-outline" size={80} color="#cbd5e1" />
+      <LinearGradient
+        colors={['#1e293b', '#0f172a']}
+        style={styles.placeholderViewer}
+      >
+        <Ionicons name="cube-outline" size={80} color="#475569" />
         <Text style={styles.placeholderText}>Vista previa no disponible</Text>
         {previewUrl && (
           <Image 
@@ -80,16 +83,18 @@ const ModelViewer = ({ embedUrl, previewUrl }: { embedUrl: string | undefined; p
             resizeMode="contain"
           />
         )}
-      </View>
+      </LinearGradient>
     );
   }
 
-  // WEB: usar iframe normal
   if (Platform.OS === 'web') {
     if (iframeError) {
       return (
-        <View style={styles.placeholderViewer}>
-          <Ionicons name="cube-outline" size={80} color="#cbd5e1" />
+        <LinearGradient
+          colors={['#1e293b', '#0f172a']}
+          style={styles.placeholderViewer}
+        >
+          <Ionicons name="cube-outline" size={80} color="#475569" />
           <Text style={styles.placeholderText}>No se pudo cargar el visor 3D</Text>
           {previewUrl && (
             <Image 
@@ -98,7 +103,7 @@ const ModelViewer = ({ embedUrl, previewUrl }: { embedUrl: string | undefined; p
               resizeMode="contain"
             />
           )}
-        </View>
+        </LinearGradient>
       );
     }
 
@@ -110,7 +115,7 @@ const ModelViewer = ({ embedUrl, previewUrl }: { embedUrl: string | undefined; p
           width: '100%',
           height: '100%',
           border: 'none',
-          backgroundColor: '#1e293b'
+          backgroundColor: '#0f172a'
         }}
         allow="autoplay; fullscreen; xr-spatial-tracking"
         onError={() => setIframeError(true)}
@@ -118,13 +123,15 @@ const ModelViewer = ({ embedUrl, previewUrl }: { embedUrl: string | undefined; p
     );
   }
 
-  // MÓVIL: usar WebView nativo
   if (!WebView) {
     return (
-      <View style={styles.placeholderViewer}>
-        <Ionicons name="cube-outline" size={80} color="#cbd5e1" />
+      <LinearGradient
+        colors={['#1e293b', '#0f172a']}
+        style={styles.placeholderViewer}
+      >
+        <ActivityIndicator size="large" color="#4f46e5" />
         <Text style={styles.placeholderText}>Cargando visor...</Text>
-      </View>
+      </LinearGradient>
     );
   }
 
@@ -135,8 +142,6 @@ const ModelViewer = ({ embedUrl, previewUrl }: { embedUrl: string | undefined; p
       javaScriptEnabled={true}
       domStorageEnabled={true}
       allowsFullscreenVideo={true}
-      onError={() => console.log('❌ WebView error')}
-      onLoad={() => console.log('✅ WebView cargado')}
     />
   );
 };
@@ -175,7 +180,6 @@ export default function ModelDetailScreen() {
         setStats(apiData.data.stats);
         setAccess(apiData.data.access);
         console.log('✅ Modelo:', apiData.data.model.name);
-        console.log('🔗 embed_url:', apiData.data.model.embed_url);
       } else {
         console.error('❌ Estructura de respuesta inesperada');
       }
@@ -198,6 +202,14 @@ export default function ModelDetailScreen() {
     fetchModel();
   };
 
+  const handleGoBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.push('/(tabs)/models');
+    }
+  };
+
   const handleAddToCart = () => {
     if (!user) {
       Alert.alert('Inicia sesión', 'Debes iniciar sesión para agregar al carrito', [
@@ -212,9 +224,6 @@ export default function ModelDetailScreen() {
   const confirmAddToCart = () => {
     if (!model) return;
     
-    const finalPrice = model.price * multipliers[selectedLicense];
-    
-    // ✅ Usar el método addToCart del CartContext
     addToCart(
       { 
         id: model.id, 
@@ -243,7 +252,6 @@ export default function ModelDetailScreen() {
     }
     if (!model) return;
     
-    const finalPrice = model.price * multipliers[selectedLicense];
     addToCart(
       { 
         id: model.id, 
@@ -299,7 +307,7 @@ export default function ModelDetailScreen() {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color="#4f46e5" />
         <Text style={styles.loadingText}>Cargando modelo...</Text>
       </View>
     );
@@ -308,9 +316,9 @@ export default function ModelDetailScreen() {
   if (!model) {
     return (
       <View style={styles.centered}>
-        <Ionicons name="cube-outline" size={64} color="#d1d5db" />
+        <Ionicons name="cube-outline" size={64} color="#cbd5e1" />
         <Text style={styles.errorText}>Modelo no encontrado</Text>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <TouchableOpacity onPress={handleGoBack} style={styles.backButton}>
           <Text style={styles.backButtonText}>Volver</Text>
         </TouchableOpacity>
       </View>
@@ -323,246 +331,350 @@ export default function ModelDetailScreen() {
   const reviewerStatus = getReviewerStatus();
 
   return (
-    <ScrollView
-      style={styles.container}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-      showsVerticalScrollIndicator={false}
-    >
-      {/* ========== VISOR 3D ========== */}
-      <View style={styles.viewerContainer}>
-        <ModelViewer embedUrl={model.embed_url} previewUrl={model.preview_url} />
-      </View>
+    <View style={styles.container}>
+      {/* ========== HEADER PERSONALIZADO ========== */}
+      <LinearGradient
+        colors={['#4f46e5', '#7c3aed']}
+        style={styles.customHeader}
+      >
+        <View style={styles.headerContent}>
+          <TouchableOpacity 
+            style={styles.backButtonHeader} 
+            onPress={handleGoBack}
+          >
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {model.name}
+          </Text>
+          <View style={styles.headerPlaceholder} />
+        </View>
+      </LinearGradient>
 
-      {/* ========== INFORMACIÓN ========== */}
-      <View style={styles.infoContainer}>
-        <Text style={styles.title}>{model.name}</Text>
+      {/* 🔥 SEPARADOR ENTRE HEADER Y VISOR */}
+      <View style={styles.headerSpacer} />
 
-        {/* Autor */}
-        {author && (
-          <View style={styles.authorCard}>
-            {author.avatar ? (
-              <Image source={{ uri: author.avatar }} style={styles.authorAvatar} />
-            ) : (
-              <View style={styles.authorAvatarPlaceholder}>
-                <Text style={styles.authorAvatarText}>{author.name.charAt(0)}</Text>
+      <ScrollView
+        style={styles.scrollView}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#4f46e5" />}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* ========== VISOR 3D ========== */}
+        <View style={styles.viewerContainer}>
+          <ModelViewer embedUrl={model.embed_url} previewUrl={model.preview_url} />
+        </View>
+
+        {/* ========== INFORMACIÓN ========== */}
+        <View style={styles.infoContainer}>
+          {/* Precio flotante */}
+          <LinearGradient
+            colors={['#4f46e5', '#7c3aed']}
+            style={styles.floatingPrice}
+          >
+            <Text style={styles.floatingPriceText}>
+              ${(basePrice * multipliers[selectedLicense]).toFixed(2)}
+            </Text>
+          </LinearGradient>
+
+          {/* Título */}
+          <Text style={styles.title}>{model.name}</Text>
+
+          {/* Autor */}
+          {author && (
+            <View style={styles.authorCard}>
+              {author.avatar ? (
+                <Image source={{ uri: author.avatar }} style={styles.authorAvatar} />
+              ) : (
+                <LinearGradient
+                  colors={['#4f46e5', '#7c3aed']}
+                  style={styles.authorAvatarPlaceholder}
+                >
+                  <Text style={styles.authorAvatarText}>{author.name.charAt(0)}</Text>
+                </LinearGradient>
+              )}
+              <View style={styles.authorInfo}>
+                <Text style={styles.authorName}>{author.name}</Text>
+                <Text style={styles.authorBio}>{author.bio || 'Creador profesional de modelos 3D'}</Text>
+              </View>
+            </View>
+          )}
+
+          {/* Badges */}
+          <View style={styles.badgesContainer}>
+            {model.category && (
+              <LinearGradient
+                colors={['#e0e7ff', '#c7d2fe']}
+                style={styles.categoryBadge}
+              >
+                <Ionicons name="folder-outline" size={12} color="#4f46e5" />
+                <Text style={styles.categoryText}>{model.category.name}</Text>
+              </LinearGradient>
+            )}
+            {model.featured && (
+              <LinearGradient
+                colors={['#fef3c7', '#fde68a']}
+                style={styles.featuredBadge}
+              >
+                <Ionicons name="star" size={12} color="#d97706" />
+                <Text style={styles.featuredText}>Destacado</Text>
+              </LinearGradient>
+            )}
+          </View>
+
+          {/* Métricas */}
+          <View style={styles.metrics}>
+            <View style={styles.metricItem}>
+              <Ionicons name="cube-outline" size={16} color="#4f46e5" />
+              <Text style={styles.metricText}>{model.format || 'GLTF'}</Text>
+            </View>
+            <View style={styles.metricItem}>
+              <Ionicons name="download-outline" size={16} color="#4f46e5" />
+              <Text style={styles.metricText}>{model.size_mb || 0} MB</Text>
+            </View>
+            <View style={styles.metricItem}>
+              <Ionicons name="calendar-outline" size={16} color="#4f46e5" />
+              <Text style={styles.metricText}>
+                {model.publication_date ? new Date(model.publication_date).toLocaleDateString() : 'N/A'}
+              </Text>
+            </View>
+          </View>
+
+          {/* Rating */}
+          <View style={styles.ratingContainer}>
+            <View style={styles.ratingScoreContainer}>
+              <Text style={styles.ratingScore}>{avgRating.toFixed(1)}</Text>
+              <Text style={styles.ratingMax}>/5</Text>
+            </View>
+            <View style={styles.ratingDetails}>
+              <View style={styles.ratingStars}>
+                {[1, 2, 3, 4, 5].map(i => (
+                  <Ionicons
+                    key={i}
+                    name={i <= avgRating ? 'star' : 'star-outline'}
+                    size={18}
+                    color={i <= avgRating ? '#fbbf24' : '#cbd5e1'}
+                  />
+                ))}
+              </View>
+              <Text style={styles.ratingCount}>{totalReviews} reseñas</Text>
+            </View>
+          </View>
+
+          {/* Selector de licencias */}
+          <Text style={styles.licenseTitle}>Selecciona tu licencia</Text>
+          <View style={styles.licenseSelector}>
+            {(['personal', 'business', 'unlimited'] as const).map(license => (
+              <TouchableOpacity
+                key={license}
+                style={[
+                  styles.licenseOption,
+                  selectedLicense === license && styles.licenseSelected
+                ]}
+                onPress={() => setSelectedLicense(license)}
+              >
+                {selectedLicense === license && (
+                  <View style={styles.licenseCheck}>
+                    <Ionicons name="checkmark" size={12} color="#fff" />
+                  </View>
+                )}
+                <Text style={styles.licenseIcon}>
+                  {license === 'personal' ? '👤' : license === 'business' ? '🏢' : '🌍'}
+                </Text>
+                <Text style={[
+                  styles.licenseName,
+                  selectedLicense === license && styles.licenseNameSelected
+                ]}>
+                  {license === 'personal' ? 'Personal' : license === 'business' ? 'Empresarial' : 'Ilimitada'}
+                </Text>
+                <Text style={styles.licensePrice}>
+                  ${(basePrice * multipliers[license]).toFixed(2)}
+                </Text>
+                <Text style={styles.licenseMultiplier}>{multipliers[license]}x</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Botones de acción */}
+          <View style={styles.actionButtons}>
+            <TouchableOpacity style={styles.buyButton} onPress={handleBuyNow}>
+              <LinearGradient
+                colors={['#4f46e5', '#7c3aed']}
+                style={styles.buyButtonGradient}
+              >
+                <Ionicons name="cart-outline" size={20} color="white" />
+                <Text style={styles.buyButtonText}>Comprar ahora</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.cartButton} onPress={handleAddToCart}>
+              <Ionicons name="add-circle-outline" size={20} color="#4f46e5" />
+              <Text style={styles.cartButtonText}>Agregar al carrito</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* ========== TABS ========== */}
+          <View style={styles.tabs}>
+            {(['description', 'features', 'reviews'] as const).map(tab => (
+              <TouchableOpacity
+                key={tab}
+                style={[styles.tab, activeTab === tab && styles.tabActive]}
+                onPress={() => setActiveTab(tab)}
+              >
+                <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                  {tab === 'description' ? 'Descripción' : tab === 'features' ? 'Características' : `Reseñas (${totalReviews})`}
+                </Text>
+                {activeTab === tab && <View style={styles.tabIndicator} />}
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* ========== TAB CONTENT ========== */}
+          <View style={styles.tabContent}>
+            {/* DESCRIPCIÓN */}
+            {activeTab === 'description' && (
+              <Text style={styles.descriptionText}>
+                {model.description || 'No hay descripción disponible para este modelo.'}
+              </Text>
+            )}
+
+            {/* CARACTERÍSTICAS */}
+            {activeTab === 'features' && (
+              <View style={styles.featuresGrid}>
+                <View style={styles.featureItem}>
+                  <LinearGradient colors={['#e0e7ff', '#c7d2fe']} style={styles.featureIcon}>
+                    <Ionicons name="cube-outline" size={22} color="#4f46e5" />
+                  </LinearGradient>
+                  <View style={styles.featureInfo}>
+                    <Text style={styles.featureLabel}>Formato</Text>
+                    <Text style={styles.featureValue}>{model.format || 'GLTF'}</Text>
+                  </View>
+                </View>
+                <View style={styles.featureItem}>
+                  <LinearGradient colors={['#e0e7ff', '#c7d2fe']} style={styles.featureIcon}>
+                    <Ionicons name="download-outline" size={22} color="#4f46e5" />
+                  </LinearGradient>
+                  <View style={styles.featureInfo}>
+                    <Text style={styles.featureLabel}>Tamaño</Text>
+                    <Text style={styles.featureValue}>{model.size_mb || 0} MB</Text>
+                  </View>
+                </View>
+                <View style={styles.featureItem}>
+                  <LinearGradient colors={['#e0e7ff', '#c7d2fe']} style={styles.featureIcon}>
+                    <Ionicons name="calendar-outline" size={22} color="#4f46e5" />
+                  </LinearGradient>
+                  <View style={styles.featureInfo}>
+                    <Text style={styles.featureLabel}>Publicado</Text>
+                    <Text style={styles.featureValue}>
+                      {model.publication_date ? new Date(model.publication_date).toLocaleDateString() : 'N/A'}
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.featureItem}>
+                  <LinearGradient colors={['#e0e7ff', '#c7d2fe']} style={styles.featureIcon}>
+                    <Ionicons name="pricetag-outline" size={22} color="#4f46e5" />
+                  </LinearGradient>
+                  <View style={styles.featureInfo}>
+                    <Text style={styles.featureLabel}>Categoría</Text>
+                    <Text style={styles.featureValue}>{model.category?.name || 'Sin categoría'}</Text>
+                  </View>
+                </View>
               </View>
             )}
-            <View style={styles.authorInfo}>
-              <Text style={styles.authorName}>{author.name}</Text>
-              <Text style={styles.authorBio}>{author.bio || 'Creador profesional'}</Text>
-            </View>
-          </View>
-        )}
 
-        {/* Categoría */}
-        {model.category && (
-          <View style={styles.categoryContainer}>
-            <Text style={styles.categoryText}>{model.category.name}</Text>
-          </View>
-        )}
+            {/* RESEÑAS */}
+            {activeTab === 'reviews' && (
+              <View>
+                <TouchableOpacity
+                  style={[styles.reviewButton, !reviewerStatus.canWrite && styles.reviewButtonDisabled]}
+                  onPress={reviewerStatus.onClick}
+                >
+                  <Ionicons name="chatbubble-outline" size={18} color="white" />
+                  <Text style={styles.reviewButtonText}>{reviewerStatus.buttonText}</Text>
+                </TouchableOpacity>
 
-        {/* Métricas */}
-        <View style={styles.metrics}>
-          <View style={styles.metricItem}>
-            <Ionicons name="cube-outline" size={16} color="#64748b" />
-            <Text style={styles.metricText}>{model.format || 'GLTF'}</Text>
-          </View>
-          <View style={styles.metricItem}>
-            <Ionicons name="download-outline" size={16} color="#64748b" />
-            <Text style={styles.metricText}>{model.size_mb || 0} MB</Text>
-          </View>
-          <View style={styles.metricItem}>
-            <Ionicons name="calendar-outline" size={16} color="#64748b" />
-            <Text style={styles.metricText}>
-              {model.publication_date ? new Date(model.publication_date).toLocaleDateString() : 'N/A'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Rating */}
-        <View style={styles.ratingContainer}>
-          <Text style={styles.ratingScore}>{avgRating.toFixed(1)}</Text>
-          <View>
-            <View style={styles.ratingStars}>
-              {[1, 2, 3, 4, 5].map(i => (
-                <Ionicons
-                  key={i}
-                  name={i <= avgRating ? 'star' : 'star-outline'}
-                  size={20}
-                  color={i <= avgRating ? '#fbbf24' : '#d1d5db'}
-                />
-              ))}
-            </View>
-            <Text style={styles.ratingCount}>{totalReviews} reseñas</Text>
-          </View>
-        </View>
-
-        {/* Precio y licencias */}
-        <View style={styles.priceCard}>
-          <View style={styles.priceHeader}>
-            <Text style={styles.priceLabel}>Precio base</Text>
-            <Text style={styles.priceLabel}>Licencia seleccionada</Text>
-          </View>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceAmount}>${basePrice.toFixed(2)} MXN</Text>
-            <Text style={[styles.priceAmount, { color: '#2563eb' }]}>
-              ${(basePrice * multipliers[selectedLicense]).toFixed(2)} MXN
-            </Text>
-          </View>
-          <Text style={styles.priceNote}>El precio varía según la licencia seleccionada</Text>
-        </View>
-
-        {/* Selector de licencias */}
-        <View style={styles.licenseSelector}>
-          {(['personal', 'business', 'unlimited'] as const).map(license => (
-            <TouchableOpacity
-              key={license}
-              style={[styles.licenseOption, selectedLicense === license && styles.licenseSelected]}
-              onPress={() => setSelectedLicense(license)}
-            >
-              <Text style={styles.licenseName}>
-                {license === 'personal' ? 'Personal' : license === 'business' ? 'Empresarial' : 'Ilimitada'}
-              </Text>
-              <Text style={styles.licensePrice}>${(basePrice * multipliers[license]).toFixed(2)} MXN</Text>
-              <Text style={styles.licenseMultiplier}>{multipliers[license]}x del precio base</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Botones de acción */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.buyButton} onPress={handleBuyNow}>
-            <Ionicons name="cart-outline" size={20} color="white" />
-            <Text style={styles.buyButtonText}>Comprar ahora</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.cartButton} onPress={handleAddToCart}>
-            <Text style={styles.cartButtonText}>Agregar al carrito</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* ========== TABS ========== */}
-        <View style={styles.tabs}>
-          {(['description', 'features', 'reviews'] as const).map(tab => (
-            <TouchableOpacity
-              key={tab}
-              style={[styles.tab, activeTab === tab && styles.tabActive]}
-              onPress={() => setActiveTab(tab)}
-            >
-              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
-                {tab === 'description' ? 'Descripción' : tab === 'features' ? 'Características' : `Reseñas (${totalReviews})`}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* ========== TAB CONTENT ========== */}
-        <View style={styles.tabContent}>
-          {/* DESCRIPCIÓN */}
-          {activeTab === 'description' && (
-            <Text style={styles.descriptionText}>
-              {model.description || 'No hay descripción disponible para este modelo.'}
-            </Text>
-          )}
-
-          {/* CARACTERÍSTICAS */}
-          {activeTab === 'features' && (
-            <View style={styles.featuresGrid}>
-              <View style={styles.featureItem}>
-                <Ionicons name="cube-outline" size={24} color="#2563eb" />
-                <View>
-                  <Text style={styles.featureLabel}>Formato</Text>
-                  <Text style={styles.featureValue}>{model.format || 'GLTF'}</Text>
-                </View>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="download-outline" size={24} color="#2563eb" />
-                <View>
-                  <Text style={styles.featureLabel}>Tamaño</Text>
-                  <Text style={styles.featureValue}>{model.size_mb || 0} MB</Text>
-                </View>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="calendar-outline" size={24} color="#2563eb" />
-                <View>
-                  <Text style={styles.featureLabel}>Publicado</Text>
-                  <Text style={styles.featureValue}>
-                    {model.publication_date ? new Date(model.publication_date).toLocaleDateString() : 'N/A'}
-                  </Text>
-                </View>
-              </View>
-              <View style={styles.featureItem}>
-                <Ionicons name="pricetag-outline" size={24} color="#2563eb" />
-                <View>
-                  <Text style={styles.featureLabel}>Categoría</Text>
-                  <Text style={styles.featureValue}>{model.category?.name || 'Sin categoría'}</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
-          {/* RESEÑAS */}
-          {activeTab === 'reviews' && (
-            <View>
-              <TouchableOpacity
-                style={[styles.reviewButton, { backgroundColor: reviewerStatus.canWrite ? '#2563eb' : '#64748b' }]}
-                onPress={reviewerStatus.onClick}
-              >
-                <Ionicons name="chatbubble-outline" size={18} color="white" />
-                <Text style={styles.reviewButtonText}>{reviewerStatus.buttonText}</Text>
-              </TouchableOpacity>
-
-              {showReviewForm && (
-                <View style={styles.reviewForm}>
-                  <Text style={styles.reviewFormTitle}>Escribe tu reseña</Text>
-                  <View style={styles.ratingSelector}>
-                    {[1, 2, 3, 4, 5].map(star => (
-                      <TouchableOpacity key={star} onPress={() => setNewReview({ ...newReview, rating: star })}>
-                        <Ionicons name={star <= newReview.rating ? 'star' : 'star-outline'} size={32} color="#fbbf24" />
+                {showReviewForm && (
+                  <View style={styles.reviewForm}>
+                    <Text style={styles.reviewFormTitle}>Escribe tu reseña</Text>
+                    <View style={styles.ratingSelector}>
+                      {[1, 2, 3, 4, 5].map(star => (
+                        <TouchableOpacity key={star} onPress={() => setNewReview({ ...newReview, rating: star })}>
+                          <Ionicons 
+                            name={star <= newReview.rating ? 'star' : 'star-outline'} 
+                            size={32} 
+                            color="#fbbf24" 
+                          />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <TextInput
+                      style={styles.reviewInput}
+                      placeholder="Comparte tu experiencia..."
+                      placeholderTextColor="#94a3b8"
+                      multiline
+                      numberOfLines={4}
+                      value={newReview.comment}
+                      onChangeText={text => setNewReview({ ...newReview, comment: text })}
+                    />
+                    <View style={styles.reviewFormButtons}>
+                      <TouchableOpacity 
+                        style={styles.submitReviewButton} 
+                        onPress={handleSubmitReview} 
+                        disabled={submittingReview}
+                      >
+                        <LinearGradient
+                          colors={['#4f46e5', '#7c3aed']}
+                          style={styles.submitButtonGradient}
+                        >
+                          <Text style={styles.submitReviewText}>
+                            {submittingReview ? 'Enviando...' : 'Enviar reseña'}
+                          </Text>
+                        </LinearGradient>
                       </TouchableOpacity>
-                    ))}
+                      <TouchableOpacity 
+                        style={styles.cancelReviewButton} 
+                        onPress={() => setShowReviewForm(false)}
+                      >
+                        <Text style={styles.cancelReviewText}>Cancelar</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
-                  <TextInput
-                    style={styles.reviewInput}
-                    placeholder="Comparte tu experiencia..."
-                    multiline
-                    numberOfLines={4}
-                    value={newReview.comment}
-                    onChangeText={text => setNewReview({ ...newReview, comment: text })}
-                  />
-                  <View style={styles.reviewFormButtons}>
-                    <TouchableOpacity style={styles.submitReviewButton} onPress={handleSubmitReview} disabled={submittingReview}>
-                      <Text style={styles.submitReviewText}>{submittingReview ? 'Enviando...' : 'Enviar reseña'}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity style={styles.cancelReviewButton} onPress={() => setShowReviewForm(false)}>
-                      <Text style={styles.cancelReviewText}>Cancelar</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              )}
+                )}
 
-              {totalReviews === 0 ? (
-                <View style={styles.emptyReviews}>
-                  <Ionicons name="star-outline" size={48} color="#cbd5e1" />
-                  <Text style={styles.emptyReviewsText}>No hay reseñas aún</Text>
-                  <Text style={styles.emptyReviewsSubtext}>¡Sé el primero en reseñar este modelo!</Text>
-                </View>
-              ) : (
-                <Text style={styles.comingSoonText}>Próximamente: lista de reseñas</Text>
-              )}
-            </View>
-          )}
+                {totalReviews === 0 && !showReviewForm ? (
+                  <View style={styles.emptyReviews}>
+                    <LinearGradient
+                      colors={['#f1f5f9', '#e2e8f0']}
+                      style={styles.emptyReviewsIcon}
+                    >
+                      <Ionicons name="star-outline" size={40} color="#94a3b8" />
+                    </LinearGradient>
+                    <Text style={styles.emptyReviewsText}>No hay reseñas aún</Text>
+                    <Text style={styles.emptyReviewsSubtext}>¡Sé el primero en reseñar este modelo!</Text>
+                  </View>
+                ) : null}
+              </View>
+            )}
+          </View>
         </View>
-      </View>
+      </ScrollView>
 
       {/* ========== MODALES ========== */}
       <Modal visible={showLicenseModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle}>Selecciona licencia</Text>
+            <LinearGradient
+              colors={['#4f46e5', '#7c3aed']}
+              style={styles.modalHeader}
+            >
+              <Ionicons name="cart-outline" size={32} color="#fff" />
+              <Text style={styles.modalTitle}>Selecciona tu licencia</Text>
+            </LinearGradient>
             {(['personal', 'business', 'unlimited'] as const).map(license => (
               <TouchableOpacity
                 key={license}
-                style={[styles.modalLicenseOption, selectedLicense === license && styles.modalLicenseSelected]}
+                style={[
+                  styles.modalLicenseOption,
+                  selectedLicense === license && styles.modalLicenseSelected
+                ]}
                 onPress={() => setSelectedLicense(license)}
               >
                 <View>
@@ -592,9 +704,16 @@ export default function ModelDetailScreen() {
       <Modal visible={showPurchaseModal} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <Ionicons name="cart-outline" size={48} color="#2563eb" style={{ textAlign: 'center', marginBottom: 16 }} />
-            <Text style={styles.modalTitle}>Necesitas comprar este modelo primero</Text>
-            <Text style={styles.modalText}>Para escribir una reseña, primero debes comprar este modelo.</Text>
+            <LinearGradient
+              colors={['#f59e0b', '#d97706']}
+              style={styles.modalHeader}
+            >
+              <Ionicons name="alert-circle-outline" size={32} color="#fff" />
+              <Text style={styles.modalTitle}>Compra requerida</Text>
+            </LinearGradient>
+            <Text style={styles.modalText}>
+              Para escribir una reseña, primero debes comprar este modelo.
+            </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity style={styles.modalCancel} onPress={() => setShowPurchaseModal(false)}>
                 <Text style={styles.modalCancelText}>Cancelar</Text>
@@ -606,95 +725,606 @@ export default function ModelDetailScreen() {
           </View>
         </View>
       </Modal>
-    </ScrollView>
+    </View>
   );
 }
 
 // ==================== ESTILOS ====================
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f9fafb' },
-  centered: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f9fafb' },
-  loadingText: { marginTop: 12, color: '#6b7280' },
-  errorText: { marginTop: 16, fontSize: 16, color: '#6b7280' },
-  backButton: { marginTop: 20, backgroundColor: '#2563eb', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 },
-  backButtonText: { color: 'white', fontWeight: 'bold' },
-  viewerContainer: { height: 350, backgroundColor: '#1e293b' },
-  webview: { flex: 1 },
-  placeholderViewer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f1f5f9' },
-  placeholderText: { marginTop: 12, color: '#94a3b8' },
-  infoContainer: { padding: 20 },
-  title: { fontSize: 28, fontWeight: 'bold', color: '#1e293b', marginBottom: 16 },
-  authorCard: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16, padding: 12, backgroundColor: '#f1f5f9', borderRadius: 16 },
-  authorAvatar: { width: 50, height: 50, borderRadius: 25 },
-  authorAvatarPlaceholder: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#2563eb', justifyContent: 'center', alignItems: 'center' },
-  authorAvatarText: { color: 'white', fontSize: 20, fontWeight: 'bold' },
-  authorInfo: { flex: 1 },
-  authorName: { fontWeight: '600', color: '#1e293b', fontSize: 16 },
-  authorBio: { fontSize: 12, color: '#64748b', marginTop: 2 },
-  categoryContainer: { marginBottom: 16 },
-  categoryText: { fontSize: 14, color: '#2563eb', backgroundColor: '#eff6ff', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20, alignSelf: 'flex-start' },
-  metrics: { flexDirection: 'row', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
-  metricItem: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#f1f5f9', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
-  metricText: { fontSize: 12, color: '#64748b' },
-  ratingContainer: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20, backgroundColor: '#f1f5f9', padding: 12, borderRadius: 16 },
-  ratingScore: { fontSize: 36, fontWeight: 'bold', color: '#2563eb' },
-  ratingStars: { flexDirection: 'row', gap: 4 },
-  ratingCount: { fontSize: 12, color: '#64748b', marginTop: 4 },
-  priceCard: { backgroundColor: '#eff6ff', borderRadius: 20, padding: 20, marginBottom: 20 },
-  priceHeader: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  priceLabel: { fontSize: 12, color: '#64748b', textTransform: 'uppercase' },
-  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  priceAmount: { fontSize: 28, fontWeight: 'bold', color: '#1e293b' },
-  priceNote: { fontSize: 11, color: '#94a3b8', marginTop: 8, textAlign: 'center' },
-  licenseSelector: { flexDirection: 'row', gap: 12, marginBottom: 20, flexWrap: 'wrap' },
-  licenseOption: { flex: 1, backgroundColor: 'white', borderWidth: 2, borderColor: '#e2e8f0', borderRadius: 16, padding: 12, alignItems: 'center' },
-  licenseSelected: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
-  licenseName: { fontWeight: '600', marginBottom: 4 },
-  licensePrice: { fontSize: 18, fontWeight: 'bold', color: '#2563eb', marginBottom: 2 },
-  licenseMultiplier: { fontSize: 10, color: '#94a3b8' },
-  actionButtons: { flexDirection: 'row', gap: 12, marginBottom: 24 },
-  buyButton: { flex: 1, backgroundColor: '#2563eb', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: 40, gap: 8 },
-  buyButtonText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-  cartButton: { flex: 1, backgroundColor: 'white', borderWidth: 2, borderColor: '#2563eb', paddingVertical: 14, borderRadius: 40, alignItems: 'center' },
-  cartButtonText: { color: '#2563eb', fontWeight: 'bold', fontSize: 16 },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#e2e8f0', marginBottom: 20 },
-  tab: { paddingVertical: 12, paddingHorizontal: 16, marginRight: 8 },
-  tabActive: { borderBottomWidth: 3, borderBottomColor: '#2563eb' },
-  tabText: { color: '#64748b', fontWeight: '500' },
-  tabTextActive: { color: '#2563eb', fontWeight: '600' },
-  tabContent: { backgroundColor: '#f8fafc', borderRadius: 20, padding: 20, marginBottom: 40 },
-  descriptionText: { color: '#334155', lineHeight: 24 },
-  featuresGrid: { gap: 12 },
-  featureItem: { flexDirection: 'row', alignItems: 'center', gap: 16, padding: 16, backgroundColor: 'white', borderRadius: 12, borderWidth: 1, borderColor: '#e2e8f0' },
-  featureLabel: { fontSize: 12, color: '#64748b' },
-  featureValue: { fontSize: 16, fontWeight: '600', color: '#1e293b' },
-  reviewButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12, borderRadius: 40, marginBottom: 20 },
-  reviewButtonText: { color: 'white', fontWeight: '600' },
-  reviewForm: { backgroundColor: 'white', borderRadius: 16, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#e2e8f0' },
-  reviewFormTitle: { fontWeight: 'bold', fontSize: 16, marginBottom: 12 },
-  ratingSelector: { flexDirection: 'row', gap: 8, marginBottom: 16, justifyContent: 'center' },
-  reviewInput: { borderWidth: 1, borderColor: '#e2e8f0', borderRadius: 12, padding: 12, minHeight: 100, textAlignVertical: 'top', marginBottom: 16 },
-  reviewFormButtons: { flexDirection: 'row', gap: 12 },
-  submitReviewButton: { flex: 1, backgroundColor: '#2563eb', paddingVertical: 12, borderRadius: 40, alignItems: 'center' },
-  submitReviewText: { color: 'white', fontWeight: '600' },
-  cancelReviewButton: { flex: 1, backgroundColor: 'white', borderWidth: 1, borderColor: '#e2e8f0', paddingVertical: 12, borderRadius: 40, alignItems: 'center' },
-  cancelReviewText: { color: '#64748b' },
-  emptyReviews: { alignItems: 'center', padding: 40 },
-  emptyReviewsText: { marginTop: 12, fontSize: 16, color: '#64748b' },
-  emptyReviewsSubtext: { fontSize: 12, color: '#94a3b8', marginTop: 4 },
-  comingSoonText: { textAlign: 'center', color: '#94a3b8', padding: 20 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
-  modalContainer: { backgroundColor: 'white', borderRadius: 24, padding: 20, width: '85%' },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', textAlign: 'center', marginBottom: 16 },
-  modalText: { textAlign: 'center', color: '#64748b', marginBottom: 20 },
-  modalLicenseOption: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 12, paddingHorizontal: 16, borderRadius: 12, marginBottom: 8, borderWidth: 1, borderColor: '#e2e8f0' },
-  modalLicenseSelected: { borderColor: '#2563eb', backgroundColor: '#eff6ff' },
-  modalLicenseName: { fontWeight: 'bold' },
-  modalLicenseDesc: { fontSize: 11, color: '#64748b', marginTop: 2 },
-  modalLicensePrice: { fontWeight: 'bold', color: '#2563eb' },
-  modalButtons: { flexDirection: 'row', gap: 12, marginTop: 16 },
-  modalCancel: { flex: 1, paddingVertical: 12, borderRadius: 40, borderWidth: 1, borderColor: '#e2e8f0', alignItems: 'center' },
-  modalCancelText: { color: '#64748b' },
-  modalConfirm: { flex: 1, backgroundColor: '#2563eb', paddingVertical: 12, borderRadius: 40, alignItems: 'center' },
-  modalConfirmText: { color: 'white', fontWeight: 'bold' },
+  container: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+  },
+  scrollView: {
+    flex: 1,
+  },
+  centered: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  loadingText: {
+    marginTop: 12,
+    color: '#6b7280',
+  },
+  errorText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#6b7280',
+  },
+  backButton: {
+    marginTop: 20,
+    backgroundColor: '#4f46e5',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  // 🔥 HEADER
+  customHeader: {
+    paddingTop: 50,
+    paddingBottom: 12,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  backButtonHeader: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+    textAlign: 'center',
+  },
+  headerPlaceholder: {
+    width: 40,
+  },
+  // 🔥 SEPARADOR ENTRE HEADER Y VISOR
+  headerSpacer: {
+    height: 12,
+    backgroundColor: '#f8fafc',
+  },
+  viewerContainer: {
+    height: 350,
+    backgroundColor: '#0f172a',
+    marginTop: 0,
+  },
+  webview: {
+    flex: 1,
+  },
+  placeholderViewer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    marginTop: 12,
+    color: '#64748b',
+  },
+  infoContainer: {
+    padding: 20,
+    position: 'relative',
+  },
+  floatingPrice: {
+    position: 'absolute',
+    top: -20,
+    right: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 25,
+    zIndex: 10,
+    shadowColor: '#4f46e5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  floatingPriceText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  authorCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 16,
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  authorAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+  },
+  authorAvatarPlaceholder: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  authorAvatarText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  authorInfo: {
+    flex: 1,
+  },
+  authorName: {
+    fontWeight: '600',
+    color: '#1e293b',
+    fontSize: 16,
+  },
+  authorBio: {
+    fontSize: 12,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  badgesContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+    flexWrap: 'wrap',
+  },
+  categoryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  categoryText: {
+    fontSize: 12,
+    color: '#4f46e5',
+    fontWeight: '500',
+  },
+  featuredBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  featuredText: {
+    fontSize: 12,
+    color: '#d97706',
+    fontWeight: '500',
+  },
+  metrics: {
+    flexDirection: 'row',
+    gap: 10,
+    marginBottom: 20,
+    flexWrap: 'wrap',
+  },
+  metricItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  metricText: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 24,
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  ratingScoreContainer: {
+    alignItems: 'center',
+  },
+  ratingScore: {
+    fontSize: 38,
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  ratingMax: {
+    fontSize: 12,
+    color: '#94a3b8',
+  },
+  ratingDetails: {
+    flex: 1,
+  },
+  ratingStars: {
+    flexDirection: 'row',
+    gap: 4,
+    marginBottom: 4,
+  },
+  ratingCount: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  licenseTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+    marginBottom: 12,
+  },
+  licenseSelector: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 24,
+  },
+  licenseOption: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#e2e8f0',
+    borderRadius: 16,
+    padding: 12,
+    alignItems: 'center',
+    position: 'relative',
+  },
+  licenseSelected: {
+    borderColor: '#4f46e5',
+    backgroundColor: '#e0e7ff',
+  },
+  licenseCheck: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#4f46e5',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  licenseIcon: {
+    fontSize: 28,
+    marginBottom: 6,
+  },
+  licenseName: {
+    fontWeight: '600',
+    marginBottom: 4,
+    fontSize: 12,
+  },
+  licenseNameSelected: {
+    color: '#4f46e5',
+  },
+  licensePrice: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1e293b',
+    marginBottom: 2,
+  },
+  licenseMultiplier: {
+    fontSize: 10,
+    color: '#94a3b8',
+  },
+  actionButtons: {
+    gap: 12,
+    marginBottom: 24,
+  },
+  buyButton: {
+    borderRadius: 40,
+    overflow: 'hidden',
+  },
+  buyButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+  },
+  buyButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  cartButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#fff',
+    borderWidth: 2,
+    borderColor: '#4f46e5',
+    paddingVertical: 14,
+    borderRadius: 40,
+  },
+  cartButtonText: {
+    color: '#4f46e5',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  tabs: {
+    flexDirection: 'row',
+    marginBottom: 20,
+  },
+  tab: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginRight: 8,
+    position: 'relative',
+  },
+  tabActive: {
+    borderBottomWidth: 0,
+  },
+  tabIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    left: 16,
+    right: 16,
+    height: 3,
+    backgroundColor: '#4f46e5',
+    borderRadius: 3,
+  },
+  tabText: {
+    color: '#64748b',
+    fontWeight: '500',
+  },
+  tabTextActive: {
+    color: '#4f46e5',
+    fontWeight: '600',
+  },
+  tabContent: {
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 40,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  descriptionText: {
+    color: '#334155',
+    lineHeight: 24,
+  },
+  featuresGrid: {
+    gap: 12,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    padding: 12,
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  featureIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureInfo: {
+    flex: 1,
+  },
+  featureLabel: {
+    fontSize: 12,
+    color: '#64748b',
+  },
+  featureValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1e293b',
+  },
+  reviewButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#4f46e5',
+    paddingVertical: 12,
+    borderRadius: 40,
+    marginBottom: 20,
+  },
+  reviewButtonDisabled: {
+    backgroundColor: '#94a3b8',
+  },
+  reviewButtonText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  reviewForm: {
+    backgroundColor: '#f8fafc',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  reviewFormTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginBottom: 12,
+    color: '#1e293b',
+  },
+  ratingSelector: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 16,
+    justifyContent: 'center',
+  },
+  reviewInput: {
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 12,
+    padding: 12,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    marginBottom: 16,
+    color: '#1e293b',
+  },
+  reviewFormButtons: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  submitReviewButton: {
+    flex: 1,
+    borderRadius: 40,
+    overflow: 'hidden',
+  },
+  submitButtonGradient: {
+    paddingVertical: 12,
+    alignItems: 'center',
+  },
+  submitReviewText: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  cancelReviewButton: {
+    flex: 1,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    paddingVertical: 12,
+    borderRadius: 40,
+    alignItems: 'center',
+  },
+  cancelReviewText: {
+    color: '#64748b',
+  },
+  emptyReviews: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  emptyReviewsIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emptyReviewsText: {
+    marginTop: 8,
+    fontSize: 16,
+    color: '#64748b',
+  },
+  emptyReviewsSubtext: {
+    fontSize: 12,
+    color: '#94a3b8',
+    marginTop: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 24,
+    overflow: 'hidden',
+    width: '85%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#fff',
+  },
+  modalText: {
+    textAlign: 'center',
+    color: '#64748b',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  modalLicenseOption: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  modalLicenseSelected: {
+    borderColor: '#4f46e5',
+    backgroundColor: '#e0e7ff',
+  },
+  modalLicenseName: {
+    fontWeight: 'bold',
+    color: '#1e293b',
+  },
+  modalLicenseDesc: {
+    fontSize: 11,
+    color: '#64748b',
+    marginTop: 2,
+  },
+  modalLicensePrice: {
+    fontWeight: 'bold',
+    color: '#4f46e5',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    padding: 20,
+    paddingTop: 0,
+  },
+  modalCancel: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 40,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#64748b',
+  },
+  modalConfirm: {
+    flex: 1,
+    backgroundColor: '#4f46e5',
+    paddingVertical: 12,
+    borderRadius: 40,
+    alignItems: 'center',
+  },
+  modalConfirmText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
 });

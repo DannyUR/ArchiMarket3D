@@ -2,7 +2,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 
 export default function TabLayout() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -10,41 +10,67 @@ export default function TabLayout() {
   if (isLoading) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#2563eb" />
+        <ActivityIndicator size="large" color="#4f46e5" />
       </View>
     );
   }
 
-  // Si no está autenticado, no mostrar las tabs (esto es solo por seguridad)
   if (!isAuthenticated) {
     return null;
   }
-
 
   return (
     <Tabs
       screenOptions={{
         headerShown: true,
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        // 🔥 HEADER TRANSPARENTE
+        headerTransparent: true,
+        headerStyle: {
+          backgroundColor: 'transparent',
+        },
+        headerTintColor: '#1f2937',
+        headerTitleStyle: {
+          fontWeight: '600',
+          fontSize: 18,
+        },
+        headerShadowVisible: false,
+        headerBackground: () => null,
+        // Estilos de la tab bar
+        tabBarActiveTintColor: '#4f46e5',
+        tabBarInactiveTintColor: '#9ca3af',
+        tabBarStyle: {
+          backgroundColor: '#ffffff',
+          borderTopWidth: 0,
+          elevation: 0,
+          shadowOpacity: 0,
+          height: Platform.OS === 'ios' ? 85 : 65,
+          paddingBottom: Platform.OS === 'ios' ? 25 : 10,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          fontWeight: '500',
+        },
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Inicio',
+          headerTitle: '',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
         }}
       />
-      {/* ✅ Cambiar de "explore" a "models" */}
       <Tabs.Screen
         name="models"
         options={{
           title: 'Modelos',
+          headerTitle: '',
+          headerTransparent: true,
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="search" size={size} color={color} />
+            <Ionicons name="grid-outline" size={size} color={color} />
           ),
         }}
       />
@@ -52,6 +78,7 @@ export default function TabLayout() {
         name="licenses"
         options={{
           title: 'Licencias',
+          headerTitle: '',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="document-text-outline" size={size} color={color} />
           ),
@@ -61,8 +88,9 @@ export default function TabLayout() {
         name="cart"
         options={{
           title: 'Carrito',
+          headerTitle: '',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="cart" size={size} color={color} />
+            <Ionicons name="cart-outline" size={size} color={color} />
           ),
         }}
       />
@@ -70,8 +98,9 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Perfil',
+          headerTitle: '',
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="person" size={size} color={color} />
+            <Ionicons name="person-outline" size={size} color={color} />
           ),
         }}
       />

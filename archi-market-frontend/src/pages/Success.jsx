@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { FiCheckCircle } from 'react-icons/fi';
 import { colors } from '../styles/theme';
 import { useCart } from '../context/CartContext';
+import API from '../services/api';
 
 const Success = () => {
     const navigate = useNavigate();
@@ -16,8 +17,25 @@ const Success = () => {
         // ✅ Ejecutar una SOLA VEZ cuando el componente se monta
         if (!hasCleared.current) {
             hasCleared.current = true;
-            clearCart();
-            console.log('✅ Carrito limpiado después del pago exitoso');
+
+            // Si recibimos shopping_id en la query, confirmar la compra en el backend
+            const confirmPurchase = async () => {
+                try {
+                    if (shoppingId) {
+                        console.log('🔁 Confirmando compra en backend, shopping_id:', shoppingId);
+                        const resp = await API.post('/shopping/confirm-purchase', { shopping_id: shoppingId });
+                        console.log('✅ Confirmación backend:', resp.data);
+                    }
+                } catch (err) {
+                    console.error('❌ Error confirmando la compra:', err.response?.data || err.message);
+                } finally {
+                    // Limpiar carrito local
+                    clearCart();
+                    console.log('✅ Carrito limpiado después del pago exitoso');
+                }
+            };
+
+            confirmPurchase();
         }
 
         // Redirigir a compras después de 3 segundos

@@ -11,7 +11,6 @@ const { width } = Dimensions.get('window');
 export default function LicensesScreen() {
     const [expandedFaq, setExpandedFaq] = useState<number | null>(null);
 
-    // Precio base de ejemplo
     const exampleBasePrice = 99.99;
 
     const multipliers = {
@@ -34,10 +33,8 @@ export default function LicensesScreen() {
                 'Actualizaciones por 1 año',
                 'Formatos: OBJ, FBX'
             ],
-            borderColor: '#3b82f6',
+            colors: ['#3b82f6', '#2563eb'],
             iconColor: '#3b82f6',
-            multiplierColor: '#3b82f6',
-            multiplierBg: '#3b82f610',
             multiplier: multipliers.personal,
             popular: false
         },
@@ -55,10 +52,8 @@ export default function LicensesScreen() {
                 'Todos los formatos',
                 'Modelos BIM incluidos'
             ],
-            borderColor: '#8b5cf6',
+            colors: ['#8b5cf6', '#7c3aed'],
             iconColor: '#8b5cf6',
-            multiplierColor: '#8b5cf6',
-            multiplierBg: '#8b5cf610',
             multiplier: multipliers.business,
             popular: true
         },
@@ -77,10 +72,8 @@ export default function LicensesScreen() {
                 'Modelos personalizados',
                 'API exclusiva'
             ],
-            borderColor: '#10b981',
+            colors: ['#10b981', '#059669'],
             iconColor: '#10b981',
-            multiplierColor: '#10b981',
-            multiplierBg: '#10b98110',
             multiplier: multipliers.unlimited,
             popular: false
         }
@@ -115,90 +108,92 @@ export default function LicensesScreen() {
 
     return (
         <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-            {/* Header - sin botón de regresar */}
+            {/* Header con gradiente */}
             <LinearGradient
-                colors={['#1e40af', '#3b82f6', '#60a5fa']}
+                colors={['#4f46e5', '#7c3aed', '#a855f7']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={styles.header}
             >
-                <Text style={styles.headerTitle}>Planes y Licencias</Text>
-                <Text style={styles.headerSubtitle}>
-                    Conoce las licencias disponibles para cada modelo
-                </Text>
+                <View style={styles.headerContent}>
+                    <Text style={styles.headerTitle}>Planes y Licencias</Text>
+                    <Text style={styles.headerSubtitle}>
+                        Elige la licencia que mejor se adapte a tus necesidades
+                    </Text>
+                </View>
             </LinearGradient>
 
             {/* Nota explicativa */}
-            <View style={styles.noteCard}>
-                <View style={styles.noteTitle}>
-                    <Ionicons name="flash-outline" size={20} color="#2563eb" />
-                    <Text style={styles.noteTitleText}>¿Cómo funcionan los precios?</Text>
+            <LinearGradient
+                colors={['#e0e7ff', '#c7d2fe']}
+                style={styles.noteCard}
+            >
+                <View style={styles.noteIcon}>
+                    <Ionicons name="flash" size={24} color="#4f46e5" />
                 </View>
+                <Text style={styles.noteTitle}>¿Cómo funcionan los precios?</Text>
                 <Text style={styles.noteText}>
                     Cada modelo 3D tiene su propio precio base. El costo final se calcula 
                     multiplicando ese precio base por el multiplicador de la licencia elegida.
                 </Text>
                 <View style={styles.noteExample}>
                     <Text style={styles.noteExampleText}>
-                        💡 Ejemplo: Un modelo de ${exampleBasePrice} MXN costaría:
+                        💡 Ejemplo: Un modelo de ${exampleBasePrice.toFixed(2)} MXN costaría:
                     </Text>
-                    <Text style={styles.noteExamplePrices}>
-                        Personal ${(exampleBasePrice * multipliers.personal).toFixed(2)} MXN · 
-                        Empresarial ${(exampleBasePrice * multipliers.business).toFixed(2)} MXN · 
-                        Ilimitada ${(exampleBasePrice * multipliers.unlimited).toFixed(2)} MXN
-                    </Text>
+                    <View style={styles.noteExamplePrices}>
+                        <View style={styles.noteExamplePrice}>
+                            <Text style={styles.noteExampleLabel}>Personal</Text>
+                            <Text style={styles.noteExampleValue}>${(exampleBasePrice * multipliers.personal).toFixed(2)}</Text>
+                        </View>
+                        <View style={styles.noteExamplePrice}>
+                            <Text style={styles.noteExampleLabel}>Empresarial</Text>
+                            <Text style={styles.noteExampleValue}>${(exampleBasePrice * multipliers.business).toFixed(2)}</Text>
+                        </View>
+                        <View style={styles.noteExamplePrice}>
+                            <Text style={styles.noteExampleLabel}>Ilimitada</Text>
+                            <Text style={styles.noteExampleValue}>${(exampleBasePrice * multipliers.unlimited).toFixed(2)}</Text>
+                        </View>
+                    </View>
                 </View>
-            </View>
+            </LinearGradient>
 
             {/* Grid de licencias */}
             <View style={styles.grid}>
                 {licenses.map((license) => (
-                    <View key={license.id}>
-                        <LinearGradient
-                            colors={['#fff', '#fff']}
-                            start={{ x: 0, y: 0 }}
-                            end={{ x: 1, y: 1 }}
-                            style={[
-                                styles.licenseCard,
-                                license.popular && styles.licenseCardPopular,
-                                { borderColor: license.borderColor }
-                            ]}
-                        >
-                            {license.popular && (
-                                <View style={[styles.popularBadge, { backgroundColor: license.borderColor }]}>
-                                    <Ionicons name="star" size={12} color="#fff" />
-                                    <Text style={styles.popularBadgeText}>MÁS POPULAR</Text>
-                                </View>
-                            )}
-
-                            <View style={styles.cardHeader}>
-                                <View style={[styles.iconWrapper, { backgroundColor: license.iconColor + '15' }]}>
-                                    <Ionicons name={license.icon as any} size={32} color={license.iconColor} />
-                                </View>
-                                <Text style={[styles.licenseName, license.popular && { color: license.borderColor }]}>
-                                    {license.name}
-                                </Text>
-                                <View style={styles.priceContainer}>
-                                    <Text style={[styles.licensePrice, { color: license.borderColor }]}>
-                                        ${license.price.toFixed(2)} MXN
-                                    </Text>
-                                    <Text style={styles.pricePeriod}>/modelo</Text>
-                                </View>
-                                <View style={[styles.multiplier, { backgroundColor: license.multiplierBg }]}>
-                                    <Text style={[styles.multiplierText, { color: license.multiplierColor }]}>
-                                        Multiplicador: {license.multiplier}x
-                                    </Text>
-                                </View>
-                                <Text style={styles.description}>{license.description}</Text>
+                    <View key={license.id} style={styles.licenseCardWrapper}>
+                        {license.popular && (
+                            <View style={[styles.popularBadge, { backgroundColor: license.colors[0] }]}>
+                                <Ionicons name="star" size={12} color="#fff" />
+                                <Text style={styles.popularBadgeText}>MÁS POPULAR</Text>
                             </View>
-
-                            <View style={styles.featuresList}>
-                                {license.features.map((feature, i) => (
-                                    <View key={i} style={styles.featureItem}>
-                                        <Ionicons name="checkmark-circle" size={18} color={license.iconColor} />
-                                        <Text style={styles.featureText}>{feature}</Text>
-                                    </View>
-                                ))}
+                        )}
+                        <LinearGradient
+                            colors={[license.colors[0], license.colors[1]]}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={styles.licenseCard}
+                        >
+                            <View style={styles.licenseContent}>
+                                <View style={styles.licenseIcon}>
+                                    <Ionicons name={license.icon as any} size={40} color="#fff" />
+                                </View>
+                                <Text style={styles.licenseName}>{license.name}</Text>
+                                <View style={styles.priceRow}>
+                                    <Text style={styles.licensePrice}>${license.price.toFixed(2)}</Text>
+                                    <Text style={styles.licensePeriod}>/modelo</Text>
+                                </View>
+                                <View style={styles.multiplierBadge}>
+                                    <Text style={styles.multiplierText}>Multiplicador {license.multiplier}x</Text>
+                                </View>
+                                <Text style={styles.licenseDescription}>{license.description}</Text>
+                                <View style={styles.featuresList}>
+                                    {license.features.map((feature, i) => (
+                                        <View key={i} style={styles.featureItem}>
+                                            <Ionicons name="checkmark-circle" size={18} color="#fff" />
+                                            <Text style={styles.featureText}>{feature}</Text>
+                                        </View>
+                                    ))}
+                                </View>
                             </View>
                         </LinearGradient>
                     </View>
@@ -207,30 +202,81 @@ export default function LicensesScreen() {
 
             {/* Tabla comparativa */}
             <View style={styles.comparisonSection}>
-                <Text style={styles.comparisonTitle}>Comparativa de precios</Text>
+                <LinearGradient
+                    colors={['#1e293b', '#0f172a']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.comparisonHeader}
+                >
+                    <Ionicons name="stats-chart" size={28} color="#fbbf24" />
+                    <Text style={styles.comparisonTitle}>Comparativa de precios</Text>
+                    <Text style={styles.comparisonSubtitle}>Ejemplos según el tipo de modelo</Text>
+                </LinearGradient>
+                
                 <View style={styles.comparisonGrid}>
                     <View style={styles.comparisonCard}>
+                        <View style={styles.comparisonCardIcon}>
+                            <Ionicons name="cube-outline" size={24} color="#3b82f6" />
+                        </View>
                         <Text style={styles.comparisonCardTitle}>Modelo Básico</Text>
                         <Text style={styles.comparisonPrice}>$19.99</Text>
-                        <Text style={styles.comparisonText}>Personal: $19.99</Text>
-                        <Text style={styles.comparisonText}>Empresarial: $49.97</Text>
-                        <Text style={styles.comparisonText}>Ilimitada: $99.95</Text>
+                        <View style={styles.comparisonDivider} />
+                        <View style={styles.comparisonRow}>
+                            <Text style={styles.comparisonLabel}>Personal</Text>
+                            <Text style={styles.comparisonValue}>$19.99</Text>
+                        </View>
+                        <View style={styles.comparisonRow}>
+                            <Text style={styles.comparisonLabel}>Empresarial</Text>
+                            <Text style={styles.comparisonValue}>$49.97</Text>
+                        </View>
+                        <View style={styles.comparisonRow}>
+                            <Text style={styles.comparisonLabel}>Ilimitada</Text>
+                            <Text style={styles.comparisonValue}>$99.95</Text>
+                        </View>
                         <Text style={styles.comparisonNote}>*Modelos simples de baja complejidad</Text>
                     </View>
+
                     <View style={styles.comparisonCard}>
+                        <View style={styles.comparisonCardIcon}>
+                            <Ionicons name="layers-outline" size={24} color="#8b5cf6" />
+                        </View>
                         <Text style={styles.comparisonCardTitle}>Modelo Estándar</Text>
                         <Text style={styles.comparisonPrice}>$49.99</Text>
-                        <Text style={styles.comparisonText}>Personal: $49.99</Text>
-                        <Text style={styles.comparisonText}>Empresarial: $124.97</Text>
-                        <Text style={styles.comparisonText}>Ilimitada: $249.95</Text>
+                        <View style={styles.comparisonDivider} />
+                        <View style={styles.comparisonRow}>
+                            <Text style={styles.comparisonLabel}>Personal</Text>
+                            <Text style={styles.comparisonValue}>$49.99</Text>
+                        </View>
+                        <View style={styles.comparisonRow}>
+                            <Text style={styles.comparisonLabel}>Empresarial</Text>
+                            <Text style={styles.comparisonValue}>$124.97</Text>
+                        </View>
+                        <View style={styles.comparisonRow}>
+                            <Text style={styles.comparisonLabel}>Ilimitada</Text>
+                            <Text style={styles.comparisonValue}>$249.95</Text>
+                        </View>
                         <Text style={styles.comparisonNote}>*Modelos de complejidad media</Text>
                     </View>
+
                     <View style={styles.comparisonCard}>
+                        <View style={styles.comparisonCardIcon}>
+                            <Ionicons name="diamond-outline" size={24} color="#10b981" />
+                        </View>
                         <Text style={styles.comparisonCardTitle}>Modelo Premium</Text>
                         <Text style={styles.comparisonPrice}>$99.99</Text>
-                        <Text style={styles.comparisonText}>Personal: $99.99</Text>
-                        <Text style={styles.comparisonText}>Empresarial: $249.97</Text>
-                        <Text style={styles.comparisonText}>Ilimitada: $499.95</Text>
+                        <View style={styles.comparisonDivider} />
+                        <View style={styles.comparisonRow}>
+                            <Text style={styles.comparisonLabel}>Personal</Text>
+                            <Text style={styles.comparisonValue}>$99.99</Text>
+                        </View>
+                        <View style={styles.comparisonRow}>
+                            <Text style={styles.comparisonLabel}>Empresarial</Text>
+                            <Text style={styles.comparisonValue}>$249.97</Text>
+                        </View>
+                        <View style={styles.comparisonRow}>
+                            <Text style={styles.comparisonLabel}>Ilimitada</Text>
+                            <Text style={styles.comparisonValue}>$499.95</Text>
+                        </View>
                         <Text style={styles.comparisonNote}>*Modelos complejos con detalles avanzados</Text>
                     </View>
                 </View>
@@ -238,10 +284,19 @@ export default function LicensesScreen() {
 
             {/* FAQ Section */}
             <View style={styles.faqSection}>
-                <View style={styles.faqTitle}>
-                    <Ionicons name="help-circle-outline" size={28} color="#2563eb" />
-                    <Text style={styles.faqTitleText}>Preguntas frecuentes</Text>
-                </View>
+                <LinearGradient
+                    colors={['#fff', '#f8fafc']}
+                    style={styles.faqHeader}
+                >
+                    <View style={styles.faqTitle}>
+                        <View style={styles.faqIconBg}>
+                            <Ionicons name="help-circle" size={28} color="#4f46e5" />
+                        </View>
+                        <Text style={styles.faqTitleText}>Preguntas frecuentes</Text>
+                    </View>
+                    <Text style={styles.faqSubtitle}>¿Tienes dudas? Aquí encontrarás respuestas</Text>
+                </LinearGradient>
+                
                 <View style={styles.faqGrid}>
                     {faqs.map((faq, index) => (
                         <TouchableOpacity
@@ -251,16 +306,20 @@ export default function LicensesScreen() {
                             onPress={() => setExpandedFaq(expandedFaq === index ? null : index)}
                         >
                             <View style={styles.faqQuestion}>
-                                <Ionicons name="help-circle-outline" size={20} color="#2563eb" />
+                                <View style={styles.faqQuestionIcon}>
+                                    <Ionicons name="help-circle-outline" size={20} color="#4f46e5" />
+                                </View>
                                 <Text style={styles.faqQuestionText}>{faq.question}</Text>
                                 <Ionicons 
                                     name={expandedFaq === index ? 'chevron-up' : 'chevron-down'} 
                                     size={20} 
-                                    color="#64748b" 
+                                    color="#94a3b8" 
                                 />
                             </View>
                             {expandedFaq === index && (
-                                <Text style={styles.faqAnswer}>{faq.answer}</Text>
+                                <View style={styles.faqAnswer}>
+                                    <Text style={styles.faqAnswerText}>{faq.answer}</Text>
+                                </View>
                             )}
                         </TouchableOpacity>
                     ))}
@@ -275,88 +334,95 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: '#f8fafc',
     },
+    // Header
     header: {
         paddingTop: 60,
         paddingBottom: 40,
         paddingHorizontal: 24,
         borderBottomLeftRadius: 32,
         borderBottomRightRadius: 32,
+    },
+    headerContent: {
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: '700',
-        color: 'white',
+        color: '#fff',
         marginBottom: 8,
     },
     headerSubtitle: {
         fontSize: 14,
-        color: 'rgba(255,255,255,0.8)',
+        color: 'rgba(255,255,255,0.85)',
         textAlign: 'center',
         lineHeight: 20,
     },
+    // Nota explicativa
     noteCard: {
-        backgroundColor: '#eff6ff',
-        borderRadius: 20,
-        padding: 20,
-        margin: 16,
-        borderWidth: 1,
-        borderColor: '#bfdbfe',
+        marginHorizontal: 16,
+    marginTop: 20,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 24,
     },
-    noteTitle: {
-        flexDirection: 'row',
+    noteIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#fff',
         alignItems: 'center',
-        gap: 8,
+        justifyContent: 'center',
         marginBottom: 12,
     },
-    noteTitleText: {
-        fontSize: 16,
-        fontWeight: '600',
-        color: '#1e40af',
+    noteTitle: {
+        fontSize: 18,
+        fontWeight: '700',
+        color: '#1e293b',
+        marginBottom: 8,
     },
     noteText: {
         fontSize: 14,
         color: '#475569',
         lineHeight: 20,
-        marginBottom: 12,
+        marginBottom: 16,
     },
     noteExample: {
-        backgroundColor: 'white',
-        borderRadius: 12,
-        padding: 12,
+        backgroundColor: '#fff',
+        borderRadius: 16,
+        padding: 16,
     },
     noteExampleText: {
-        fontSize: 12,
+        fontSize: 13,
+        color: '#64748b',
+        marginBottom: 12,
+    },
+    noteExamplePrices: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        gap: 12,
+    },
+    noteExamplePrice: {
+        flex: 1,
+        alignItems: 'center',
+    },
+    noteExampleLabel: {
+        fontSize: 11,
         color: '#64748b',
         marginBottom: 4,
     },
-    noteExamplePrices: {
-        fontSize: 13,
-        fontWeight: '500',
-        color: '#2563eb',
+    noteExampleValue: {
+        fontSize: 14,
+        fontWeight: '600',
+        color: '#4f46e5',
     },
+    // Grid de licencias
     grid: {
         padding: 16,
-        gap: 20,
+        gap: 24,
     },
-    licenseCard: {
-        backgroundColor: 'white',
-        borderRadius: 32,
-        padding: 20,
-        borderWidth: 2,
+    licenseCardWrapper: {
         position: 'relative',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
-        elevation: 3,
-    },
-    licenseCardPopular: {
-        shadowColor: '#8b5cf6',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.15,
-        shadowRadius: 20,
-        elevation: 6,
+        marginBottom: 8,
     },
     popularBadge: {
         position: 'absolute',
@@ -372,62 +438,76 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     popularBadgeText: {
-        color: 'white',
+        color: '#fff',
         fontSize: 11,
         fontWeight: '700',
         letterSpacing: 0.5,
     },
-    cardHeader: {
-        alignItems: 'center',
-        marginBottom: 20,
+    licenseCard: {
+        borderRadius: 28,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.15,
+        shadowRadius: 20,
+        elevation: 10,
     },
-    iconWrapper: {
-        width: 70,
-        height: 70,
-        borderRadius: 30,
+    licenseContent: {
+        padding: 24,
+        alignItems: 'center',
+    },
+    licenseIcon: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        backgroundColor: 'rgba(255,255,255,0.2)',
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 16,
     },
     licenseName: {
-        fontSize: 24,
+        fontSize: 26,
         fontWeight: '700',
-        color: '#1e293b',
+        color: '#fff',
         marginBottom: 12,
     },
-    priceContainer: {
+    priceRow: {
         flexDirection: 'row',
         alignItems: 'baseline',
         marginBottom: 8,
     },
     licensePrice: {
-        fontSize: 32,
+        fontSize: 36,
         fontWeight: '700',
+        color: '#fff',
     },
-    pricePeriod: {
+    licensePeriod: {
         fontSize: 14,
-        color: '#64748b',
+        color: 'rgba(255,255,255,0.7)',
         marginLeft: 4,
     },
-    multiplier: {
+    multiplierBadge: {
+        backgroundColor: 'rgba(255,255,255,0.2)',
         paddingHorizontal: 12,
         paddingVertical: 4,
-        borderRadius: 30,
+        borderRadius: 20,
         marginBottom: 12,
     },
     multiplierText: {
         fontSize: 12,
         fontWeight: '600',
+        color: '#fff',
     },
-    description: {
+    licenseDescription: {
         fontSize: 14,
-        color: '#64748b',
+        color: 'rgba(255,255,255,0.85)',
         textAlign: 'center',
         lineHeight: 20,
+        marginBottom: 20,
     },
     featuresList: {
+        width: '100%',
         gap: 12,
-        marginBottom: 8,
     },
     featureItem: {
         flexDirection: 'row',
@@ -435,93 +515,158 @@ const styles = StyleSheet.create({
         gap: 10,
     },
     featureText: {
-        fontSize: 14,
-        color: '#334155',
+        fontSize: 13,
+        color: '#fff',
         flex: 1,
     },
+    // Tabla comparativa
     comparisonSection: {
-        backgroundColor: '#f1f5f9',
         margin: 16,
         marginTop: 8,
-        padding: 20,
         borderRadius: 24,
+        overflow: 'hidden',
+        backgroundColor: '#fff',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 3,
+    },
+    comparisonHeader: {
+        padding: 20,
+        alignItems: 'center',
     },
     comparisonTitle: {
         fontSize: 20,
         fontWeight: '700',
-        color: '#1e293b',
-        textAlign: 'center',
-        marginBottom: 20,
+        color: '#fff',
+        marginTop: 8,
+    },
+    comparisonSubtitle: {
+        fontSize: 13,
+        color: 'rgba(255,255,255,0.7)',
+        marginTop: 4,
     },
     comparisonGrid: {
+        padding: 16,
         gap: 16,
     },
     comparisonCard: {
-        backgroundColor: 'white',
+        backgroundColor: '#f8fafc',
+        borderRadius: 20,
         padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
+    },
+    comparisonCardIcon: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
+        backgroundColor: '#e0e7ff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 12,
     },
     comparisonCardTitle: {
         fontSize: 16,
         fontWeight: '600',
         color: '#1e293b',
-        marginBottom: 12,
+        marginBottom: 4,
     },
     comparisonPrice: {
-        fontSize: 24,
+        fontSize: 28,
         fontWeight: '700',
-        color: '#2563eb',
+        color: '#1e293b',
         marginBottom: 12,
     },
-    comparisonText: {
+    comparisonDivider: {
+        height: 1,
+        backgroundColor: '#e2e8f0',
+        marginVertical: 12,
+    },
+    comparisonRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    comparisonLabel: {
         fontSize: 13,
-        color: '#475569',
-        marginBottom: 4,
+        color: '#64748b',
+    },
+    comparisonValue: {
+        fontSize: 13,
+        fontWeight: '500',
+        color: '#1e293b',
     },
     comparisonNote: {
         fontSize: 11,
         color: '#94a3b8',
-        marginTop: 8,
+        marginTop: 12,
         fontStyle: 'italic',
     },
+    // FAQ Section
     faqSection: {
-        backgroundColor: 'white',
         margin: 16,
         marginTop: 8,
         marginBottom: 32,
-        padding: 20,
+        backgroundColor: '#fff',
         borderRadius: 24,
-        borderWidth: 1,
-        borderColor: '#e2e8f0',
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 3,
     },
-    faqTitle: {
-        flexDirection: 'row',
+    faqHeader: {
+        padding: 20,
+        alignItems: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#e2e8f0',
+    },
+    faqIconBg: {
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#e0e7ff',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        marginBottom: 20,
+        marginBottom: 8,
+    },
+    faqTitle: {
+        alignItems: 'center',
     },
     faqTitleText: {
         fontSize: 20,
         fontWeight: '700',
         color: '#1e293b',
     },
+    faqSubtitle: {
+        fontSize: 13,
+        color: '#64748b',
+        marginTop: 4,
+    },
     faqGrid: {
+        padding: 16,
         gap: 12,
     },
     faqItem: {
         backgroundColor: '#f8fafc',
-        padding: 16,
         borderRadius: 16,
+        padding: 16,
         borderWidth: 1,
         borderColor: '#e2e8f0',
     },
     faqQuestion: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: 12,
+    },
+    faqQuestionIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#e0e7ff',
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     faqQuestionText: {
         flex: 1,
@@ -531,11 +676,13 @@ const styles = StyleSheet.create({
     },
     faqAnswer: {
         marginTop: 12,
-        fontSize: 14,
-        color: '#64748b',
-        lineHeight: 20,
         paddingTop: 12,
         borderTopWidth: 1,
         borderTopColor: '#e2e8f0',
+    },
+    faqAnswerText: {
+        fontSize: 14,
+        color: '#64748b',
+        lineHeight: 20,
     },
 });

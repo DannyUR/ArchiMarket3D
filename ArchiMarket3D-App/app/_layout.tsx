@@ -4,8 +4,15 @@ import { AuthProvider, useAuth } from '../context/AuthContext';
 import { CartProvider } from '../context/CartContext';
 import { SettingsProvider } from '../context/SettingsContext';
 import { useEffect, useRef } from 'react';
-import { View, ActivityIndicator } from 'react-native';
+import { View, ActivityIndicator, Platform } from 'react-native';
 import { GamificationProvider } from '../context/GamificationContext';
+
+// Solo importar deep links en móvil
+let setupDeepLinks = () => {};
+if (Platform.OS !== 'web') {
+  const deepLinking = require('./utils/deepLinking');
+  setupDeepLinks = deepLinking.setupDeepLinks;
+}
 
 // Componente que maneja la protección de rutas
 function RootLayoutNav() {
@@ -14,14 +21,23 @@ function RootLayoutNav() {
     const isRedirecting = useRef(false);
     const lastRedirectRef = useRef<string>('');
 
+    // Configurar deep links solo en móvil
+    useEffect(() => {
+        if (Platform.OS !== 'web') {
+            const cleanup = setupDeepLinks();
+            return cleanup;
+        }
+    }, []);
+
     useEffect(() => {
         if (isLoading) return;
         if (isRedirecting.current) return;
 
         const inAuthGroup = segments[0] === 'auth';
         const inTabsGroup = segments[0] === '(tabs)';
-
-        // ✅ Ya no hay index, la raíz es auth/login
+        
+        const publicRoutes = ['reset-password', 'forgot-password', 'email-verified'];
+        const isPublicRoute = publicRoutes.includes(segments[0]);
 
         const currentPath = segments.join('/');
 
@@ -30,16 +46,21 @@ function RootLayoutNav() {
             segments,
             inAuthGroup,
             inTabsGroup,
-            currentPath
+            isPublicRoute,
+            currentPath,
+            platform: Platform.OS
         });
 
-        // Evitar redirecciones en bucle
         if (lastRedirectRef.current === currentPath) {
             console.log('⚠️ Posible bucle de redirección detectado, evitando...');
             return;
         }
 
-        // ✅ Si NO está autenticado y NO está en auth, redirigir a login
+        if (isPublicRoute) {
+            console.log('📍 Ruta pública, acceso permitido');
+            return;
+        }
+
         if (!isAuthenticated && !inAuthGroup) {
             console.log('🚫 Usuario no autenticado, redirigiendo a login');
             isRedirecting.current = true;
@@ -51,7 +72,6 @@ function RootLayoutNav() {
             return;
         }
 
-        // ✅ Si está autenticado y está en auth, redirigir a tabs
         if (isAuthenticated && inAuthGroup) {
             console.log('✅ Usuario autenticado en auth, redirigiendo a tabs');
             isRedirecting.current = true;
@@ -75,22 +95,45 @@ function RootLayoutNav() {
 
     return (
         <Stack screenOptions={{ headerShown: false }}>
-            {/* ✅ ELIMINADO: <Stack.Screen name="index" /> */}
-
-            {/* Pantallas de autenticación */}
             <Stack.Screen name="auth" />
-
-            {/* Pantallas principales (protegidas) */}
+            <Stack.Screen 
+                name="reset-password" 
+                options={{
+                    headerShown: true,
+                    title: 'Restablecer Contraseña',
+                    headerStyle: { backgroundColor: '#1e40af' },
+                    headerTintColor: '#fff',
+                    headerBackTitle: 'Volver',
+                }}
+            />
+            <Stack.Screen 
+                name="forgot-password" 
+                options={{
+                    headerShown: true,
+                    title: 'Olvidé mi contraseña',
+                    headerStyle: { backgroundColor: '#1e40af' },
+                    headerTintColor: '#fff',
+                    headerBackTitle: 'Volver',
+                }}
+            />
+            <Stack.Screen 
+                name="email-verified" 
+                options={{
+                    headerShown: true,
+                    title: 'Verificar Email',
+                    headerStyle: { backgroundColor: '#1e40af' },
+                    headerTintColor: '#fff',
+                    headerBackTitle: 'Volver',
+                }}
+            />
             <Stack.Screen name="(tabs)" />
-
-            {/* Otras pantallas */}
             <Stack.Screen name="checkout" />
             <Stack.Screen
                 name="models/[id]"
                 options={{
                     title: 'Detalle del modelo',
                     headerBackTitle: 'Volver',
-                    headerShown: true,
+                    headerShown: false,
                     headerStyle: { backgroundColor: '#1e40af' },
                     headerTintColor: '#fff',
                 }}

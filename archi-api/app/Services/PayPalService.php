@@ -16,25 +16,30 @@ class PayPalService
         $this->mode = config('services.paypal.mode', 'sandbox');
         $this->clientId = config('services.paypal.client_id');
         $this->secret = config('services.paypal.secret');
+        
+        Log::info('PayPalService inicializado', [
+            'mode' => $this->mode,
+            'client_id_present' => !empty($this->clientId),
+            'secret_present' => !empty($this->secret)
+        ]);
     }
 
     /**
-     * Crear una orden de pago - Versión simplificada sin ItemList complicado
+     * Crear una orden de pago - Versión CORREGIDA
      */
     public function createOrder($shoppingId, $total, $items, $returnUrl, $cancelUrl, $metadata = [])
     {
         try {
-            \Log::info('📊 PARÁMETROS QUE ENVÍO A PAYPAL:', [
+            Log::info('=== CREAR ORDEN PAYPAL ===', [
                 'shopping_id' => $shoppingId,
                 'total' => $total,
-                'total_type' => gettype($total),
-                'items_count' => count($items),
-                'items' => $items,
-                'returnUrl' => $returnUrl,
-                'cancelUrl' => $cancelUrl
+                'items_count' => count($items)
             ]);
 
-            // Crear una orden PayPal SIMPLE sin usar el SDK problemático
+            // Calcular total correctamente si viene como string
+            $totalAmount = floatval($total);
+            
+            // Estructura CORRECTA para PayPal API v1
             $paymentData = [
                 'intent' => 'sale',
                 'payer' => [
@@ -43,11 +48,21 @@ class PayPalService
                 'transactions' => [
                     [
                         'amount' => [
-                            'total' => round($total, 2),
-                            'currency' => 'USD'
+                            'total' => number_format($totalAmount, 2, '.', ''),
+                            'currency' => 'USD',
+                            'details' => [
+                                'subtotal' => number_format($totalAmount, 2, '.', '')
+                            ]
                         ],
                         'description' => 'Compra en ArchiMarket3D - ' . count($items) . ' modelo(s)',
-                        'invoice_number' => $shoppingId . '-' . time()
+                        'invoice_number' => $shoppingId . '-' . time(),
+                        'custom' => json_encode([
+                            'shopping_id' => $shoppingId,
+                            'user_id' => auth()->id() ?? ($metadata['user_id'] ?? null)
+                        ]),
+                        'item_list' => [
+                            'items' => []
+                        ]
                     ]
                 ],
                 'redirect_urls' => [
@@ -55,33 +70,45 @@ class PayPalService
                     'cancel_url' => $cancelUrl
                 ]
             ];
+            
+            // Agregar items si hay
+            foreach ($items as $index => $item) {
+                $model = \App\Models\Model3D::find($item['model_id']);
+                $itemPrice = $this->calculateItemPrice($model->price, $item['license_type']);
+                
+                $paymentData['transactions'][0]['item_list']['items'][] = [
+                    'name' => $model->name,
+                    'sku' => 'MODEL-' . $item['model_id'],
+                    'price' => number_format($itemPrice, 2, '.', ''),
+                    'currency' => 'USD',
+                    'quantity' => $item['quantity'] ?? 1
+                ];
+            }
 
-            \Log::info('📤 JSON que se enviará a PayPal:', $paymentData);
+            Log::info('📤 Enviando a PayPal:', $paymentData);
 
-            // Hacer llamada directa a PayPal API con curl
+            // Hacer llamada a PayPal
             $response = $this->callPayPalAPI('/v1/payments/payment', $paymentData);
 
             if (!$response || !isset($response['id'])) {
+                Log::error('Respuesta inválida de PayPal', ['response' => $response]);
                 throw new Exception('No se recibió respuesta válida de PayPal');
             }
 
-            // Buscar el link de aprobación
+            // Buscar URL de aprobación
             $approvalUrl = null;
-            if (isset($response['links']) && is_array($response['links'])) {
-                foreach ($response['links'] as $link) {
-                    if (isset($link['rel']) && $link['rel'] === 'approval_url') {
-                        $approvalUrl = $link['href'];
-                        break;
-                    }
+            foreach ($response['links'] as $link) {
+                if ($link['rel'] === 'approval_url') {
+                    $approvalUrl = $link['href'];
+                    break;
                 }
             }
 
             if (!$approvalUrl) {
-                throw new Exception('No se encontró URL de aprobación en respuesta de PayPal');
+                throw new Exception('No se encontró URL de aprobación');
             }
 
-            \Log::info('✅ Orden PayPal creada', [
-                'shopping_id' => $shoppingId,
+            Log::info('✅ Orden PayPal creada', [
                 'payment_id' => $response['id'],
                 'approval_url' => $approvalUrl
             ]);
@@ -93,26 +120,39 @@ class PayPalService
             ];
 
         } catch (Exception $e) {
-            \Log::error('❌ Error creando orden PayPal: ' . $e->getMessage());
-            \Log::error($e->getTraceAsString());
+            Log::error('❌ Error en createOrder: ' . $e->getMessage());
+            Log::error($e->getTraceAsString());
             
             return [
                 'success' => false,
-                'message' => 'Error al crear la orden de pago',
-                'error' => $e->getMessage()
+                'message' => $e->getMessage()
             ];
         }
     }
 
     /**
-     * Llamada directa a PayPal API usando curl
+     * Calcular precio según tipo de licencia
+     */
+    private function calculateItemPrice($basePrice, $licenseType)
+    {
+        $multipliers = [
+            'personal' => 1.0,
+            'business' => 2.5,
+            'unlimited' => 5.0
+        ];
+        
+        $multiplier = $multipliers[$licenseType] ?? 1.0;
+        return round($basePrice * $multiplier, 2);
+    }
+
+    /**
+     * Llamada a PayPal API
      */
     private function callPayPalAPI($endpoint, $data)
     {
-        // Primero obtener access token
         $token = $this->getAccessToken();
         if (!$token) {
-            throw new Exception('No se pudo obtener token de acceso de PayPal');
+            throw new Exception('No se pudo obtener token de acceso');
         }
 
         $url = $this->getAPIURL() . $endpoint;
@@ -132,14 +172,14 @@ class PayPalService
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        \Log::info('PayPal API Response', [
+        Log::info('PayPal API Response', [
             'endpoint' => $endpoint,
             'http_code' => $httpCode,
             'response' => $response
         ]);
 
         if ($httpCode >= 400) {
-            \Log::error('PayPal API Error', [
+            Log::error('PayPal API Error', [
                 'code' => $httpCode,
                 'response' => $response
             ]);
@@ -150,7 +190,7 @@ class PayPalService
     }
 
     /**
-     * Obtener access token de PayPal
+     * Obtener Access Token
      */
     private function getAccessToken()
     {
@@ -161,7 +201,7 @@ class PayPalService
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
         curl_setopt($ch, CURLOPT_USERPWD, $this->clientId . ':' . $this->secret);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json', 'Accept-Language: en_US']);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Accept: application/json']);
         curl_setopt($ch, CURLOPT_POST, true);
         curl_setopt($ch, CURLOPT_POSTFIELDS, 'grant_type=client_credentials');
 
@@ -169,8 +209,11 @@ class PayPalService
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         curl_close($ch);
 
-        if ($httpCode != 200) {
-            \Log::error('PayPal OAuth Error', ['code' => $httpCode, 'response' => $response]);
+        if ($httpCode !== 200) {
+            Log::error('PayPal OAuth Error', [
+                'code' => $httpCode,
+                'response' => $response
+            ]);
             return null;
         }
 
@@ -179,7 +222,7 @@ class PayPalService
     }
 
     /**
-     * Obtener URL base según el modo
+     * Obtener URL base de PayPal
      */
     private function getAPIURL()
     {
@@ -190,11 +233,16 @@ class PayPalService
     }
 
     /**
-     * Ejecutar/capturar el pago
+     * Ejecutar/Capturar pago
      */
     public function executePayment($paymentId, $payerId)
     {
         try {
+            Log::info('=== EJECUTAR PAGO ===', [
+                'payment_id' => $paymentId,
+                'payer_id' => $payerId
+            ]);
+            
             $token = $this->getAccessToken();
             if (!$token) {
                 throw new Exception('No se pudo obtener token de acceso');
@@ -220,33 +268,85 @@ class PayPalService
 
             $result = json_decode($response, true);
 
-            \Log::info('✅ Pago ejecutado', [
-                'payment_id' => $paymentId,
-                'state' => $result['state'] ?? 'unknown'
+            if ($httpCode !== 200 && $httpCode !== 201) {
+                throw new Exception('Error ejecutando pago: ' . ($result['message'] ?? 'Unknown error'));
+            }
+
+            Log::info('✅ Pago ejecutado', [
+                'state' => $result['state'] ?? 'completed'
             ]);
 
             return [
                 'success' => true,
-                'payment' => $result,
-                'state' => $result['state'] ?? 'unknown'
+                'state' => $result['state'] ?? 'completed',
+                'payment' => $result
             ];
 
         } catch (Exception $e) {
-            \Log::error('❌ Error ejecutando pago: ' . $e->getMessage());
-
+            Log::error('❌ Error en executePayment: ' . $e->getMessage());
             return [
                 'success' => false,
-                'message' => 'Error al ejecutar el pago',
-                'error' => $e->getMessage()
+                'message' => $e->getMessage()
             ];
         }
     }
 
-    /**
-     * Verificar webhook
+        /**
+     * Capturar una orden de PayPal (para API v2 - usada por app móvil)
      */
-    public function verifyWebhook($headers, $body)
+    public function captureOrder($orderId)
     {
-        return true;
+        try {
+            \Log::info('=== CAPTURAR ORDEN PAYPAL ===', ['order_id' => $orderId]);
+            
+            $token = $this->getAccessToken();
+            if (!$token) {
+                throw new Exception('No se pudo obtener token de acceso');
+            }
+            
+            // Usar API v2 de PayPal
+            $url = $this->getAPIURL() . '/v2/checkout/orders/' . $orderId . '/capture';
+            
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_HTTPHEADER, [
+                'Content-Type: application/json',
+                'Authorization: Bearer ' . $token
+            ]);
+            curl_setopt($ch, CURLOPT_POST, true);
+            
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+            
+            $result = json_decode($response, true);
+            
+            \Log::info('Respuesta PayPal capture:', [
+                'http_code' => $httpCode,
+                'response' => $result
+            ]);
+            
+            if ($httpCode === 201 || $httpCode === 200) {
+                return [
+                    'success' => true,
+                    'capture_id' => $result['id'] ?? $orderId,
+                    'status' => $result['status'] ?? 'COMPLETED'
+                ];
+            }
+            
+            return [
+                'success' => false,
+                'message' => $result['message'] ?? 'Error capturando pago'
+            ];
+            
+        } catch (Exception $e) {
+            \Log::error('❌ Error en captureOrder: ' . $e->getMessage());
+            return [
+                'success' => false,
+                'message' => $e->getMessage()
+            ];
+        }
     }
 }
