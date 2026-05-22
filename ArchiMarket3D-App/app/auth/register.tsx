@@ -102,7 +102,7 @@ export default function RegisterScreen() {
               <Feather name="box" size={32} color="#4f46e5" />
             </View>
             <Text style={styles.logo}>
-              Archi<span style={styles.logoAccent}>Market</span>3D
+              Archi<Text style={styles.logoAccent}>Market</Text>3D
             </Text>
           </View>
 

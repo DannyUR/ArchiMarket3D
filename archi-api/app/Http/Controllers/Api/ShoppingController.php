@@ -685,7 +685,7 @@ class ShoppingController extends Controller
             DB::rollBack();
             \Log::error('❌ Error en executePayPalPayment: ' . $e->getMessage());
             
-            $errorUrl = 'http://localhost:8083/cart?error=' . urlencode($e->getMessage());
+            $errorUrl = 'http://localhost:8081/cart?error=' . urlencode($e->getMessage());
             return redirect()->to($errorUrl);
         }
     }
@@ -696,7 +696,7 @@ class ShoppingController extends Controller
     private function redirectAfterPayment($shoppingId, Request $request)
     {
         // Configuración de URLs
-        $expoWebUrl = 'http://192.168.1.20:8083'; // Cambia por tu IP
+        $expoWebUrl = 'http://192.168.1.20:8081'; // Cambia por tu IP
         $deepLink = 'archimarket3d://purchases/success?shopping_id=' . $shoppingId . '&payment_success=true';
         
         // Detectar plataforma por User-Agent

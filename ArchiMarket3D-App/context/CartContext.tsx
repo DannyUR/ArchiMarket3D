@@ -7,12 +7,12 @@ import { Alert, Platform } from 'react-native';
 import api from '../api/client';
 import { useAuth } from './AuthContext';
 
-// 🔥 CONFIGURACIÓN - CAMBIA ESTA IP POR LA TUYA
-// Ejecuta 'ipconfig' en Windows y busca "IPv4"
+// 🔥 CONFIGURACIÓN
 const LOCAL_IP = '192.168.1.20'; // ← CAMBIA A TU IP REAL
 const BACKEND_PORT = '8000';
+const REACT_WEB_PORT = '3000';    // Frontend React
+const EXPO_WEB_PORT = '8081';      // App Expo en web
 const APP_SCHEME = 'archimarket3d';
-const EXPO_WEB_PORT = '8083'; // Puerto de la app Expo en web
 
 export interface Model {
     id: number;
@@ -47,7 +47,6 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | undefined>(undefined);
 const STORAGE_KEY = '@archimarket_cart';
 
-// ✅ Hook personalizado
 export function useCart() {
     const context = useContext(CartContext);
     if (context === undefined) {
@@ -63,22 +62,64 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     const [cartLoaded, setCartLoaded] = useState(false);
     const { isAuthenticated } = useAuth();
 
-    // Detectar plataforma
-    const isMobileApp = Platform.OS !== 'web'; // iOS o Android real
-    const isExpoWeb = Platform.OS === 'web'; // Expo en navegador (puerto 8083)
+    // 🔥 DETECCIÓN DE ENTORNO (CORREGIDA)
+    const isRealMobileApp = Platform.OS !== 'web'; // APK real
+    const isWeb = Platform.OS === 'web';
     
-    // URLs según plataforma
-    const BACKEND_URL = `http://${LOCAL_IP}:${BACKEND_PORT}`;
-    const EXPO_WEB_URL = `http://${LOCAL_IP}:${EXPO_WEB_PORT}`;
+    // 🔥 Detectar tipo de web (React o Expo)
+    let webType: 'react' | 'expo' | 'unknown' = 'unknown';
+    let webPort = '';
+    
+    if (isWeb && typeof window !== 'undefined') {
+        webPort = window.location.port;
+        
+        if (webPort === REACT_WEB_PORT) {
+            webType = 'react';
+            console.log('🌐 Detectado: Frontend React (puerto 3000)');
+        } else if (webPort === EXPO_WEB_PORT) {
+            webType = 'expo';
+            console.log('📱 Detectado: App Expo Web (puerto 8081)');
+        } else {
+            webType = 'unknown';
+            console.log(`⚠️ Puerto desconocido: ${webPort}`);
+        }
+    }
+    
+    // 🔥 URLs según el entorno
+    let BACKEND_URL: string;
+    let FRONTEND_URL: string;
+    
+    if (isRealMobileApp) {
+        // APK real - usar IP y deep links
+        BACKEND_URL = `http://${LOCAL_IP}:${BACKEND_PORT}`;
+        FRONTEND_URL = `${APP_SCHEME}://`;
+        console.log(`📱 APK REAL - Backend: ${BACKEND_URL}`);
+    } else if (webType === 'react') {
+        // Frontend React (puerto 3000)
+        BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
+        FRONTEND_URL = `http://localhost:${REACT_WEB_PORT}`;
+        console.log(`🌐 REACT WEB - Backend: ${BACKEND_URL}`);
+    } else if (webType === 'expo') {
+        // App Expo Web (puerto 8081)
+        BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
+        FRONTEND_URL = `http://localhost:${EXPO_WEB_PORT}`;
+        console.log(`📱 EXPO WEB - Backend: ${BACKEND_URL}`);
+    } else {
+        // Fallback - usar localhost
+        BACKEND_URL = `http://localhost:${BACKEND_PORT}`;
+        FRONTEND_URL = `http://localhost:${webPort || EXPO_WEB_PORT}`;
+        console.log(`⚠️ FALLBACK - usando localhost:${webPort}`);
+    }
 
     useEffect(() => {
         loadCart();
         console.log('📱 ========== CART PROVIDER INICIALIZADO ==========');
-        console.log('📱 Plataforma:', Platform.OS);
-        console.log('📱 isMobileApp:', isMobileApp);
-        console.log('📱 isExpoWeb:', isExpoWeb);
+        console.log('📱 Platform:', Platform.OS);
+        console.log('📱 isRealMobileApp:', isRealMobileApp);
+        console.log('📱 webType:', webType);
+        console.log('📱 webPort:', webPort);
         console.log('🌐 Backend URL:', BACKEND_URL);
-        console.log('🌐 Expo Web URL:', EXPO_WEB_URL);
+        console.log('🌐 Frontend URL:', FRONTEND_URL);
         console.log('==================================================');
     }, []);
 
@@ -195,9 +236,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 
             console.log('🛒 ========== INICIANDO CHECKOUT ==========');
             console.log('📦 Items en carrito:', cartItems.length);
-            console.log('📱 Plataforma:', Platform.OS);
-            console.log('📱 isMobileApp:', isMobileApp);
-            console.log('📱 isExpoWeb:', isExpoWeb);
+            console.log('📱 isRealMobileApp:', isRealMobileApp);
+            console.log('📱 webType:', webType);
 
             if (!isAuthenticated) {
                 Alert.alert(
@@ -221,26 +261,36 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 license_type: item.license
             }));
 
-            // 🔥 DETERMINAR return_url SEGÚN LA PLATAFORMA
-            let returnUrl;
-            let cancelUrl = `${APP_SCHEME}://checkout`;
+            // 🔥 DETERMINAR URLs SEGÚN EL ENTORNO
+            let returnUrl: string;
+            let cancelUrl: string;
 
-            if (isMobileApp) {
-                // App móvil REAL - PayPal redirige a deep link directamente
+            if (isRealMobileApp) {
+                // APK REAL - deep link directo
                 returnUrl = `${APP_SCHEME}://purchases/success`;
-                console.log('📱 Usando deep link para app móvil:', returnUrl);
-            } else {
-                // Web (Expo) - PayPal redirige al backend, luego backend redirige a web
+                cancelUrl = `${APP_SCHEME}://checkout`;
+                console.log('📱 APK REAL - usando deep links');
+            } else if (webType === 'react') {
+                // Frontend React (puerto 3000) - redirigir al backend
                 returnUrl = `${BACKEND_URL}/api/shopping/execute-paypal-payment`;
-                cancelUrl = `${EXPO_WEB_URL}/checkout`;
-                console.log('🌐 Usando callback para web:', returnUrl);
+                cancelUrl = `${FRONTEND_URL}/checkout`;
+                console.log('🌐 REACT WEB - usando callback');
+            } else if (webType === 'expo') {
+                // App Expo Web (puerto 8081) - redirigir al backend
+                returnUrl = `${BACKEND_URL}/api/shopping/execute-paypal-payment`;
+                cancelUrl = `${FRONTEND_URL}/checkout`;
+                console.log('📱 EXPO WEB - usando callback');
+            } else {
+                // Fallback
+                returnUrl = `${BACKEND_URL}/api/shopping/execute-paypal-payment`;
+                cancelUrl = `${FRONTEND_URL}/checkout`;
+                console.log('⚠️ FALLBACK - usando URLs por defecto');
             }
 
             console.log('📤 Enviando a PayPal:', { items });
             console.log('🔗 Return URL:', returnUrl);
             console.log('❌ Cancel URL:', cancelUrl);
 
-            // Crear orden en PayPal
             const response = await api.post('/shopping/create-paypal-order', { 
                 items,
                 return_url: returnUrl,
@@ -257,7 +307,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
                 if (canOpen) {
                     await Linking.openURL(response.data.approval_url);
                 } else {
-                    Alert.alert('Error', 'No se pudo abrir PayPal. Asegúrate de tener la app de PayPal instalada o usa el navegador.');
+                    Alert.alert('Error', 'No se pudo abrir PayPal');
                 }
             } else {
                 throw new Error(response.data.message || 'Error al crear la orden');

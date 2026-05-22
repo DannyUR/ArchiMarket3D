@@ -25,6 +25,7 @@ export default function LoginScreen() {
             await login(email, password);
             console.log('✅ Login exitoso, el usuario debería estar autenticado');
         } catch (error: any) {
+            console.log('🔥 ERROR COMPLETO:', JSON.stringify(error, null, 2));
             console.log('❌ Login fallido:', error);
             let errorMessage = 'Credenciales incorrectas';
             
@@ -53,7 +54,7 @@ export default function LoginScreen() {
                             <Feather name="box" size={32} color="#4f46e5" />
                         </View>
                         <Text style={styles.logo}>
-                            Archi<span style={styles.logoAccent}>Market</span>3D
+                            Archi<Text style={styles.logoAccent}>Market</Text>3D
                         </Text>
                     </View>
 

@@ -91,47 +91,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const login = async (email: string, password: string) => {
         try {
             setIsLoading(true);
-            console.log('📡 Enviando login request...');
 
-            const response = await api.post('/auth/login', { email, password });
+            console.log('🔥 INTENTANDO LOGIN A:');
+            console.log('http://192.168.1.20:8000/api/auth/login');
 
-            console.log('📥 Respuesta completa:', JSON.stringify(response.data, null, 2));
+            const response = await fetch('http://192.168.1.20:8000/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    email,
+                    password
+                })
+            });
 
-            // ✅ Extraer datos correctamente (adaptado a la respuesta del backend)
-            let newToken, userData;
+            console.log('🔥 STATUS:', response.status);
 
-            if (response.data.data) {
-                // Formato: { success: true, data: { token, user } }
-                newToken = response.data.data.token;
-                userData = response.data.data.user;
-            } else if (response.data.token) {
-                // Formato directo
-                newToken = response.data.token;
-                userData = response.data.user;
-            } else {
-                throw new Error('Formato de respuesta inválido');
+            const data = await response.json();
+
+            console.log('🔥 RESPONSE DATA:', data);
+
+            if (!response.ok) {
+                throw new Error(data.message || 'Error en login');
             }
 
-            console.log('✅ Token obtenido:', newToken ? 'Sí' : 'No');
-            console.log('✅ Usuario obtenido:', userData);
+            let newToken;
+            let userData;
 
-            // Guardar en storage
+            if (data.data) {
+                newToken = data.data.token;
+                userData = data.data.user;
+            } else if (data.token) {
+                newToken = data.token;
+                userData = data.user;
+            } else {
+                throw new Error('Formato inválido');
+            }
+
+            console.log('✅ LOGIN EXITOSO');
+
             await AsyncStorage.setItem('@auth_token', newToken);
             await AsyncStorage.setItem('@user_data', JSON.stringify(userData));
 
-            // Actualizar estado
             setToken(newToken);
             setUser(userData);
-            api.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
 
-            console.log('✅ Login exitoso, redirigiendo a home...');
-
-            // Redirigir manualmente
             router.replace('/(tabs)');
 
         } catch (error: any) {
             console.error('❌ Login error:', error);
-            console.error('Detalles:', error.response?.data);
             throw error;
         } finally {
             setIsLoading(false);

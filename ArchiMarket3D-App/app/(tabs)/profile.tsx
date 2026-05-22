@@ -1,4 +1,3 @@
-// app/(tabs)/profile.tsx
 import {
     View, Text, ScrollView, TouchableOpacity, TextInput,
     ActivityIndicator, Alert, StyleSheet, Switch, RefreshControl,
@@ -521,7 +520,7 @@ export default function ProfileScreen() {
                     {activeTab === 'profile' && (
                         <View style={styles.section}>
                             {!editMode ? (
-                                <>
+                                <View>
                                     <View style={styles.infoCard}>
                                         <LinearGradient colors={['#e0e7ff', '#c7d2fe']} style={styles.infoCardGradient}>
                                             <View style={styles.infoCardHeader}>
@@ -585,11 +584,14 @@ export default function ProfileScreen() {
                                             <Ionicons name="arrow-forward" size={16} color="#fff" />
                                         </LinearGradient>
                                     </TouchableOpacity>
-                                </>
+                                </View>
                             ) : (
                                 <View style={styles.editForm}>
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Nombre completo <Text style={styles.required}>*</Text></Text>
+                                        <View style={styles.row}>
+                                            <Text style={styles.label}>Nombre completo </Text>
+                                            <Text style={styles.required}>*</Text>
+                                        </View>
                                         <TextInput
                                             style={styles.input}
                                             value={formData.name}
@@ -610,7 +612,10 @@ export default function ProfileScreen() {
                                     </View>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Teléfono <Text style={styles.optional}>(Opcional)</Text></Text>
+                                        <View style={styles.row}>
+                                            <Text style={styles.label}>Teléfono </Text>
+                                            <Text style={styles.optional}>(Opcional)</Text>
+                                        </View>
                                         <TextInput
                                             style={styles.input}
                                             value={formData.phone}
@@ -621,7 +626,10 @@ export default function ProfileScreen() {
                                     </View>
 
                                     <View style={styles.inputGroup}>
-                                        <Text style={styles.label}>Empresa <Text style={styles.optional}>(Opcional)</Text></Text>
+                                        <View style={styles.row}>
+                                            <Text style={styles.label}>Empresa </Text>
+                                            <Text style={styles.optional}>(Opcional)</Text>
+                                        </View>
                                         <TextInput
                                             style={styles.input}
                                             value={formData.company}
@@ -660,10 +668,10 @@ export default function ProfileScreen() {
                                                 {loading ? (
                                                     <ActivityIndicator color="#fff" size="small" />
                                                 ) : (
-                                                    <>
+                                                    <View style={styles.row}>
                                                         <Text style={styles.saveButtonText}>Guardar cambios</Text>
                                                         <Ionicons name="checkmark" size={18} color="#fff" />
-                                                    </>
+                                                    </View>
                                                 )}
                                             </LinearGradient>
                                         </TouchableOpacity>
@@ -791,7 +799,7 @@ export default function ProfileScreen() {
                                     </TouchableOpacity>
                                 </View>
                             ) : (
-                                <>
+                                <View>
                                     <View style={styles.statsGrid}>
                                         <View style={styles.statCardSimple}>
                                             <Ionicons name="cash" size={24} color="#4f46e5" />
@@ -876,7 +884,7 @@ export default function ProfileScreen() {
                                             </TouchableOpacity>
                                         ))}
                                     </View>
-                                </>
+                                </View>
                             )}
                         </View>
                     )}
@@ -994,9 +1002,10 @@ export default function ProfileScreen() {
                     {activeTab === 'achievements' && (
                         <View style={styles.section}>
                             <View style={styles.achievementsHeader}>
-                                <Text style={styles.sectionTitle}>
-                                    <Ionicons name="trophy" size={20} color="#4f46e5" /> Mis Logros
-                                </Text>
+                                <View style={styles.row}>
+                                    <Ionicons name="trophy" size={20} color="#4f46e5" />
+                                    <Text style={styles.sectionTitle}> Mis Logros</Text>
+                                </View>
                                 <LinearGradient colors={['#4f46e5', '#7c3aed']} style={styles.achievementsCountBadge}>
                                     <Text style={styles.achievementsCount}>{unlockedAchievements.length}/{totalAchievements}</Text>
                                 </LinearGradient>
@@ -1016,7 +1025,7 @@ export default function ProfileScreen() {
                                     <Text style={styles.emptyText}>Completa compras y escribe reseñas para desbloquear logros</Text>
                                 </View>
                             ) : (
-                                <>
+                                <View>
                                     <LevelProgressBar
                                         level={gamification.level}
                                         levelIcon={gamification.level_icon}
@@ -1059,14 +1068,14 @@ export default function ProfileScreen() {
                                         <Text style={styles.nextLevelText}>Nivel {gamification.level + 1}</Text>
                                         <Text style={styles.nextLevelXp}>{Math.ceil(gamification.xp_next_level - gamification.xp)} XP para subir</Text>
                                     </View>
-                                </>
+                                </View>
                             )}
                         </View>
                     )}
                 </View>
             </ScrollView>
 
-            {/* MODALES (sin cambios) */}
+            {/* MODALES */}
             {/* Modal de detalle de compra */}
             <Modal visible={modalVisible} animationType="slide" transparent={true} onRequestClose={() => setModalVisible(false)}>
                 <View style={styles.modalOverlay}>
@@ -1116,8 +1125,8 @@ export default function ProfileScreen() {
                                         <View key={model.id} style={styles.modalModelItem}>
                                             <View style={styles.modalModelInfo}>
                                                 <Text style={styles.modalModelName}>{model.name}</Text>
-                                                <Text style={styles.modalModelMeta}>
-                                                    {model.format} • {model.size_mb} MB • {getLicenseTypeLabel(model.pivot?.license_type)}
+                                                <Text>
+                                                    {`${model.format} • ${model.size_mb} MB • ${getLicenseTypeLabel(model.pivot?.license_type)}`}
                                                 </Text>
                                             </View>
                                             <View style={styles.modalModelPrice}>
@@ -1165,7 +1174,7 @@ export default function ProfileScreen() {
                                 <Text style={styles.loadingText}>Cargando formatos...</Text>
                             </View>
                         ) : downloadInfo?.is_downloadable && downloadInfo.available_formats?.length > 0 ? (
-                            <>
+                            <View>
                                 {selectedModel && (
                                     <View style={styles.modelInfoCard}>
                                         <Text style={styles.modelInfoName}>{selectedModel.name}</Text>
@@ -1201,7 +1210,7 @@ export default function ProfileScreen() {
                                         );
                                     })}
                                 </ScrollView>
-                            </>
+                            </View>
                         ) : (
                             <View style={styles.emptyFormats}>
                                 <Ionicons name="alert-circle-outline" size={48} color="#cbd5e1" />
@@ -1222,10 +1231,10 @@ export default function ProfileScreen() {
                                     {isDownloading ? (
                                         <ActivityIndicator size="small" color="#fff" />
                                     ) : (
-                                        <>
+                                        <View style={styles.row}>
                                             <Ionicons name="download" size={18} color="#fff" />
                                             <Text style={styles.downloadFooterButtonText}>Descargar</Text>
-                                        </>
+                                        </View>
                                     )}
                                 </LinearGradient>
                             </TouchableOpacity>
@@ -1295,6 +1304,8 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
+    row: { flexDirection: 'row', alignItems: 'center' },
+    tabActive: {},
     container: { flex: 1, backgroundColor: '#f8fafc' },
     // Header
     header: { paddingTop: 60, paddingBottom: 40, borderBottomLeftRadius: 32, borderBottomRightRadius: 32 },

@@ -10,7 +10,7 @@ import { GamificationProvider } from '../context/GamificationContext';
 // Solo importar deep links en móvil
 let setupDeepLinks = () => {};
 if (Platform.OS !== 'web') {
-  const deepLinking = require('./utils/deepLinking');
+  const deepLinking = require('../src/utils/deepLinking');
   setupDeepLinks = deepLinking.setupDeepLinks;
 }
 
